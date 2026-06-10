@@ -89,6 +89,48 @@ def test_chat_unavailable_model_errors(fake_root):
     assert "not found on disk" in evs[0]["message"]
 
 
+def test_chat_load_failure_unloads_and_errors(fake_root):
+    def bad_loader(path):
+        raise RuntimeError("no metal")
+
+    a = app_module.create_app(loader=bad_loader, stream_fn=fake_stream)
+    client = TestClient(a)
+    with client.stream("POST", "/api/chat", json={
+        "model_id": "qwen-dpo",
+        "messages": [{"role": "user", "content": "hi"}],
+    }) as r:
+        evs = events(r)
+    assert evs[-1]["type"] == "error"
+    assert "load failed" in evs[-1]["message"]
+    assert "no metal" in evs[-1]["message"]
+    assert a.state.manager.current_id is None
+
+
+def test_chat_already_loaded_skips_load_events(fake_root):
+    client, a = make_client()
+    body = {"model_id": "qwen-dpo", "messages": [{"role": "user", "content": "hi"}]}
+    with client.stream("POST", "/api/chat", json=body) as r:
+        list(r.iter_lines())
+    with client.stream("POST", "/api/chat", json=body) as r:
+        evs = events(r)
+    assert not any(e["type"] == "load" for e in evs)
+    assert any(e["type"] == "token" for e in evs)
+    stats = [e for e in evs if e["type"] == "stats"][0]
+    assert stats["load_seconds"] == 0.0
+
+
+def test_chat_first_load_event_is_prompt_heartbeat_or_ready(fake_root):
+    client, _ = make_client()
+    with client.stream("POST", "/api/chat", json={
+        "model_id": "gemma-dpo",
+        "messages": [{"role": "user", "content": "hi"}],
+    }) as r:
+        evs = events(r)
+    load_evs = [e for e in evs if e["type"] == "load"]
+    assert load_evs, "expected load events on cold start"
+    assert load_evs[-1]["status"] == "ready"
+
+
 def test_chat_generation_exception_becomes_error_event(fake_root):
     def boom(model, tokenizer, messages, temperature, top_p, max_tokens):
         yield "par", 1, 5.0

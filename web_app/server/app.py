@@ -1,4 +1,5 @@
 import asyncio
+import threading
 import time
 
 from fastapi import FastAPI
@@ -55,6 +56,7 @@ def create_app(loader=None, stream_fn=None) -> FastAPI:
         """Load model in executor; heartbeat 'loading' events each second."""
         loop = asyncio.get_running_loop()
         fut = loop.run_in_executor(None, mgr.load_sync, model_id, str(path))
+        fut.add_done_callback(lambda f: f.cancelled() or f.exception())
         t0 = time.monotonic()
         while not fut.done():
             yield sse({"type": "load", "status": "loading", "model_id": model_id,
@@ -82,10 +84,12 @@ def create_app(loader=None, stream_fn=None) -> FastAPI:
                 return
 
             async with mgr.lock:
+                load_secs = 0.0
                 try:
                     if mgr.current_id != req.model_id:
                         async for ev in load_events(mgr, req.model_id, config.model_path(m)):
                             yield ev
+                        load_secs = mgr.load_seconds
                 except Exception as e:
                     mgr.unload()
                     yield sse({"type": "error", "message": f"load failed: {e}"})
@@ -94,12 +98,15 @@ def create_app(loader=None, stream_fn=None) -> FastAPI:
                 loop = asyncio.get_running_loop()
                 q: asyncio.Queue = asyncio.Queue()
                 msgs = [mm.model_dump() for mm in req.messages]
+                stop = threading.Event()
 
                 def worker():
                     try:
                         for text, ntok, tps in stream_fn(mgr.model, mgr.tokenizer, msgs,
                                                          req.temperature, req.top_p,
                                                          req.max_tokens):
+                            if stop.is_set():
+                                break
                             loop.call_soon_threadsafe(q.put_nowait, ("token", text, ntok, tps))
                         loop.call_soon_threadsafe(q.put_nowait, ("end", None, None, None))
                     except Exception as e:  # surfaced as SSE error event
@@ -108,23 +115,26 @@ def create_app(loader=None, stream_fn=None) -> FastAPI:
                 loop.run_in_executor(None, worker)
                 t0 = time.monotonic()
                 full, gen_tokens, tps = "", 0, 0.0
-                while True:
-                    kind, text, ntok, ntps = await q.get()
-                    if kind == "token":
-                        full += text
-                        gen_tokens, tps = ntok, ntps
-                        yield sse({"type": "token", "text": text})
-                    elif kind == "error":
-                        yield sse({"type": "error", "message": text})
-                        return
-                    else:
-                        break
-                stats = {"type": "stats", "model_id": req.model_id,
-                         "gen_tokens": gen_tokens, "tps": tps,
-                         "seconds": round(time.monotonic() - t0, 1),
-                         "load_seconds": mgr.load_seconds}
-                yield sse(stats)
-                yield sse({"type": "done"})
+                try:
+                    while True:
+                        kind, text, ntok, ntps = await q.get()
+                        if kind == "token":
+                            full += text
+                            gen_tokens, tps = ntok, ntps
+                            yield sse({"type": "token", "text": text})
+                        elif kind == "error":
+                            yield sse({"type": "error", "message": text})
+                            return
+                        else:
+                            break
+                    stats = {"type": "stats", "model_id": req.model_id,
+                             "gen_tokens": gen_tokens, "tps": tps,
+                             "seconds": round(time.monotonic() - t0, 1),
+                             "load_seconds": load_secs}
+                    yield sse(stats)
+                    yield sse({"type": "done"})
+                finally:
+                    stop.set()
 
         return StreamingResponse(gen(), media_type="text/event-stream")
 
