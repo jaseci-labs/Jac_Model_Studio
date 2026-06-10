@@ -1,0 +1,186 @@
+/* DataGen dashboard — glassmorphic monochrome design system.
+   Black & white only; the sole color lives in the chart strokes. */
+
+:global(*) { box-sizing: border-box; }
+:global(html), :global(body) { margin: 0; padding: 0; }
+:global(body) {
+  background: #060608;
+  color: #fafafa;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+:global(::selection) { background: rgba(255, 255, 255, 0.18); }
+
+/* thin monochrome scrollbars */
+:global(::-webkit-scrollbar) { width: 10px; height: 10px; }
+:global(::-webkit-scrollbar-thumb) { background: rgba(255, 255, 255, 0.12); border-radius: 8px; }
+:global(::-webkit-scrollbar-thumb:hover) { background: rgba(255, 255, 255, 0.2); }
+:global(::-webkit-scrollbar-track) { background: transparent; }
+
+.dg-app {
+  min-height: 100vh;
+  /* faint monochrome blobs give the glass something to refract */
+  background:
+    radial-gradient(900px 500px at 12% -8%, rgba(255, 255, 255, 0.06), transparent 60%),
+    radial-gradient(1100px 600px at 110% 0%, rgba(255, 255, 255, 0.045), transparent 55%),
+    radial-gradient(700px 700px at 50% 120%, rgba(255, 255, 255, 0.03), transparent 60%),
+    #060608;
+}
+
+/* ---- nav ---- */
+.dg-nav {
+  position: sticky; top: 0; z-index: 50;
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.85rem 1.4rem;
+  background: rgba(10, 10, 14, 0.55);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.dg-brand {
+  font-size: 0.82rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+  color: #fff; margin-right: 1.2rem;
+  display: inline-flex; align-items: center; gap: 0.55rem;
+}
+.dg-brand-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #fff; box-shadow: 0 0 10px rgba(255, 255, 255, 0.7);
+}
+.dg-navlink {
+  text-decoration: none; color: #8b8b96;
+  font-size: 0.84rem; font-weight: 500;
+  padding: 0.35rem 0.8rem; border-radius: 8px;
+  border: 1px solid transparent;
+  transition: color .15s, background .15s, border-color .15s;
+}
+.dg-navlink:hover { color: #e6e6ee; background: rgba(255, 255, 255, 0.05); }
+.dg-navlink.dg-active {
+  color: #fff; background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+.dg-spacer { flex: 1; }
+
+/* ---- page ---- */
+.dg-page { padding: 1.5rem 1.6rem; max-width: 1180px; margin: 0 auto; }
+.dg-row { display: flex; gap: 0.7rem; align-items: center; flex-wrap: wrap; }
+.dg-row-end { display: flex; gap: 0.7rem; align-items: flex-end; flex-wrap: wrap; }
+.dg-stack { display: flex; flex-direction: column; gap: 0.4rem; }
+.dg-mb { margin-bottom: 1.1rem; }
+.dg-mb-lg { margin-bottom: 1.6rem; }
+
+/* ---- glass surfaces ---- */
+.dg-glass {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  backdrop-filter: blur(16px) saturate(130%);
+  -webkit-backdrop-filter: blur(16px) saturate(130%);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 16px 40px -24px rgba(0, 0, 0, 0.8);
+}
+.dg-card { padding: 0.95rem 1.05rem; }
+
+/* ---- stat cards ---- */
+.dg-stats { display: flex; gap: 0.7rem; flex-wrap: wrap; }
+.dg-stat { min-width: 132px; padding: 0.75rem 0.95rem; }
+.dg-stat-label {
+  color: #7a7a85; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em;
+  margin-bottom: 0.35rem;
+}
+.dg-stat-value { color: #fff; font-size: 1.45rem; font-weight: 700; line-height: 1; letter-spacing: -0.01em; }
+.dg-stat-sub { color: #6b6b76; font-size: 0.72rem; margin-top: 0.3rem; }
+
+/* ---- titles / text ---- */
+.dg-h1 { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 0.2rem; color: #fff; }
+.dg-title { color: #e8e8ef; font-size: 0.92rem; font-weight: 650; margin-bottom: 0.55rem; }
+.dg-muted { color: #9a9aa5; font-size: 0.84rem; }
+.dg-faint { color: #6b6b76; font-size: 0.8rem; }
+.dg-mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+
+/* ---- buttons ---- */
+.dg-btn {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.42rem 0.95rem; border-radius: 9px; cursor: pointer;
+  font-size: 0.82rem; font-weight: 550;
+  background: rgba(255, 255, 255, 0.04); color: #cfcfd6;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: background .15s, color .15s, border-color .15s, transform .05s;
+}
+.dg-btn:hover { background: rgba(255, 255, 255, 0.08); color: #fff; border-color: rgba(255, 255, 255, 0.18); }
+.dg-btn:active { transform: translateY(1px); }
+.dg-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.dg-btn-primary {
+  background: #fafafa; color: #09090b; border-color: #fafafa; font-weight: 650;
+}
+.dg-btn-primary:hover { background: #fff; color: #000; border-color: #fff; }
+.dg-btn-danger { color: #f4f4f6; border-color: rgba(255, 255, 255, 0.16); background: rgba(255, 255, 255, 0.02); }
+.dg-btn-danger:hover { background: rgba(255, 255, 255, 0.08); }
+
+/* segmented control */
+.dg-seg { display: inline-flex; padding: 3px; gap: 3px; border-radius: 11px;
+  background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.09); }
+.dg-seg-btn {
+  padding: 0.34rem 0.85rem; border-radius: 8px; cursor: pointer; border: none;
+  background: transparent; color: #8b8b96; font-size: 0.8rem; font-weight: 550;
+  transition: background .15s, color .15s;
+}
+.dg-seg-btn:hover { color: #e6e6ee; }
+.dg-seg-btn.dg-active { background: #fafafa; color: #09090b; }
+
+/* ---- inputs ---- */
+.dg-field { display: flex; flex-direction: column; gap: 0.25rem; }
+.dg-label { color: #8b8b96; font-size: 0.74rem; }
+.dg-input, .dg-select, .dg-textarea {
+  padding: 0.5rem 0.7rem; border-radius: 9px;
+  background: rgba(255, 255, 255, 0.03); color: #f4f4f6;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.82rem; outline: none;
+  transition: border-color .15s, background .15s;
+}
+.dg-input:focus, .dg-select:focus, .dg-textarea:focus {
+  border-color: rgba(255, 255, 255, 0.32); background: rgba(255, 255, 255, 0.05);
+}
+.dg-input::placeholder, .dg-textarea::placeholder { color: #5c5c66; }
+.dg-select { min-width: 150px; }
+.dg-select option { background: #111114; color: #f4f4f6; }
+.dg-textarea { width: 100%; min-height: 120px; resize: vertical; font-family: ui-monospace, Menlo, monospace; font-size: 0.76rem; }
+
+/* ---- badge + status dot (monochrome; differentiate by dot, not color) ---- */
+.dg-badge {
+  display: inline-flex; align-items: center; gap: 0.45rem;
+  padding: 0.22rem 0.7rem; border-radius: 999px; font-size: 0.76rem; font-weight: 600;
+  background: rgba(255, 255, 255, 0.06); color: #e6e6ee;
+  border: 1px solid rgba(255, 255, 255, 0.12); text-transform: capitalize;
+}
+.dg-dot { width: 7px; height: 7px; border-radius: 50%; background: #6b6b76; flex: none; }
+.dg-dot-run { background: #fff; box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.6); animation: dg-pulse 1.4s infinite; }
+.dg-dot-done { background: #fff; }
+.dg-dot-fail { background: transparent; border: 1.5px solid #fff; width: 8px; height: 8px; }
+.dg-dot-idle { background: #54545e; }
+@keyframes dg-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.5); }
+  70% { box-shadow: 0 0 0 6px rgba(255, 255, 255, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+}
+
+/* ---- banner ---- */
+.dg-banner {
+  border-radius: 12px; padding: 0.7rem 0.95rem; font-size: 0.8rem; line-height: 1.5;
+  background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #c9c9d2;
+}
+.dg-banner strong { color: #fff; }
+
+/* ---- log / pre ---- */
+.dg-log {
+  background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 12px; padding: 0.7rem 0.9rem; margin: 0;
+  font-size: 0.72rem; line-height: 1.5; color: #b7b7c0;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  overflow: auto; white-space: pre-wrap;
+}
+
+/* ---- charts ---- */
+.dg-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 0.9rem; }
+.dg-chart { padding: 0.85rem 0.95rem; }
+.dg-chart-title { color: #d4d4dc; font-size: 0.82rem; font-weight: 600; margin-bottom: 0.5rem; }
+.dg-chart-empty { color: #54545e; font-size: 0.8rem; text-align: center; padding: 2.6rem 0; }
