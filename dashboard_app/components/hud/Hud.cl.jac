@@ -1,7 +1,7 @@
 """Shared HUD primitives: bracket stat tiles, status glyphs, syntax-colored logs.
 
 Color is semantic only (green good / red fail / amber caution); One-Dark palette
-for code tokens in logs. Pure presentation — no server imports.
+for code tokens in logs. Pure presentation; no server imports.
 """
 
 glob KEYWORDS: list[str] = [

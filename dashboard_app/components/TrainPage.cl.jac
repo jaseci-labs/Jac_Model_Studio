@@ -1,4 +1,4 @@
-"""Train: split console — LAUNCH.CONFIG left, RUN.STATUS + tall log right.
+"""Train: split console. LAUNCH.CONFIG left, RUN.STATUS + tall log right.
 
 Shells out (server-side) to run_probe.sh / run_dpo.sh via services/jobs.sv.jac.
 The trainer's loss curves live on the Monitor screen; this screen shows run
@@ -84,7 +84,7 @@ def:pub TrainPage() -> JsxElement {
                         <Field key="di" label="DRY_ITERS" value={dry_iters} hint="30" onChange={lambda v: str { dry_iters = v; }} />
                         <label key="sd" className="dg-row" style={{"gap": "0.45rem", "color": "#777", "fontSize": "0.74rem"}}>
                             <input type="checkbox" checked={skip_dry} onChange={lambda (e: ChangeEvent) { skip_dry = not skip_dry; }} />
-                            <span>SKIP DRY-RUN</span>
+                            <span>SKIP DRY RUN</span>
                         </label>
                     }}
                     {if mode == "dpo" {
@@ -94,7 +94,7 @@ def:pub TrainPage() -> JsxElement {
                         <Field key="ds" label="SUBSET" value={subset} hint="50" onChange={lambda v: str { subset = v; }} />
                     }}
                     <div className="dg-banner">
-                        <strong>⚠ HEAVY.</strong> A 30B run is hours long and near the 48GB Metal ceiling — don't launch SFT and
+                        <strong>⚠ HEAVY.</strong> A 30B run is hours long and near the 48GB Metal ceiling. Don't launch SFT and
                         DPO for the same model at once. SFT iters come from <span className="dg-mono">configs/lora.yaml</span>.
                     </div>
                     <button onClick={do_start} disabled={is_running} className="dg-btn dg-btn-primary" style={{"justifyContent": "center", "padding": "0.6rem"}}>{"▶ START " + mode.upper()}</button>
@@ -107,7 +107,7 @@ def:pub TrainPage() -> JsxElement {
                     {status is not None and <StatusGlyph status={status.status} />}
                     {status is not None and <span className="dg-faint">{"PID " + str(status.pid)}</span>}
                     {status is not None and <span className="dg-faint">{"ITER " + str(status.last_iter)}</span>}
-                    {status is not None and <span className="dg-faint">{"STARTED " + (status.started if status.started != "" else "—")}</span>}
+                    {status is not None and <span className="dg-faint">{"STARTED " + (status.started if status.started != "" else "n/a")}</span>}
                     <span className="dg-spacer"></span>
                     <button onClick={do_stop} disabled={not is_running} className="dg-btn dg-btn-danger">■ STOP</button>
                 </div>

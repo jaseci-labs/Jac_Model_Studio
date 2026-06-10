@@ -11,8 +11,8 @@ import from .hud.Hud { BracketTile, StatusGlyph, JsonRow, LogView }
 
 # pipeline order (subset that's useful to trigger from the UI).
 glob STAGES: list[list[str]] = [
-    ["seed_conversion", "seed"], ["idiomatic_batch", "idiom-1"], ["idiomatic_batch2", "idiom-2"],
-    ["idiomatic_batch3", "idiom-3"], ["scale_conversion", "scale (slow)"], ["dpo_conversion", "dpo pairs"],
+    ["seed_conversion", "seed"], ["idiomatic_batch", "idiom 1"], ["idiomatic_batch2", "idiom 2"],
+    ["idiomatic_batch3", "idiom 3"], ["scale_conversion", "scale (slow)"], ["dpo_conversion", "dpo pairs"],
     ["build_manifest", "manifest"], ["build_splits", "sft splits"], ["build_dpo_splits", "dpo splits"],
     ["holdout", "holdout"], ["graph_holdout", "graph holdout"], ["dataset_stats", "stats"],
 ];
@@ -145,7 +145,7 @@ def:pub IngestPage() -> JsxElement {
                             }}
                         </select>
                         <button onClick={prev_page} className="dg-btn">‹ PREV</button>
-                        <span className="dg-faint">{"ROWS " + str(offset) + "–" + str(offset + len(rows))}</span>
+                        <span className="dg-faint">{"ROWS " + str(offset) + ".." + str(offset + len(rows))}</span>
                         <button onClick={next_page} className="dg-btn">NEXT ›</button>
                     </div>
                     <div className="dg-stack">

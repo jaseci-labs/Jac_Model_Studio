@@ -1,4 +1,4 @@
-"""History — PAST training sessions. Browse any finished run's metrics (snapshot),
+"""History: PAST training sessions. Browse any finished run's metrics (snapshot),
 and compare runs (gemma vs qwen) overlaid. Live runs live on the Monitor tab."""
 
 sv import from ..services.jobs { Session, list_sessions }

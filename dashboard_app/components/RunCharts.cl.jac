@@ -6,7 +6,7 @@ import from .charts.MetricChart { MetricChart }
 import from .hud.Hud { BracketTile, LogView }
 
 def last_y(series: list[dict]) -> str {
-    if len(series) == 0 { return "—"; }
+    if len(series) == 0 { return "n/a"; }
     return str(series[len(series) - 1]["y"]);
 }
 
@@ -17,7 +17,7 @@ def loss_trend(series: list[dict]) -> list[str] {
     b: float = float(str(series[len(series) - 1]["y"]));
     if b < a { return ["▼ CONVERGING", "dg-acc-green"]; }
     if b > a { return ["▲ RISING", "dg-acc-amber"]; }
-    return ["— HOLDING", ""];
+    return ["HOLDING", ""];
 }
 
 def pass_trend(series: list[dict]) -> list[str] {

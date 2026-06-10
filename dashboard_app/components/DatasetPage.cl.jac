@@ -2,7 +2,7 @@
 
 Table + expand. Pick any dataset file; each row shows index/name/difficulty/source/
 preview; click to expand the full Python + Jac (or DPO chosen/rejected) code, which
-the server syntax-highlights into classed spans (rendered here via unsafe_html —
+the server syntax-highlights into classed spans (rendered here via unsafe_html;
 trusted local dataset, not user input)."""
 
 sv import from ..services.dataset { FileRef, DataRow, list_dataset_files, dataset_rows }
@@ -81,7 +81,7 @@ def:pub DatasetPage() -> JsxElement {
                 }}
             </select>
             <button onClick={prev_page} className="dg-btn">‹ PREV</button>
-            <span className="dg-faint">{"ROWS " + str(offset) + "–" + str(offset + len(rows))}</span>
+            <span className="dg-faint">{"ROWS " + str(offset) + ".." + str(offset + len(rows))}</span>
             <button onClick={next_page} className="dg-btn">NEXT ›</button>
             <span className="dg-spacer"></span>
             <span className="dg-faint">CLICK ROW TO EXPAND</span>
