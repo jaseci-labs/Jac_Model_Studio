@@ -38,6 +38,11 @@ class ChatRequest(BaseModel):
     persist_user: bool = True
 
 
+class LoadRequest(BaseModel):
+    model_config = {"protected_namespaces": ()}
+    model_id: str
+
+
 def create_app(loader=None, stream_fn=None) -> FastAPI:
     db.init_db()
     app = FastAPI(title="Jac Studio")
@@ -185,6 +190,29 @@ def create_app(loader=None, stream_fn=None) -> FastAPI:
                     yield sse({"type": "done"})
                 finally:
                     stop.set()
+
+        return StreamingResponse(gen(), media_type="text/event-stream")
+
+    @app.post("/api/load")
+    async def load(req: LoadRequest):
+        mgr = app.state.manager
+
+        async def gen():
+            m = config.model_by_id(req.model_id)
+            if m is None:
+                yield sse({"type": "error", "message": f"unknown model: {req.model_id}"})
+                return
+            if not config.model_available(m):
+                yield sse({"type": "error",
+                           "message": f"model not found on disk: {config.model_path(m)}"})
+                return
+            async with mgr.lock:
+                try:
+                    async for ev in load_events(mgr, req.model_id, config.model_path(m)):
+                        yield ev
+                except Exception as e:
+                    mgr.unload()
+                    yield sse({"type": "error", "message": f"load failed: {e}"})
 
         return StreamingResponse(gen(), media_type="text/event-stream")
 
