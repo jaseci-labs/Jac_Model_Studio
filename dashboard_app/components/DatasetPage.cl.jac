@@ -80,14 +80,14 @@ def:pub DatasetPage() -> JsxElement {
                     <option key={f.path} value={f.path}>{f.label + "  (" + str(f.count) + ")"}</option>
                 }}
             </select>
-            <button onClick={prev_page} className="dg-btn">‹ prev</button>
-            <span className="dg-faint">{"rows " + str(offset) + "–" + str(offset + len(rows))}</span>
-            <button onClick={next_page} className="dg-btn">next ›</button>
+            <button onClick={prev_page} className="dg-btn">‹ PREV</button>
+            <span className="dg-faint">{"ROWS " + str(offset) + "–" + str(offset + len(rows))}</span>
+            <button onClick={next_page} className="dg-btn">NEXT ›</button>
             <span className="dg-spacer"></span>
-            <span className="dg-faint">click a row to expand</span>
+            <span className="dg-faint">CLICK ROW TO EXPAND</span>
         </div>
 
-        <div className="dg-glass dg-table">
+        <div className="dg-table">
             <div className="dg-thead">
                 <div>#</div><div>name</div><div>difficulty</div><div>source</div><div>preview</div>
             </div>

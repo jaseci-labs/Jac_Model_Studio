@@ -190,3 +190,33 @@
 /* ---- charts ---- */
 .dg-chart { padding: 0.9rem 0.95rem 0.6rem; }
 .dg-chart-empty { color: #555; font-size: 0.78rem; letter-spacing: 0.2em; text-align: center; padding: 2.6rem 0; }
+
+/* ---- dataset table (HUD) ---- */
+.dg-table { border: 1px solid #333; }
+.dg-thead, .dg-tr {
+  display: grid;
+  grid-template-columns: 56px minmax(120px, 200px) 110px minmax(120px, 180px) 1fr;
+  gap: 0.6rem; align-items: center;
+  padding: 0.5rem 0.9rem;
+}
+.dg-thead { border-bottom: 1px solid #333; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.18em; color: #777; }
+.dg-tr { border-bottom: 1px solid #1c1c1f; cursor: pointer; transition: background .12s; font-size: 0.78rem; color: #bbb; }
+.dg-tr:hover { background: rgba(255, 255, 255, 0.03); }
+.dg-tr.dg-open { background: rgba(255, 255, 255, 0.05); }
+.dg-td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dg-kind { font-size: 0.66rem; padding: 0.08rem 0.4rem; border: 1px solid #444; color: #999; text-transform: uppercase; letter-spacing: 0.08em; }
+.dg-detail { padding: 0.9rem 1rem 1.1rem; background: rgba(0, 0, 0, 0.35); border-bottom: 1px solid #1c1c1f; }
+.dg-detail-prompt { color: #b7b7c0; font-size: 0.8rem; margin-bottom: 0.7rem; line-height: 1.5; white-space: pre-wrap; }
+.dg-code-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0.7rem; }
+
+/* ---- code block + One-Dark tokens (server-side highlighted spans) ---- */
+.dg-code { border: 1px solid #333; background: #0a0a0c; }
+.dg-code-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.18em; color: #777; padding: 0.35rem 0.7rem; border-bottom: 1px solid #2a2a2e; }
+.dg-code-pre { margin: 0; padding: 0.7rem 0.85rem; overflow: auto; max-height: 360px; }
+.dg-code-pre code { font-family: inherit; font-size: 0.76rem; line-height: 1.55; color: #d7d7e0; white-space: pre; }
+.tok-kw   { color: #c678dd; }
+.tok-type { color: #56b6c2; }
+.tok-bi   { color: #e5c07b; }
+.tok-str  { color: #98c379; }
+.tok-num  { color: #d19a66; }
+.tok-com  { color: #6b7079; font-style: italic; }
