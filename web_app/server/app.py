@@ -120,6 +120,12 @@ def create_app(loader=None, stream_fn=None) -> FastAPI:
                            "message": f"model not found on disk: {config.model_path(m)}"})
                 return
 
+            if req.chat_id is not None and req.persist_user and req.messages:
+                try:
+                    db.add_message(req.chat_id, "user", req.messages[-1].content)
+                except Exception as e:
+                    print(f"history write failed: {e}")
+
             async with mgr.lock:
                 load_secs = 0.0
                 try:
@@ -171,9 +177,6 @@ def create_app(loader=None, stream_fn=None) -> FastAPI:
                     yield sse(stats)
                     if req.chat_id is not None:
                         try:
-                            if req.persist_user and req.messages:
-                                db.add_message(req.chat_id, "user",
-                                               req.messages[-1].content)
                             db.add_message(req.chat_id, "assistant", full,
                                            model_id=req.model_id, stats=stats,
                                            pair_group=req.pair_group)

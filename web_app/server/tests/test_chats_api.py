@@ -78,3 +78,22 @@ def test_chat_without_chat_id_persists_nothing(fake_root):
     }) as r:
         list(r.iter_lines())
     assert client.get("/api/chats").json() == []
+
+
+def test_user_message_persists_even_if_generation_fails(fake_root):
+    def boom(model, tokenizer, messages, temperature, top_p, max_tokens):
+        raise RuntimeError("kaboom")
+        yield  # pragma: no cover
+
+    client = TestClient(app_module.create_app(loader=lambda p: ("m", FakeTok()),
+                                              stream_fn=boom))
+    cid = client.post("/api/chats", json={"title": "t"}).json()["id"]
+    with client.stream("POST", "/api/chat", json={
+        "model_id": "qwen-dpo",
+        "messages": [{"role": "user", "content": "doomed prompt"}],
+        "chat_id": cid,
+    }) as r:
+        list(r.iter_lines())
+    msgs = client.get(f"/api/chats/{cid}").json()["messages"]
+    assert [m["role"] for m in msgs] == ["user"]
+    assert msgs[0]["content"] == "doomed prompt"
