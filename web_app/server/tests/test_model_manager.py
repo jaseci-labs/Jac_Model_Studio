@@ -1,3 +1,5 @@
+import pytest
+
 from model_manager import ModelManager
 
 
@@ -43,3 +45,23 @@ def test_unload_clears_state():
     assert mgr.current_id is None
     assert mgr.model is None
     assert mgr.tokenizer is None
+
+
+def test_loader_failure_leaves_clean_state():
+    def bad_loader(path):
+        raise RuntimeError("OOM")
+    mgr = ModelManager(loader=bad_loader)
+    with pytest.raises(RuntimeError):
+        mgr.load_sync("qwen-dpo", "/fake/qwen")
+    assert mgr.current_id is None
+    assert mgr.model is None
+    assert mgr.tokenizer is None
+
+
+def test_noop_load_resets_load_seconds():
+    calls = []
+    mgr = ModelManager(loader=make_loader(calls))
+    mgr.load_sync("qwen-dpo", "/fake/qwen")
+    mgr.load_seconds = 99.0  # simulate stale value
+    assert mgr.load_sync("qwen-dpo", "/fake/qwen") == 0.0
+    assert mgr.load_seconds == 0.0
