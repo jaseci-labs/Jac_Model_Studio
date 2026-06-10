@@ -27,11 +27,6 @@
     #050507;
 }
 
-/* ---- semantic accents ---- */
-.dg-acc-green { color: #4ade80; }
-.dg-acc-red   { color: #f87171; }
-.dg-acc-amber { color: #fbbf24; }
-
 /* ---- nav ---- */
 .dg-nav {
   position: sticky; top: 0; z-index: 50;
@@ -58,7 +53,6 @@
 /* ---- page + layout helpers ---- */
 .dg-page { padding: 1.5rem 1.6rem; max-width: 1180px; margin: 0 auto; }
 .dg-row { display: flex; gap: 0.7rem; align-items: center; flex-wrap: wrap; }
-.dg-row-end { display: flex; gap: 0.7rem; align-items: flex-end; flex-wrap: wrap; }
 .dg-stack { display: flex; flex-direction: column; gap: 0.5rem; }
 .dg-mb { margin-bottom: 1.1rem; }
 .dg-mb-lg { margin-bottom: 1.6rem; }
@@ -92,9 +86,6 @@
 }
 
 /* ---- titles / text ---- */
-.dg-h1 { font-size: 1.2rem; letter-spacing: 0.1em; margin: 0 0 0.2rem; color: #fff; }
-.dg-title { color: #aaa; font-size: 0.8rem; letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 0.55rem; }
-.dg-muted { color: #9a9aa5; font-size: 0.84rem; }
 .dg-faint { color: #666; font-size: 0.78rem; }
 .dg-mono { font-family: inherit; }
 
@@ -220,3 +211,13 @@
 .tok-str  { color: #98c379; }
 .tok-num  { color: #d19a66; }
 .tok-com  { color: #6b7079; font-style: italic; }
+
+/* ---- log follow: column-reverse pins scroll to the newest line ---- */
+.dg-log-follow { display: flex; flex-direction: column-reverse; }
+
+/* ---- semantic accents ---- */
+/* Last on purpose: compound forms outrank the base color set by
+   .dg-tile-sub / .dg-stage (incl. its :hover and .dg-active states). */
+.dg-acc-green, .dg-tile-sub.dg-acc-green, .dg-stage.dg-acc-green { color: #4ade80; }
+.dg-acc-red, .dg-tile-sub.dg-acc-red, .dg-stage.dg-acc-red { color: #f87171; }
+.dg-acc-amber, .dg-tile-sub.dg-acc-amber { color: #fbbf24; }

@@ -47,8 +47,13 @@ def:pub StatusGlyph(status: str) -> JsxElement {
 }
 
 def:pub LogView(text: str, maxh: str) -> JsxElement {
-    lines: list[str] = text.split("\n");
-    return <pre className="dg-log" style={{"maxHeight": maxh}}>
+    # Newest-last text rendered newest-first inside a column-reverse flex pre:
+    # visual order stays chronological and the scroll position pins to the tail.
+    lines: list[str] = [];
+    for ln in text.split("\n") {
+        lines.insert(0, ln);
+    }
+    return <pre className="dg-log dg-log-follow" style={{"maxHeight": maxh}}>
         {for (i, ln) in enumerate(lines) {
             <div key={str(i)}>
                 {for (j, w) in enumerate(ln.split(" ")) {
