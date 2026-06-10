@@ -1,5 +1,7 @@
 import json
+import os
 
+import pytest
 from fastapi.testclient import TestClient
 
 import app as app_module
@@ -146,3 +148,19 @@ def test_chat_generation_exception_becomes_error_event(fake_root):
     assert any(e["type"] == "token" for e in evs)
     assert evs[-1]["type"] == "error"
     assert "kaboom" in evs[-1]["message"]
+
+
+@pytest.mark.slow
+@pytest.mark.skipif(not os.environ.get("JAC_STUDIO_SLOW"), reason="set JAC_STUDIO_SLOW=1")
+def test_real_model_generates():
+    import mlx_lm
+    from generate import stream_tokens
+    import config
+    m = config.model_by_id("gemma-dpo")
+    model, tok = mlx_lm.load(str(config.model_path(m)))
+    text = ""
+    for t, n, tps in stream_tokens(model, tok,
+                                   [{"role": "user", "content": "Say hello in Jac."}],
+                                   0.2, 0.9, 64):
+        text += t
+    assert len(text) > 0
