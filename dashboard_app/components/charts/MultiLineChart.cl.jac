@@ -1,25 +1,25 @@
-"""Overlay line chart: one line per run, merged on x. Used by Monitor's compare view.
-Each run gets a distinct color (the only color in the UI)."""
+"""Overlay line chart: one line per run, merged on x. Used by History's compare view.
+HUD panel; each run keeps a distinct color from the compare palette."""
 
 import from "recharts" { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend }
 
 def:pub MultiLineChart(title: str, data: list[dict], names: list[str], colors: list[str]) -> JsxElement {
-    return <div className="dg-glass dg-chart">
-        <div className="dg-chart-title">{title}</div>
-        {len(data) == 0 and <div className="dg-chart-empty">no data yet</div>}
+    return <div className="dg-panel dg-chart">
+        <span className="dg-panel-label">{title}</span>
+        {len(data) == 0 and <div className="dg-chart-empty">NO SIGNAL</div>}
         {len(data) > 0 and <ResponsiveContainer width="100%" height={210}>
-            <LineChart data={data} margin={{"top": 6, "right": 12, "left": 0, "bottom": 0}}>
-                <CartesianGrid stroke="rgba(255,255,255,0.06)" strokeDasharray="3 3" vertical={False} />
-                <XAxis dataKey="x" stroke="rgba(255,255,255,0.28)" tick={{"fill": "#7a7a85", "fontSize": 11}} tickLine={False} axisLine={False} />
-                <YAxis stroke="rgba(255,255,255,0.28)" tick={{"fill": "#7a7a85", "fontSize": 11}} tickLine={False} axisLine={False} width={46} domain={["auto", "auto"]} />
+            <LineChart data={data} margin={{"top": 10, "right": 14, "left": 0, "bottom": 0}}>
+                <CartesianGrid stroke="#1c1c1f" vertical={False} />
+                <XAxis dataKey="x" tick={{"fill": "#666", "fontSize": 10, "fontFamily": "ui-monospace, Menlo, monospace"}} tickLine={False} axisLine={{"stroke": "#333"}} />
+                <YAxis tick={{"fill": "#666", "fontSize": 10, "fontFamily": "ui-monospace, Menlo, monospace"}} tickLine={False} axisLine={False} width={46} domain={["auto", "auto"]} />
                 <Tooltip
-                    contentStyle={{"background": "rgba(16,16,20,0.9)", "border": "1px solid rgba(255,255,255,0.14)", "borderRadius": "8px", "backdropFilter": "blur(8px)"}}
-                    labelStyle={{"color": "#9a9aa5"}}
+                    contentStyle={{"background": "#0a0a0c", "border": "1px solid #333", "borderRadius": "0px", "fontFamily": "ui-monospace, Menlo, monospace", "fontSize": "11px"}}
+                    labelStyle={{"color": "#777"}}
                     itemStyle={{"color": "#fafafa"}}
                 />
-                <Legend wrapperStyle={{"fontSize": "0.75rem", "color": "#9a9aa5"}} />
+                <Legend wrapperStyle={{"fontSize": "0.72rem", "color": "#9a9aa5", "fontFamily": "ui-monospace, Menlo, monospace"}} />
                 {for (i, nm) in enumerate(names) {
-                    <Line key={nm} type="monotone" dataKey={nm} stroke={colors[i % len(colors)]} strokeWidth={2} dot={False} isAnimationActive={False} connectNulls={True} />
+                    <Line key={nm} type="monotone" dataKey={nm} stroke={colors[i % len(colors)]} strokeWidth={1.4} dot={False} isAnimationActive={False} connectNulls={True} />
                 }}
             </LineChart>
         </ResponsiveContainer>}
