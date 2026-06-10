@@ -1,4 +1,4 @@
-"""Top-level shell: glass nav bar + client routes (Monitor / Train / Ingest)."""
+"""Top-level shell: HUD nav bar + client routes (Monitor / Train / Ingest)."""
 
 import from "@jac/runtime" { Router, Routes, Route, Navigate, Link, useLocation }
 import from .MonitorPage { MonitorPage }
@@ -14,14 +14,14 @@ def:pub NavLink(dest: str, label: str, path: str) -> JsxElement {
 def:pub NavBar() -> JsxElement {
     path: str = str(useLocation()["pathname"]);
     return <nav className="dg-nav">
-        <span className="dg-brand"><span className="dg-brand-dot"></span>DataGen</span>
+        <span className="dg-brand">⟨ DATAGEN ⟩</span>
         <NavLink dest="/monitor" label="Monitor" path={path} />
         <NavLink dest="/history" label="History" path={path} />
         <NavLink dest="/train" label="Train" path={path} />
         <NavLink dest="/ingest" label="Ingest" path={path} />
         <NavLink dest="/dataset" label="Dataset" path={path} />
         <span className="dg-spacer"></span>
-        <span className="dg-faint">local · mlx</span>
+        <span className="dg-faint">LOCAL · MLX</span>
     </nav>;
 }
 
