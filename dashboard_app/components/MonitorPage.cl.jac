@@ -76,7 +76,11 @@ def:pub MonitorPage() -> JsxElement {
 
     feed: str = "⦿ LIVE";
     feedcls: str = "dg-status dg-glyph-run";
-    if stalled {
+    if len(running) == 0 {
+        feed = "○ NO FEED";
+        feedcls = "dg-status dg-glyph-idle";
+    }
+    if stalled and len(running) > 0 {
         feed = "⦿ STALLED " + str(int(stale * 2.5)) + "s";
         feedcls = "dg-status dg-acc-amber";
     }
