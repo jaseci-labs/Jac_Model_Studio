@@ -7,7 +7,7 @@ add-examples appends validated rows to the conversion sources.
 
 sv import from ..services.dataset { DatasetStats, FileStat, FileRef, dataset_stats, list_dataset_files, sample_rows, add_examples }
 sv import from ..services.jobs { JobStatus, run_builder, builder_status }
-import from .MonitorPage { StatCard }
+import from .RunCharts { StatCard }
 import from .TrainPage { StatusBadge }
 
 # pipeline order (subset that's useful to trigger from the UI).

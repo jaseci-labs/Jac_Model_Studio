@@ -147,30 +147,36 @@ def _last_iter(name: str, mode: str) -> int {
 }
 
 
-def _status_obj(name: str, mode: str, message: str) -> JobStatus {
+def _live_status(name: str, mode: str) -> str {
     # Recompute live status from the persisted job + pid liveness + exit marker.
+    # "idle" = no job for this (name, mode).
+    job: dict = _read_job(name, mode);
+    if len(job) == 0 { return "idle"; }
+    status: str = str(job.get("status", "idle"));
+    if status != "running" { return status; }
+    pid: int = int(job.get("pid", 0));
+    _reap(pid);
+    # The exit marker is authoritative (a finished child may still be a zombie
+    # that reads as alive); fall back to pid liveness only without one.
+    m = re.search("__EXIT__ (\\d+)", _tail(_run_log(name, mode), 80));
+    if m is not None {
+        status = "done" if str(m.group(1)) == "0" else "failed";
+    } elif _alive(pid) {
+        status = "running";
+    } else {
+        status = "stopped";
+    }
+    job["status"] = status;
+    _write_job(name, mode, job);
+    return status;
+}
+
+
+def _status_obj(name: str, mode: str, message: str) -> JobStatus {
     job: dict = _read_job(name, mode);
     pid: int = int(job.get("pid", 0));
-    status: str = str(job.get("status", "idle"));
+    status: str = _live_status(name, mode);
     runlog: str = _run_log(name, mode);
-    if status == "running" {
-        _reap(pid);
-        # The exit marker is authoritative (a finished child may still be a
-        # zombie that reads as alive); fall back to pid liveness only without one.
-        tail: str = _tail(runlog, 80);
-        m = re.search("__EXIT__ (\\d+)", tail);
-        if m is not None {
-            status = "done" if str(m.group(1)) == "0" else "failed";
-            job["status"] = status;
-            _write_job(name, mode, job);
-        } elif _alive(pid) {
-            status = "running";
-        } else {
-            status = "stopped";
-            job["status"] = status;
-            _write_job(name, mode, job);
-        }
-    }
     return JobStatus(
         name=name,
         mode=mode,
@@ -187,6 +193,52 @@ def _status_obj(name: str, mode: str, message: str) -> JobStatus {
 def:pub job_status(name: str, mode: str) -> JobStatus {
     if not _safe(name, False) { return _status_obj(name, mode, "bad name"); }
     return _status_obj(name, mode, "");
+}
+
+
+obj Session {
+    has name: str,
+        mode: str,
+        status: str,
+        last_iter: int,
+        started: str,
+        label: str;
+}
+
+
+def:pub list_sessions() -> list[Session] {
+    # Every (name, mode) training session in results/, with live status.
+    # status: running | done | failed | stopped | finished (a CLI run with a log
+    # but no job file). The UI splits these into live (Monitor) vs past (History).
+    out: list[Session] = [];
+    base = Path(_root() + "/results");
+    if not base.exists() { return out; }
+    for child in sorted(base.iterdir()) {
+        if not child.is_dir() { continue; }
+        if child.name == "comparison" or child.name == "_builder" { continue; }
+        nm: str = child.name;
+        for mode in ["sft", "dpo"] {
+            if mode == "dpo" {
+                logp: str = str(child) + "/dpo/train.log";
+            } else {
+                logp: str = str(child) + "/train.log";
+            }
+            has_log: bool = Path(logp).exists();
+            job: dict = _read_job(nm, mode);
+            if not has_log and len(job) == 0 { continue; }
+            st: str = _live_status(nm, mode);
+            if st == "idle" { st = "finished"; }
+            out.append(Session(
+                name=nm,
+                mode=mode,
+                status=st,
+                last_iter=_last_iter(nm, mode),
+                started=str(job.get("started", "")),
+                label=nm + " · " + mode.upper(),
+            ));
+        }
+    }
+    return out;
 }
 
 

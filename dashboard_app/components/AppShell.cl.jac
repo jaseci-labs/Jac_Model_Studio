@@ -2,6 +2,7 @@
 
 import from "@jac/runtime" { Router, Routes, Route, Navigate, Link, useLocation }
 import from .MonitorPage { MonitorPage }
+import from .HistoryPage { HistoryPage }
 import from .TrainPage { TrainPage }
 import from .IngestPage { IngestPage }
 import from .DatasetPage { DatasetPage }
@@ -15,6 +16,7 @@ def:pub NavBar() -> JsxElement {
     return <nav className="dg-nav">
         <span className="dg-brand"><span className="dg-brand-dot"></span>DataGen</span>
         <NavLink dest="/monitor" label="Monitor" path={path} />
+        <NavLink dest="/history" label="History" path={path} />
         <NavLink dest="/train" label="Train" path={path} />
         <NavLink dest="/ingest" label="Ingest" path={path} />
         <NavLink dest="/dataset" label="Dataset" path={path} />
@@ -30,6 +32,7 @@ def:pub AppShell() -> JsxElement {
             <Routes>
                 <Route path="/" element={<Navigate to="/monitor" replace={True} />} />
                 <Route path="/monitor" element={<MonitorPage />} />
+                <Route path="/history" element={<HistoryPage />} />
                 <Route path="/train" element={<TrainPage />} />
                 <Route path="/ingest" element={<IngestPage />} />
                 <Route path="/dataset" element={<DatasetPage />} />
