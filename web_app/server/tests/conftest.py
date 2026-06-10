@@ -15,3 +15,8 @@ def fake_root(tmp_path, monkeypatch):
         (d / "weights.safetensors").write_bytes(b"x" * 1000)
     monkeypatch.setenv("JAC_STUDIO_DATA_ROOT", str(tmp_path))
     return tmp_path
+
+
+@pytest.fixture(autouse=True)
+def tmp_db_global(tmp_path, monkeypatch):
+    monkeypatch.setenv("JAC_STUDIO_DB", str(tmp_path / "chats.db"))

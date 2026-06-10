@@ -2,11 +2,12 @@ import asyncio
 import threading
 import time
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 import config
+import db
 import generate
 from model_manager import ModelManager
 from sse import sse
@@ -15,6 +16,14 @@ from sse import sse
 class ChatMessage(BaseModel):
     role: str
     content: str
+
+
+class ChatCreate(BaseModel):
+    title: str
+
+
+class ChatRename(BaseModel):
+    title: str
 
 
 class ChatRequest(BaseModel):
@@ -30,6 +39,7 @@ class ChatRequest(BaseModel):
 
 
 def create_app(loader=None, stream_fn=None) -> FastAPI:
+    db.init_db()
     app = FastAPI(title="Jac Studio")
     app.state.manager = ModelManager(loader=loader)
     app.state.stream_fn = stream_fn
@@ -51,6 +61,33 @@ def create_app(loader=None, stream_fn=None) -> FastAPI:
             "ram_gb": config.total_ram_gb(),
             "resident_gb": resident_gb,
         }
+
+    @app.get("/api/chats")
+    def chats_list():
+        return db.list_chats()
+
+    @app.post("/api/chats")
+    def chats_create(body: ChatCreate):
+        return db.create_chat(body.title)
+
+    @app.get("/api/chats/{chat_id}")
+    def chats_get(chat_id: int):
+        chat = db.get_chat(chat_id)
+        if chat is None:
+            raise HTTPException(404)
+        return {"chat": chat, "messages": db.get_messages(chat_id)}
+
+    @app.patch("/api/chats/{chat_id}")
+    def chats_rename(chat_id: int, body: ChatRename):
+        if db.get_chat(chat_id) is None:
+            raise HTTPException(404)
+        db.rename_chat(chat_id, body.title)
+        return {"ok": True}
+
+    @app.delete("/api/chats/{chat_id}")
+    def chats_delete(chat_id: int):
+        db.delete_chat(chat_id)
+        return {"ok": True}
 
     async def load_events(mgr, model_id: str, path: str):
         """Load model in executor; heartbeat 'loading' events each second."""
@@ -132,6 +169,16 @@ def create_app(loader=None, stream_fn=None) -> FastAPI:
                              "seconds": round(time.monotonic() - t0, 1),
                              "load_seconds": load_secs}
                     yield sse(stats)
+                    if req.chat_id is not None:
+                        try:
+                            if req.persist_user and req.messages:
+                                db.add_message(req.chat_id, "user",
+                                               req.messages[-1].content)
+                            db.add_message(req.chat_id, "assistant", full,
+                                           model_id=req.model_id, stats=stats,
+                                           pair_group=req.pair_group)
+                        except Exception as e:
+                            print(f"history write failed: {e}")
                     yield sse({"type": "done"})
                 finally:
                     stop.set()
