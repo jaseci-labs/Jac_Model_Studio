@@ -5,7 +5,7 @@ sv import from ..services.jobs { Session, list_sessions }
 sv import from ..services.runs { RunMetrics, CompareResult, get_run_metrics, compare_runs }
 import from .RunCharts { RunCharts }
 import from .charts.MultiLineChart { MultiLineChart }
-import from .TrainPage { StatusBadge }
+import from .hud.Hud { StatusGlyph }
 
 glob CMP_COLORS: list[str] = ["#60a5fa", "#f472b6", "#34d399", "#a78bfa", "#22d3ee"];
 
@@ -80,9 +80,9 @@ def:pub HistoryPage() -> JsxElement {
                     <option key={x.name + x.mode} value={x.name + "|" + x.mode}>{x.label}</option>
                 }}
             </select>
-            {not compare and cur_status != "" and <StatusBadge status={cur_status} />}
+            {not compare and cur_status != "" and <StatusGlyph status={cur_status} />}
             <button onClick={toggle_compare} className={"dg-btn dg-btn-primary" if compare else "dg-btn"}>
-                {"Comparing all runs" if compare else "Compare runs"}
+                {"COMPARING ALL RUNS" if compare else "COMPARE"}
             </button>
             {compare and <div className="dg-seg">
                 <button onClick={lambda (e: MouseEvent) { set_cmode("sft"); }} className={"dg-seg-btn dg-active" if cmode == "sft" else "dg-seg-btn"}>SFT</button>
@@ -92,24 +92,23 @@ def:pub HistoryPage() -> JsxElement {
 
         {compare and len(chead) > 0 and <div className="dg-stats dg-mb">
             {for (i, h) in enumerate(chead) {
-                <div key={str(h["name"])} className="dg-glass dg-stat">
-                    <div className="dg-stat-label">
-                        <span className="dg-dot" style={{"background": CMP_COLORS[i % len(CMP_COLORS)], "display": "inline-block", "marginRight": "0.4rem"}}></span>
-                        {str(h["name"]) + " · " + cmode}
-                    </div>
-                    <div className="dg-stat-value">{str(h["final_pass"]) + "%"}</div>
-                    <div className="dg-stat-sub">{"idiom " + str(h["idiom_sim"]) + " · loss " + str(h["last_loss"])}</div>
+                <div key={str(h["name"])} className="dg-tile">
+                    <span className="dg-br dg-br-tl"></span>
+                    <span className="dg-br dg-br-br"></span>
+                    <div className="dg-tile-label" style={{"color": CMP_COLORS[i % len(CMP_COLORS)]}}>{"■ " + str(h["name"]) + " · " + cmode}</div>
+                    <div className="dg-tile-value">{str(h["final_pass"]) + "%"}</div>
+                    <div className="dg-tile-sub">{"idiom " + str(h["idiom_sim"]) + " · loss " + str(h["last_loss"])}</div>
                 </div>
             }}
         </div>}
 
         {compare and len(chead) > 0 and <div className="dg-grid">
-            <MultiLineChart title="Train loss" data={ctrain} names={cnames} colors={CMP_COLORS} />
-            <MultiLineChart title="Val loss" data={cval} names={cnames} colors={CMP_COLORS} />
-            <MultiLineChart title="Holdout test-pass % · learning curve" data={ccurve} names={cnames} colors={CMP_COLORS} />
+            <MultiLineChart title="LOSS.TRAIN" data={ctrain} names={cnames} colors={CMP_COLORS} />
+            <MultiLineChart title="LOSS.VAL" data={cval} names={cnames} colors={CMP_COLORS} />
+            <MultiLineChart title="CURVE.PASS" data={ccurve} names={cnames} colors={CMP_COLORS} />
         </div>}
 
-        {not compare and metrics is None and <div className="dg-muted" style={{"padding": "3rem 0"}}>No past runs yet.</div>}
-        {not compare and metrics and <RunCharts metrics={metrics} />}
+        {not compare and metrics is None and <div className="dg-chart-empty" style={{"padding": "4rem 0"}}>NO PAST RUNS</div>}
+        {not compare and metrics and <RunCharts metrics={metrics} live={False} />}
     </div>;
 }
