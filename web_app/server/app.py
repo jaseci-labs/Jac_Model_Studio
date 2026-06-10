@@ -5,6 +5,7 @@ import time
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -48,6 +49,12 @@ class LoadRequest(BaseModel):
 def create_app(loader=None, stream_fn=None) -> FastAPI:
     db.init_db()
     app = FastAPI(title="Jac Studio")
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     app.state.manager = ModelManager(loader=loader)
     app.state.stream_fn = stream_fn
 

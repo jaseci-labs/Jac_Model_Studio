@@ -56,3 +56,14 @@ def test_models_endpoint_reports_loaded(fake_root):
     body = client.get("/api/models").json()
     assert body["loaded"] == "qwen-dpo"
     assert body["resident_gb"] is not None
+
+
+def test_cors_preflight_allows_ui_origin(fake_root):
+    client = TestClient(app_module.create_app())
+    r = client.options("/api/chats", headers={
+        "Origin": "http://localhost:3000",
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "content-type",
+    })
+    assert r.status_code == 200
+    assert r.headers["access-control-allow-origin"] == "http://localhost:3000"

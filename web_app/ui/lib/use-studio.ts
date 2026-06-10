@@ -19,6 +19,7 @@ export function useStudio() {
   const [modelId, setModelId] = useState("qwen-dpo");
   const [compareId, setCompareId] = useState<string | null>(null);
   const [loadingModel, setLoadingModel] = useState<{ id: string; elapsed: number } | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [chats, setChats] = useState<ChatMeta[]>([]);
   const [chatId, setChatId] = useState<number | null>(null);
   const [messages, setMessages] = useState<UiMessage[]>([]);
@@ -76,10 +77,14 @@ export function useStudio() {
   const loadModel = useCallback(async (id: string) => {
     setModelId(id);
     setLoadingModel({ id, elapsed: 0 });
+    setLoadError(null);
     try {
       await streamLoad(id, (e) => {
         if (e.type === "load" && e.status === "loading") setLoadingModel({ id, elapsed: e.elapsed ?? 0 });
+        else if (e.type === "error") setLoadError(e.message ?? null);
       });
+    } catch (err) {
+      setLoadError(String(err));
     } finally {
       setLoadingModel(null);
       refreshModels();
@@ -116,29 +121,38 @@ export function useStudio() {
         setChatId(cid);
         api.chats().then(setChats).catch(() => {});
       }
-      const history = [
-        ...messagesRef.current
-          .filter((m) => !m.error && (!m.pairGroup || m.modelId === modelId))
+      const base = messagesRef.current.filter((m) => !m.error);
+      const histFor = (id: string) => [
+        ...base
+          .filter((m) => !m.pairGroup || m.modelId === id)
           .map((m) => ({ role: m.role, content: m.content })),
         { role: "user", content: text },
       ];
       setMessages((ms) => [...ms, { role: "user", content: text }]);
       if (compareId) {
         const pg = crypto.randomUUID();
-        await runLeg(modelId, history, cid, true, pg);
-        await runLeg(compareId, history, cid, false, pg);
+        await runLeg(modelId, histFor(modelId), cid, true, pg);
+        await runLeg(compareId, histFor(compareId), cid, false, pg);
       } else {
-        await runLeg(modelId, history, cid, true, null);
+        await runLeg(modelId, histFor(modelId), cid, true, null);
       }
       api.chats().then(setChats).catch(() => {});
       refreshModels();
+    } catch (err) {
+      setMessages((ms) => {
+        const last = ms[ms.length - 1];
+        if (last?.role === "assistant" && last.streaming) {
+          return ms.map((m, i) => (i === ms.length - 1 ? { ...m, streaming: false, loadState: null, error: String(err) } : m));
+        }
+        return [...ms, { role: "assistant" as const, content: "", error: String(err), modelId, pairGroup: null }];
+      });
     } finally {
       setBusy(false);
     }
   }, [busy, chatId, compareId, modelId, runLeg, refreshModels]);
 
   return {
-    online, modelsInfo, modelId, compareId, loadingModel, chats, chatId, messages,
+    online, modelsInfo, modelId, compareId, loadingModel, loadError, chats, chatId, messages,
     prompts, sampling, composer, busy,
     setCompareId, setSampling, setComposer,
     newChat, openChat, removeChat, loadModel, send, refreshModels,
