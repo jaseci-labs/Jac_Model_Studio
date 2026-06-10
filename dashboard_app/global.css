@@ -2,22 +2,22 @@
    Mono dark; color is semantic only (green=good, red=fail, amber=caution).
    Spec: docs/superpowers/specs/2026-06-10-dashboard-hud-redesign-design.md */
 
-:global(*) { box-sizing: border-box; }
-:global(html), :global(body) { margin: 0; padding: 0; }
-:global(body) {
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
   background: #050507;
   color: #d8d8d8;
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 13px;
   -webkit-font-smoothing: antialiased;
 }
-:global(::selection) { background: rgba(255, 255, 255, 0.18); }
+::selection { background: rgba(255, 255, 255, 0.18); }
 
 /* thin monochrome scrollbars */
-:global(::-webkit-scrollbar) { width: 10px; height: 10px; }
-:global(::-webkit-scrollbar-thumb) { background: rgba(255, 255, 255, 0.12); }
-:global(::-webkit-scrollbar-thumb:hover) { background: rgba(255, 255, 255, 0.2); }
-:global(::-webkit-scrollbar-track) { background: transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.12); }
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
+::-webkit-scrollbar-track { background: transparent; }
 
 /* app canvas: pure dark + faint scanlines */
 .dg-app {

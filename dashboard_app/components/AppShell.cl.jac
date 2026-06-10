@@ -14,7 +14,7 @@ def:pub NavLink(dest: str, label: str, path: str) -> JsxElement {
 def:pub NavBar() -> JsxElement {
     path: str = str(useLocation()["pathname"]);
     return <nav className="dg-nav">
-        <span className="dg-brand">⟨ DATAGEN ⟩</span>
+        <span className="dg-brand">DATAGEN</span>
         <NavLink dest="/monitor" label="Monitor" path={path} />
         <NavLink dest="/history" label="History" path={path} />
         <NavLink dest="/train" label="Train" path={path} />
