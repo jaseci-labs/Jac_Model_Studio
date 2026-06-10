@@ -1,13 +1,16 @@
 "use client";
+import { useState } from "react";
 import { useStudio } from "@/lib/use-studio";
 import { Sidebar } from "@/components/sidebar";
 import { Offline } from "@/components/offline";
 import { ModelPill } from "@/components/model-pill";
 import { Thread } from "@/components/thread";
 import { Composer } from "@/components/composer";
+import { Rail } from "@/components/rail";
 
 export default function Home() {
   const s = useStudio();
+  const [railCollapsed, setRailCollapsed] = useState(false);
   if (s.online === false) return <Offline />;
   if (s.online === null) return null;
   return (
@@ -44,7 +47,15 @@ export default function Home() {
           }}
         />
       </main>
-      <div className="w-60 shrink-0">{/* Task 13 */}</div>
+      <Rail
+        prompts={s.prompts}
+        sampling={s.sampling}
+        lastStats={[...s.messages].reverse().find((m) => m.stats)?.stats ?? null}
+        collapsed={railCollapsed}
+        onSampling={s.setSampling}
+        onPick={s.setComposer}
+        onToggle={() => setRailCollapsed(!railCollapsed)}
+      />
     </div>
   );
 }
