@@ -1,7 +1,31 @@
+import asyncio
+import time
+
 from fastapi import FastAPI
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 import config
+import generate
 from model_manager import ModelManager
+from sse import sse
+
+
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+
+class ChatRequest(BaseModel):
+    model_config = {"protected_namespaces": ()}  # allow model_id field
+    model_id: str
+    messages: list[ChatMessage]
+    temperature: float = 0.2
+    top_p: float = 0.9
+    max_tokens: int = 1024
+    chat_id: int | None = None
+    pair_group: str | None = None
+    persist_user: bool = True
 
 
 def create_app(loader=None, stream_fn=None) -> FastAPI:
@@ -26,6 +50,83 @@ def create_app(loader=None, stream_fn=None) -> FastAPI:
             "ram_gb": config.total_ram_gb(),
             "resident_gb": resident_gb,
         }
+
+    async def load_events(mgr, model_id: str, path: str):
+        """Load model in executor; heartbeat 'loading' events each second."""
+        loop = asyncio.get_running_loop()
+        fut = loop.run_in_executor(None, mgr.load_sync, model_id, str(path))
+        t0 = time.monotonic()
+        while not fut.done():
+            yield sse({"type": "load", "status": "loading", "model_id": model_id,
+                       "elapsed": round(time.monotonic() - t0, 1)})
+            try:
+                await asyncio.wait_for(asyncio.shield(fut), timeout=1.0)
+            except asyncio.TimeoutError:
+                pass
+        secs = await fut  # re-raises load errors
+        yield sse({"type": "load", "status": "ready", "model_id": model_id, "seconds": secs})
+
+    @app.post("/api/chat")
+    async def chat(req: ChatRequest):
+        mgr = app.state.manager
+        stream_fn = app.state.stream_fn or generate.stream_tokens
+
+        async def gen():
+            m = config.model_by_id(req.model_id)
+            if m is None:
+                yield sse({"type": "error", "message": f"unknown model: {req.model_id}"})
+                return
+            if not config.model_available(m):
+                yield sse({"type": "error",
+                           "message": f"model not found on disk: {config.model_path(m)}"})
+                return
+
+            async with mgr.lock:
+                try:
+                    if mgr.current_id != req.model_id:
+                        async for ev in load_events(mgr, req.model_id, config.model_path(m)):
+                            yield ev
+                except Exception as e:
+                    mgr.unload()
+                    yield sse({"type": "error", "message": f"load failed: {e}"})
+                    return
+
+                loop = asyncio.get_running_loop()
+                q: asyncio.Queue = asyncio.Queue()
+                msgs = [mm.model_dump() for mm in req.messages]
+
+                def worker():
+                    try:
+                        for text, ntok, tps in stream_fn(mgr.model, mgr.tokenizer, msgs,
+                                                         req.temperature, req.top_p,
+                                                         req.max_tokens):
+                            loop.call_soon_threadsafe(q.put_nowait, ("token", text, ntok, tps))
+                        loop.call_soon_threadsafe(q.put_nowait, ("end", None, None, None))
+                    except Exception as e:  # surfaced as SSE error event
+                        loop.call_soon_threadsafe(q.put_nowait, ("error", str(e), None, None))
+
+                loop.run_in_executor(None, worker)
+                t0 = time.monotonic()
+                full, gen_tokens, tps = "", 0, 0.0
+                while True:
+                    kind, text, ntok, ntps = await q.get()
+                    if kind == "token":
+                        full += text
+                        gen_tokens, tps = ntok, ntps
+                        yield sse({"type": "token", "text": text})
+                    elif kind == "error":
+                        yield sse({"type": "error", "message": text})
+                        return
+                    else:
+                        break
+                stats = {"type": "stats", "model_id": req.model_id,
+                         "gen_tokens": gen_tokens, "tps": tps,
+                         "seconds": round(time.monotonic() - t0, 1),
+                         "load_seconds": mgr.load_seconds}
+                yield sse(stats)
+                yield sse({"type": "done"})
+
+        return StreamingResponse(gen(), media_type="text/event-stream")
 
     return app
 
