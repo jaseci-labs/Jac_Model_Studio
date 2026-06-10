@@ -47,3 +47,12 @@ def test_models_endpoint(fake_root):
     assert body["loaded"] is None
     assert body["ram_gb"] > 0
     assert body["resident_gb"] is None
+
+
+def test_models_endpoint_reports_loaded(fake_root):
+    a = app_module.create_app(loader=lambda p: ("m", "t"))
+    client = TestClient(a)
+    a.state.manager.load_sync("qwen-dpo", str(fake_root / "models/qwen-jac-dpo-fused-q8"))
+    body = client.get("/api/models").json()
+    assert body["loaded"] == "qwen-dpo"
+    assert body["resident_gb"] is not None
