@@ -47,7 +47,7 @@ def:pub MonitorPage() -> JsxElement {
 
     return <div className="dg-page">
         <div className="dg-row dg-mb">
-            <span className="dg-badge"><span className="dg-dot dg-dot-run"></span>Live</span>
+            <span className="dg-status dg-glyph-run">⦿ LIVE</span>
             {for x in running {
                 <button key={x.name + x.mode}
                     onClick={lambda (e: MouseEvent) { pick(x.name, x.mode); }}
@@ -56,14 +56,15 @@ def:pub MonitorPage() -> JsxElement {
                 </button>
             }}
             <span className="dg-spacer"></span>
-            {metrics and <span className="dg-faint">{"iter " + str(metrics.last_iter)}</span>}
+            {metrics and <span className="dg-faint">{"ITER " + str(metrics.last_iter)}</span>}
         </div>
 
-        {len(running) == 0 and <div className="dg-glass dg-card" style={{"textAlign": "center", "padding": "3rem 1rem"}}>
-            <div className="dg-title" style={{"marginBottom": "0.3rem"}}>No active run</div>
-            <div className="dg-muted">Start one on the <strong>Train</strong> tab — it will stream here live. Finished runs are under <strong>History</strong>.</div>
+        {len(running) == 0 and <div className="dg-panel" style={{"textAlign": "center", "padding": "2.6rem 1rem"}}>
+            <span className="dg-panel-label">MONITOR</span>
+            <div className="dg-chart-empty" style={{"padding": "0 0 0.5rem"}}>NO ACTIVE RUN</div>
+            <div className="dg-faint">Start one on the TRAIN tab — it streams here live. Finished runs live under HISTORY.</div>
         </div>}
 
-        {len(running) > 0 and metrics and <RunCharts metrics={metrics} />}
+        {len(running) > 0 and metrics and <RunCharts metrics={metrics} live={True} />}
     </div>;
 }
