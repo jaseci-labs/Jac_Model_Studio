@@ -192,7 +192,8 @@ def create_app(loader=None, stream_fn=None) -> FastAPI:
                     if req.chat_id is not None:
                         try:
                             db.add_message(req.chat_id, "assistant", full,
-                                           model_id=req.model_id, stats=stats,
+                                           model_id=req.model_id,
+                                           stats={k: v for k, v in stats.items() if k != "type"},
                                            pair_group=req.pair_group)
                         except Exception as e:
                             print(f"history write failed: {e}")

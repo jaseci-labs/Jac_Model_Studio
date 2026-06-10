@@ -35,6 +35,11 @@ export function useStudio() {
       const m = await api.models();
       setModelsInfo(m);
       setOnline(true);
+      setModelId((cur) => {
+        const ok = m.models.find((x) => x.id === cur)?.available;
+        if (ok) return cur;
+        return m.loaded ?? m.models.find((x) => x.available)?.id ?? cur;
+      });
     } catch {
       setOnline(false);
     }

@@ -36,31 +36,50 @@ export function Sidebar(props: {
       >
         + new chat
       </button>
-      <div className="micro-label mb-1">HISTORY</div>
-      <div className="flex-1 space-y-0.5 overflow-y-auto">
-        {props.chats.map((c) => (
-          <div
-            key={c.id}
-            onClick={gate(() => props.onOpen(c.id))}
-            className={`group flex cursor-pointer items-center justify-between rounded-md px-2 py-1.5 text-xs ${
-              c.id === props.activeId ? "bg-[#1a1a1a] text-neutral-100" : "text-neutral-400 hover:bg-[#141414]"
-            } ${props.busy ? "opacity-50" : ""}`}
-          >
-            <span className="truncate">{c.title}</span>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!props.busy) props.onDelete(c.id);
-              }}
-              className="hidden font-mono text-[9px] text-neutral-600 hover:text-neutral-300 group-hover:block"
-            >
-              DEL
-            </button>
-          </div>
-        ))}
+      <div className="flex-1 overflow-y-auto">
         {props.chats.length === 0 && (
           <p className="px-2 font-mono text-[10px] text-neutral-600">no chats yet</p>
         )}
+        {(() => {
+          const today = new Date().toISOString().slice(0, 10);
+          const groups: { day: string; chats: ChatMeta[] }[] = [];
+          for (const c of props.chats) {
+            const day = c.updated_at?.slice(0, 10) ?? "";
+            const last = groups[groups.length - 1];
+            if (last && last.day === day) {
+              last.chats.push(c);
+            } else {
+              groups.push({ day, chats: [c] });
+            }
+          }
+          return groups.map(({ day, chats }) => (
+            <div key={day}>
+              <div className="micro-label mb-1 mt-2">{day === today ? "TODAY" : day}</div>
+              <div className="space-y-0.5">
+                {chats.map((c) => (
+                  <div
+                    key={c.id}
+                    onClick={gate(() => props.onOpen(c.id))}
+                    className={`group flex cursor-pointer items-center justify-between rounded-md px-2 py-1.5 text-xs ${
+                      c.id === props.activeId ? "bg-[#1a1a1a] text-neutral-100" : "text-neutral-400 hover:bg-[#141414]"
+                    } ${props.busy ? "opacity-50" : ""}`}
+                  >
+                    <span className="truncate">{c.title}</span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!props.busy) props.onDelete(c.id);
+                      }}
+                      className="hidden font-mono text-[9px] text-neutral-600 hover:text-neutral-300 group-hover:block"
+                    >
+                      DEL
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ));
+        })()}
       </div>
       <MemGauge info={props.info} />
     </aside>
