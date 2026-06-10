@@ -1,6 +1,8 @@
 import asyncio
+import json
 import threading
 import time
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
@@ -215,6 +217,11 @@ def create_app(loader=None, stream_fn=None) -> FastAPI:
                     yield sse({"type": "error", "message": f"load failed: {e}"})
 
         return StreamingResponse(gen(), media_type="text/event-stream")
+
+    @app.get("/api/prompts")
+    def prompts():
+        p = Path(__file__).parent / "prompts.json"
+        return json.loads(p.read_text())
 
     return app
 
