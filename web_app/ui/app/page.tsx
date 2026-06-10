@@ -31,7 +31,10 @@ export default function Home() {
           compareId={s.compareId}
           loading={s.loadingModel}
           loadError={s.loadError}
-          onPick={(id) => { void s.loadModel(id); }}
+          onPick={(id) => {
+            if (id === s.compareId) s.setCompareId(null);
+            void s.loadModel(id);
+          }}
           onPickCompare={s.setCompareId}
         />
         <Thread messages={s.messages} modelLabel={(id) => s.modelsInfo?.models.find((m) => m.id === id)?.label ?? id ?? ""} />
