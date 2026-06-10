@@ -179,6 +179,52 @@
   overflow: auto; white-space: pre-wrap;
 }
 
+/* ---- dataset table (table + expand) ---- */
+.dg-table { border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; overflow: hidden; }
+.dg-thead, .dg-tr {
+  display: grid;
+  grid-template-columns: 56px minmax(120px, 200px) 110px minmax(120px, 180px) 1fr;
+  gap: 0.6rem; align-items: center;
+  padding: 0.5rem 0.9rem;
+}
+.dg-thead {
+  background: rgba(255, 255, 255, 0.04); border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.07em; color: #6b6b76;
+}
+.dg-tr {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05); cursor: pointer;
+  transition: background .12s; font-size: 0.8rem; color: #cfcfd6;
+}
+.dg-tr:hover { background: rgba(255, 255, 255, 0.04); }
+.dg-tr.dg-open { background: rgba(255, 255, 255, 0.06); }
+.dg-td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dg-kind { font-size: 0.66rem; padding: 0.08rem 0.4rem; border-radius: 5px; border: 1px solid rgba(255,255,255,0.14); color: #9a9aa5; }
+.dg-detail {
+  padding: 0.9rem 1rem 1.1rem; background: rgba(0, 0, 0, 0.35);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.dg-detail-prompt { color: #b7b7c0; font-size: 0.82rem; margin-bottom: 0.7rem; line-height: 1.5; white-space: pre-wrap; }
+.dg-code-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0.7rem; }
+
+/* ---- code block + full-color syntax tokens ---- */
+.dg-code { border: 1px solid rgba(255, 255, 255, 0.09); border-radius: 10px; overflow: hidden; background: #0b0b11; }
+.dg-code-label {
+  font-size: 0.68rem; text-transform: lowercase; letter-spacing: 0.05em; color: #7a7a85;
+  padding: 0.35rem 0.7rem; border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.03); font-family: ui-monospace, Menlo, monospace;
+}
+.dg-code-pre { margin: 0; padding: 0.7rem 0.85rem; overflow: auto; max-height: 360px; }
+.dg-code-pre code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.76rem; line-height: 1.55;
+  color: #d7d7e0; white-space: pre;
+}
+.tok-kw   { color: #c678dd; }            /* keywords */
+.tok-type { color: #56b6c2; }            /* types */
+.tok-bi   { color: #e5c07b; }            /* builtins */
+.tok-str  { color: #98c379; }            /* strings */
+.tok-num  { color: #d19a66; }            /* numbers */
+.tok-com  { color: #6b7079; font-style: italic; }  /* comments */
+
 /* ---- charts ---- */
 .dg-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 0.9rem; }
 .dg-chart { padding: 0.85rem 0.95rem; }
