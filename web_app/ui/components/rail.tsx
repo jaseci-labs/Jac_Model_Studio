@@ -83,16 +83,19 @@ export function Rail(props: {
           <div key={key} className="mb-3">
             <div className="mb-1 flex justify-between text-[10px] text-neutral-400">
               <span>{key.replace("_", " ")}</span>
-              <span className="font-mono">{val}</span>
+              <span className="font-mono">{Number(val.toFixed(2))}</span>
             </div>
             <Slider
               min={min}
               max={max}
               step={step}
               value={[val]}
-              onValueChange={(v) =>
-                props.onSampling({ ...props.sampling, [key]: (v as number[])[0] })
-              }
+              onValueChange={(v) => {
+                const n = Array.isArray(v) ? v[0] : v;
+                if (typeof n === "number" && !Number.isNaN(n)) {
+                  props.onSampling({ ...props.sampling, [key]: n });
+                }
+              }}
             />
           </div>
         ))}
