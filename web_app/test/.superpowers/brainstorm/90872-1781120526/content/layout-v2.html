@@ -1,0 +1,84 @@
+<h2>A + C hybrid — two ways to merge</h2>
+<p class="subtitle">Both keep A's history sidebar and C's instrument rail. Difference: where the prompt library lives.</p>
+
+<div class="options">
+  <div class="option" data-choice="h1" onclick="toggleSelect(this)">
+    <div class="letter">1</div>
+    <div class="content">
+      <h3>Tabbed Left Sidebar</h3>
+      <p>Left sidebar = tabs: <b>Chats | Prompts</b>. Right rail = controls + stats, collapsible. Chat stays wide.</p>
+      <div class="mockup">
+        <div class="mockup-body">
+          <div style="display:flex;gap:8px;height:230px;font-size:10px;">
+            <div style="width:22%;border:1px solid #999;padding:6px;">
+              <div style="display:flex;border-bottom:1px solid #333;margin-bottom:4px;">
+                <div style="flex:1;text-align:center;font-weight:bold;border-bottom:2px solid #000;">Chats</div>
+                <div style="flex:1;text-align:center;color:#888;">Prompts</div>
+              </div>
+              <div style="border:1px solid #bbb;padding:3px;margin-bottom:6px;text-align:center;">+ New chat</div>
+              <div style="border-bottom:1px solid #ddd;padding:3px;">walker for BFS…</div>
+              <div style="border-bottom:1px solid #ddd;padding:3px;">convert dataclass…</div>
+            </div>
+            <div style="flex:1;border:1px solid #999;padding:6px;display:flex;flex-direction:column;">
+              <div style="display:flex;justify-content:space-between;border-bottom:1px solid #ddd;padding-bottom:4px;">
+                <b>[ Qwen DPO ▾ ]</b><span>⇄ compare</span>
+              </div>
+              <div style="flex:1;padding:4px;">
+                <div style="text-align:right;margin:4px;"><span style="border:1px solid #999;padding:2px 6px;">convert to jac…</span></div>
+                <div style="margin:4px;"><span style="border:1px solid #ccc;padding:2px 6px;">walker Counter { … }</span><br><span style="font-size:8px;color:#888;">42 tok/s · 312 tok · 7.4s</span></div>
+              </div>
+              <div style="border:1px solid #999;padding:4px;">Type a message…</div>
+            </div>
+            <div style="width:17%;border:1px solid #999;padding:6px;">
+              <div style="font-weight:bold;border-bottom:1px solid #333;">CONTROLS</div>
+              <div style="padding:2px;">temp ──●──</div>
+              <div style="padding:2px;">max tok ───●</div>
+              <div style="padding:2px;">top-p ──●──</div>
+              <div style="font-weight:bold;border-bottom:1px solid #333;margin-top:8px;">MODEL</div>
+              <div style="padding:2px;">loaded · 28GB</div>
+              <div style="padding:2px;color:#888;">⟨ collapse</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="h2" onclick="toggleSelect(this)">
+    <div class="letter">2</div>
+    <div class="content">
+      <h3>Prompts in Right Rail</h3>
+      <p>Left sidebar = chats only (A pure). Right rail = <b>prompt library on top</b>, controls + stats below. Everything visible at once, denser.</p>
+      <div class="mockup">
+        <div class="mockup-body">
+          <div style="display:flex;gap:8px;height:230px;font-size:10px;">
+            <div style="width:20%;border:1px solid #999;padding:6px;">
+              <div style="border:1px solid #bbb;padding:3px;margin-bottom:6px;text-align:center;">+ New chat</div>
+              <div style="border-bottom:1px solid #ddd;padding:3px;">walker for BFS…</div>
+              <div style="border-bottom:1px solid #ddd;padding:3px;">convert dataclass…</div>
+              <div style="border-bottom:1px solid #ddd;padding:3px;">explain impl block</div>
+            </div>
+            <div style="flex:1;border:1px solid #999;padding:6px;display:flex;flex-direction:column;">
+              <div style="display:flex;justify-content:space-between;border-bottom:1px solid #ddd;padding-bottom:4px;">
+                <b>[ Gemma DPO ▾ ]</b><span>⇄ compare</span>
+              </div>
+              <div style="flex:1;"></div>
+              <div style="border:1px solid #999;padding:4px;">Type a message…</div>
+            </div>
+            <div style="width:22%;border:1px solid #999;padding:6px;">
+              <div style="font-weight:bold;border-bottom:1px solid #333;">PROMPTS</div>
+              <div style="padding:2px;">▸ py→jac (12)</div>
+              <div style="padding:2px;">▸ idioms (8)</div>
+              <div style="padding:2px;">▸ explain (6)</div>
+              <div style="padding:2px;">▸ general (5)</div>
+              <div style="font-weight:bold;border-bottom:1px solid #333;margin-top:6px;">CONTROLS</div>
+              <div style="padding:2px;">temp ──●── · tok ───●</div>
+              <div style="font-weight:bold;border-bottom:1px solid #333;margin-top:6px;">STATS</div>
+              <div style="padding:2px;">42 tok/s · 7.4s</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

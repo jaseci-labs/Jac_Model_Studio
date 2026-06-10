@@ -1,0 +1,70 @@
+<h2>Train page — which structure?</h2>
+<p class="subtitle">Same HUD style. Train = pick model/mode/knobs, launch, watch orchestrator log. Two arrangements.</p>
+
+<div class="cards" style="display:flex;flex-direction:column;gap:18px;">
+
+  <!-- T1 STACKED -->
+  <div class="card" data-choice="t1-stacked" onclick="toggleSelect(this)" style="width:100%;">
+    <div class="card-image" style="background:#050507;padding:16px;display:block;">
+      <div style="font-family:ui-monospace,Menlo,monospace;max-width:760px;margin:0 auto;font-size:9px;">
+        <div style="border:1px solid #444;padding:5px 8px;color:#999;margin-bottom:8px;">⚠ HEAVY — 30B run hours long, near 48G ceiling. Don't run SFT + DPO same model.</div>
+        <div style="border:1px solid #666;padding:8px;margin-bottom:8px;color:#ccc;">
+          <div style="color:#777;margin-bottom:4px;">01 · MODEL</div>
+          <div style="display:flex;gap:8px;">
+            <span style="border:1px solid #555;padding:4px 8px;flex:2;">base model: Qwen/Qwen3-Coder-30B…</span>
+            <span style="border:1px solid #555;padding:4px 8px;flex:1;">name: qwen</span>
+            <span style="border:1px solid #fff;padding:4px 8px;">SFT</span><span style="border:1px dashed #555;padding:4px 8px;color:#666;">DPO</span>
+          </div>
+        </div>
+        <div style="border:1px solid #666;padding:8px;margin-bottom:8px;color:#ccc;">
+          <div style="color:#777;margin-bottom:4px;">02 · PARAMETERS (env knobs · SFT iters from configs/lora.yaml)</div>
+          <div style="display:flex;gap:8px;">
+            <span style="border:1px solid #555;padding:4px 8px;flex:1;">EVAL_EVERY 60</span>
+            <span style="border:1px solid #555;padding:4px 8px;flex:1;">SUBSET 50</span>
+            <span style="border:1px solid #555;padding:4px 8px;flex:1;">DRY_ITERS 30</span>
+            <span style="border:1px solid #555;padding:4px 8px;flex:1;">☐ skip dry</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;">
+          <span style="border:2px solid #4ade80;color:#4ade80;padding:6px 18px;">▶ START SFT</span>
+          <span style="border:1px solid #555;color:#777;padding:6px 14px;">■ STOP</span>
+          <span style="color:#4ade80;">⦿ RUNNING · pid 4421 · iter 480 · started 14:02</span>
+        </div>
+        <div style="border:1px dashed #555;padding:14px 10px;color:#888;text-align:center;">RUN LOG — full width (quantize / fuse / eval stages)</div>
+      </div>
+    </div>
+    <div class="card-body"><h3>T1 — Numbered stages, stacked</h3><p>01 MODEL → 02 PARAMETERS → launch row → full-width log. Reads top-to-bottom like a checklist; log gets full width.</p></div>
+  </div>
+
+  <!-- T2 SPLIT CONSOLE -->
+  <div class="card" data-choice="t2-console" onclick="toggleSelect(this)" style="width:100%;">
+    <div class="card-image" style="background:#050507;padding:16px;display:block;">
+      <div style="font-family:ui-monospace,Menlo,monospace;max-width:760px;margin:0 auto;font-size:9px;">
+        <div style="display:flex;gap:8px;">
+          <div style="flex:1;border:1px solid #666;padding:10px;color:#ccc;display:flex;flex-direction:column;gap:6px;">
+            <div style="color:#777;">LAUNCH.CONFIG</div>
+            <span style="border:1px solid #555;padding:4px 8px;">base: Qwen/Qwen3-Coder-30B…</span>
+            <span style="border:1px solid #555;padding:4px 8px;">name: qwen</span>
+            <div><span style="border:1px solid #fff;padding:3px 10px;">SFT</span> <span style="border:1px dashed #555;padding:3px 10px;color:#666;">DPO</span></div>
+            <span style="border:1px solid #555;padding:4px 8px;">EVAL_EVERY 60</span>
+            <span style="border:1px solid #555;padding:4px 8px;">SUBSET 50</span>
+            <span style="border:1px solid #555;padding:4px 8px;">DRY_ITERS 30 · ☐ skip</span>
+            <div style="color:#666;font-size:8px;">⚠ heavy: hours, near 48G</div>
+            <span style="border:2px solid #4ade80;color:#4ade80;padding:6px;text-align:center;">▶ START SFT</span>
+          </div>
+          <div style="flex:1.6;border:1px solid #666;padding:10px;color:#ccc;display:flex;flex-direction:column;gap:6px;">
+            <div style="display:flex;gap:8px;align-items:center;">
+              <span style="color:#777;">RUN.STATUS</span>
+              <span style="color:#4ade80;">⦿ RUNNING</span>
+              <span style="color:#888;">pid 4421 · iter 480 · 2h14m</span>
+              <span style="margin-left:auto;border:1px solid #555;color:#777;padding:2px 8px;">■ STOP</span>
+            </div>
+            <div style="border:1px dashed #555;padding:8px;color:#888;flex:1;line-height:1.8;">RUN LOG (tall, sticky)<br/>fuse: writing fused-model…<br/>eval: 42/150 pass…<br/>iter 480: train 0.412<br/>…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body"><h3>T2 — Split console</h3><p>Config form fixed left, status + tall log right. See knobs and output simultaneously; less scrolling, denser.</p></div>
+  </div>
+
+</div>

@@ -1,0 +1,83 @@
+<h2>Ingest page — which structure?</h2>
+<p class="subtitle">Ingest = dataset stats, 12 builder stages (pipeline order), JSONL preview with paging, append raw examples. Two arrangements.</p>
+
+<div class="cards" style="display:flex;flex-direction:column;gap:18px;">
+
+  <!-- I1 PIPELINE STEPPER -->
+  <div class="card" data-choice="i1-stepper" onclick="toggleSelect(this)" style="width:100%;">
+    <div class="card-image" style="background:#050507;padding:16px;display:block;">
+      <div style="font-family:ui-monospace,Menlo,monospace;max-width:760px;margin:0 auto;font-size:9px;">
+        <div style="display:flex;gap:8px;margin-bottom:8px;">
+          <div style="border:1px solid #666;padding:8px;flex:1;color:#ccc;text-align:center;">SFT 1616</div>
+          <div style="border:1px solid #666;padding:8px;flex:1;color:#ccc;text-align:center;">DPO 60</div>
+          <div style="border:1px solid #666;padding:8px;flex:1;color:#ccc;text-align:center;">MLX 1454/162</div>
+          <div style="border:1px solid #666;padding:8px;flex:1;color:#ccc;text-align:center;">HOLDOUT 150/45</div>
+        </div>
+        <div style="border:1px solid #666;padding:8px;margin-bottom:8px;color:#ccc;">
+          <div style="color:#777;margin-bottom:6px;">PIPELINE — run in order, top to bottom</div>
+          <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;line-height:2.2;">
+            <span style="border:1px solid #4ade80;color:#4ade80;padding:3px 8px;">✓ seed</span><span style="color:#555;">→</span>
+            <span style="border:1px solid #4ade80;color:#4ade80;padding:3px 8px;">✓ idiom-1</span><span style="color:#555;">→</span>
+            <span style="border:1px solid #4ade80;color:#4ade80;padding:3px 8px;">✓ idiom-2</span><span style="color:#555;">→</span>
+            <span style="border:1px solid #fff;color:#fff;padding:3px 8px;">⦿ scale (running)</span><span style="color:#555;">→</span>
+            <span style="border:1px dashed #555;color:#777;padding:3px 8px;">dpo pairs</span><span style="color:#555;">→</span>
+            <span style="border:1px dashed #555;color:#777;padding:3px 8px;">manifest</span><span style="color:#555;">→</span>
+            <span style="border:1px dashed #555;color:#777;padding:3px 8px;">splits</span><span style="color:#555;">→</span>
+            <span style="border:1px dashed #555;color:#777;padding:3px 8px;">holdout</span><span style="color:#555;">→</span>
+            <span style="border:1px dashed #555;color:#777;padding:3px 8px;">stats</span>
+          </div>
+          <div style="border:1px dashed #555;padding:6px;color:#888;margin-top:6px;">stage log tail — scale_conversion: 412/600 rows…</div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:2px;color:#999;">
+          <span style="border-bottom:1px solid #fff;color:#fff;padding:3px 8px;">PREVIEW</span>
+          <span style="padding:3px 8px;color:#666;">ADD EXAMPLES</span>
+        </div>
+        <div style="border:1px solid #666;padding:10px;color:#888;">
+          file: sft.jsonl (1616) · rows 0–8 · ‹ ›<br/>
+          <span style="color:#666;">{"messages":[{"role":"user","content":"Convert this…"}]} …syntax-colored…</span>
+        </div>
+      </div>
+    </div>
+    <div class="card-body"><h3>I1 — Pipeline stepper + tabs</h3><p>Stages as ordered arrow chain with live status (✓ done, ⦿ running, dashed = pending). Preview/Add as tabs below. Pipeline order self-evident.</p></div>
+  </div>
+
+  <!-- I2 THREE PANEL -->
+  <div class="card" data-choice="i2-panels" onclick="toggleSelect(this)" style="width:100%;">
+    <div class="card-image" style="background:#050507;padding:16px;display:block;">
+      <div style="font-family:ui-monospace,Menlo,monospace;max-width:760px;margin:0 auto;font-size:9px;">
+        <div style="display:flex;gap:8px;margin-bottom:8px;">
+          <div style="border:1px solid #666;padding:8px;flex:1;color:#ccc;text-align:center;">SFT 1616</div>
+          <div style="border:1px solid #666;padding:8px;flex:1;color:#ccc;text-align:center;">DPO 60</div>
+          <div style="border:1px solid #666;padding:8px;flex:1;color:#ccc;text-align:center;">MLX 1454/162</div>
+          <div style="border:1px solid #666;padding:8px;flex:1;color:#ccc;text-align:center;">HOLDOUT 150/45</div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <div style="flex:1;border:1px solid #666;padding:8px;color:#ccc;">
+            <div style="color:#777;margin-bottom:4px;">BUILDERS</div>
+            <div style="line-height:2;">
+              <span style="color:#4ade80;">✓</span> seed<br/>
+              <span style="color:#4ade80;">✓</span> idiom-1 · 2 · 3<br/>
+              <span style="color:#fff;">⦿</span> scale <span style="color:#666;">(slow)</span><br/>
+              <span style="color:#666;">○</span> dpo pairs<br/>
+              <span style="color:#666;">○</span> manifest<br/>
+              <span style="color:#666;">○</span> splits · holdout<br/>
+              <span style="color:#666;">○</span> stats
+            </div>
+            <div style="border:1px dashed #555;padding:5px;color:#888;margin-top:6px;">log: 412/600 rows…</div>
+          </div>
+          <div style="flex:2;display:flex;flex-direction:column;gap:8px;">
+            <div style="border:1px solid #666;padding:10px;color:#888;flex:1;">
+              <div style="color:#777;">PREVIEW — sft.jsonl (1616) · rows 0–8 · ‹ ›</div>
+              <span style="color:#666;">{"messages":[…]} syntax-colored rows…</span>
+            </div>
+            <div style="border:1px solid #666;padding:10px;color:#888;">
+              <div style="color:#777;">ADD EXAMPLES — target ▾ · textarea · APPEND</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body"><h3>I2 — Builder rail + work area</h3><p>Builders as vertical checklist left (status glyph per stage), preview big + add-form right. Everything on screen, no tabs.</p></div>
+  </div>
+
+</div>

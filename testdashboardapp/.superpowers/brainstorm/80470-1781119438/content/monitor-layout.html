@@ -1,0 +1,83 @@
+<h2>Monitor page — which layout?</h2>
+<p class="subtitle">Style is locked (HUD, subtle accents). Now structure: where do stats, charts, and the live log go? Wireframes below — boxes are placeholders, judge arrangement only.</p>
+
+<div class="cards" style="display:flex;flex-direction:column;gap:18px;">
+
+  <!-- L1 CLASSIC STACK -->
+  <div class="card" data-choice="l1-stack" onclick="toggleSelect(this)" style="width:100%;">
+    <div class="card-image" style="background:#050507;padding:16px;display:block;">
+      <div style="font-family:ui-monospace,Menlo,monospace;max-width:760px;margin:0 auto;font-size:9px;">
+        <div style="border:1px solid #444;padding:4px 8px;color:#999;margin-bottom:8px;">NAV — run selector · SFT/DPO · auto-refresh</div>
+        <div style="display:flex;gap:8px;margin-bottom:8px;">
+          <div style="border:1px solid #666;padding:10px;flex:1;color:#ccc;text-align:center;">PASS<br/>82%</div>
+          <div style="border:1px solid #666;padding:10px;flex:1;color:#ccc;text-align:center;">TRN<br/>0.41</div>
+          <div style="border:1px solid #666;padding:10px;flex:1;color:#ccc;text-align:center;">VAL<br/>0.58</div>
+          <div style="border:1px solid #666;padding:10px;flex:1;color:#ccc;text-align:center;">TOK/S<br/>412</div>
+          <div style="border:1px solid #666;padding:10px;flex:1;color:#ccc;text-align:center;">IDIOM<br/>0.62</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+          <div style="border:1px solid #888;padding:18px 10px;color:#fff;text-align:center;">CHART · train loss ◢</div>
+          <div style="border:1px solid #888;padding:18px 10px;color:#fff;text-align:center;">CHART · val loss ◢</div>
+          <div style="border:1px solid #888;padding:18px 10px;color:#fff;text-align:center;">CHART · pass curve ◢</div>
+          <div style="border:1px solid #888;padding:18px 10px;color:#fff;text-align:center;">CHART · lr / tok-s ◢</div>
+        </div>
+        <div style="border:1px dashed #555;padding:12px 10px;color:#888;text-align:center;">LOG.TAIL — full width, scrolls</div>
+      </div>
+    </div>
+    <div class="card-body"><h3>L1 — Classic stack (current structure, cleaned)</h3><p>Stats strip → 2×2 chart grid → log at bottom. Familiar; log needs scrolling to see.</p></div>
+  </div>
+
+  <!-- L2 HERO + RAIL -->
+  <div class="card" data-choice="l2-hero" onclick="toggleSelect(this)" style="width:100%;">
+    <div class="card-image" style="background:#050507;padding:16px;display:block;">
+      <div style="font-family:ui-monospace,Menlo,monospace;max-width:760px;margin:0 auto;font-size:9px;">
+        <div style="border:1px solid #444;padding:4px 8px;color:#999;margin-bottom:8px;">NAV — run selector · SFT/DPO · auto-refresh</div>
+        <div style="display:flex;gap:8px;margin-bottom:8px;">
+          <div style="flex:2.4;display:flex;flex-direction:column;gap:8px;">
+            <div style="border:1px solid #fff;padding:34px 10px;color:#fff;text-align:center;">HERO CHART — one big chart, switchable<br/><span style="color:#777;">(loss / pass curve / lr / tok-s tabs)</span></div>
+            <div style="display:flex;gap:8px;">
+              <div style="border:1px solid #666;padding:8px;flex:1;color:#aaa;text-align:center;">spark ◢ trn</div>
+              <div style="border:1px solid #666;padding:8px;flex:1;color:#aaa;text-align:center;">spark ◢ val</div>
+              <div style="border:1px solid #666;padding:8px;flex:1;color:#aaa;text-align:center;">spark ◢ pass</div>
+              <div style="border:1px solid #666;padding:8px;flex:1;color:#aaa;text-align:center;">spark ◢ lr</div>
+            </div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;gap:8px;">
+            <div style="border:1px solid #666;padding:8px;color:#ccc;text-align:center;">PASS 82% ▲</div>
+            <div style="border:1px solid #666;padding:8px;color:#ccc;text-align:center;">TRN 0.41 ▼</div>
+            <div style="border:1px solid #666;padding:8px;color:#ccc;text-align:center;">VAL 0.58 —</div>
+            <div style="border:1px solid #666;padding:8px;color:#ccc;text-align:center;">IDIOM 0.62</div>
+            <div style="border:1px dashed #555;padding:14px 8px;color:#888;text-align:center;flex:1;">LOG.TAIL<br/>(side, always visible)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body"><h3>L2 — Hero chart + side rail</h3><p>One big switchable chart (click sparkline to swap in), stats + log stacked in right rail. Best for "stare at loss for hours"; log always on screen.</p></div>
+  </div>
+
+  <!-- L3 SPLIT COCKPIT -->
+  <div class="card" data-choice="l3-cockpit" onclick="toggleSelect(this)" style="width:100%;">
+    <div class="card-image" style="background:#050507;padding:16px;display:block;">
+      <div style="font-family:ui-monospace,Menlo,monospace;max-width:760px;margin:0 auto;font-size:9px;">
+        <div style="border:1px solid #444;padding:4px 8px;color:#999;margin-bottom:8px;">NAV + STATUS STRIP — run · mode · ⦿ ACTIVE · iter 480 · 2h14m · eta</div>
+        <div style="display:flex;gap:8px;">
+          <div style="flex:1.8;display:flex;flex-direction:column;gap:8px;">
+            <div style="display:flex;gap:8px;">
+              <div style="border:1px solid #666;padding:8px;flex:1;color:#ccc;text-align:center;">PASS 82%</div>
+              <div style="border:1px solid #666;padding:8px;flex:1;color:#ccc;text-align:center;">TRN 0.41</div>
+              <div style="border:1px solid #666;padding:8px;flex:1;color:#ccc;text-align:center;">VAL 0.58</div>
+            </div>
+            <div style="border:1px solid #888;padding:16px 10px;color:#fff;text-align:center;">CHART · losses overlaid ◢◢</div>
+            <div style="border:1px solid #888;padding:16px 10px;color:#fff;text-align:center;">CHART · pass curve ◢</div>
+          </div>
+          <div style="flex:1;border:1px dashed #555;padding:10px;color:#888;display:flex;flex-direction:column;">
+            <div style="color:#aaa;margin-bottom:6px;">LOG.TAIL — sticky full-height column</div>
+            <div style="color:#666;line-height:1.8;">iter 480: train 0.412<br/>iter 470: train 0.418<br/>iter 460: val 0.581 ✓<br/>iter 450: train 0.425<br/>…<br/>…<br/>…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body"><h3>L3 — Split cockpit</h3><p>Charts left (losses overlaid in one chart + pass curve), log gets a permanent full-height right column. Status strip merged into nav. Most "mission control"; log is first-class.</p></div>
+  </div>
+
+</div>

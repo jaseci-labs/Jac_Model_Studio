@@ -1,0 +1,95 @@
+<h2>Four more monochrome directions</h2>
+<p class="subtitle">Previous three (Ink &amp; Paper / Brutalist / Soft Mono) still on the table. Click any.</p>
+
+<div class="options">
+  <div class="option" data-choice="swiss" onclick="toggleSelect(this)">
+    <div class="letter">D</div>
+    <div class="content">
+      <h3>Swiss Grid</h3>
+      <p>White, Helvetica, oversized numerals, exposed grid lines, heavy black bars. International Typographic style.</p>
+      <div style="background:#fff;color:#000;border:2px solid #000;font-family:Helvetica,Arial,sans-serif;">
+        <div style="display:flex;border-bottom:2px solid #000;">
+          <div style="background:#000;color:#fff;padding:8px 12px;font-weight:bold;font-size:14px;letter-spacing:-0.5px;">JAC—STUDIO</div>
+          <div style="flex:1;display:flex;align-items:center;justify-content:flex-end;padding:0 10px;font-size:10px;border-left:1px solid #000;">QWEN DPO ▾ &nbsp;|&nbsp; ⇄</div>
+        </div>
+        <div style="padding:12px;font-size:12px;background-image:linear-gradient(#eee 1px,transparent 1px);background-size:100% 24px;">
+          <div style="text-align:right;margin:6px 0;"><span style="background:#000;color:#fff;padding:3px 8px;">Convert this dataclass to Jac</span></div>
+          <div style="margin:6px 0;">
+            <div style="border-left:4px solid #000;padding:6px 10px;font-family:monospace;font-size:11px;">node Person {<br>&nbsp;&nbsp;has name: str;<br>}</div>
+            <div style="font-size:22px;font-weight:bold;margin-top:4px;">42<span style="font-size:9px;font-weight:normal;"> TOK/S</span> &nbsp;312<span style="font-size:9px;font-weight:normal;"> TOK</span> &nbsp;7.4<span style="font-size:9px;font-weight:normal;"> S</span></div>
+          </div>
+        </div>
+        <div style="border-top:2px solid #000;padding:8px 12px;font-size:11px;color:#999;">Type a message ________________</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="noir" onclick="toggleSelect(this)">
+    <div class="letter">E</div>
+    <div class="content">
+      <h3>Noir Glass</h3>
+      <p>Deep black, frosted translucent panels, soft white glow, dramatic spotlighting. Museum at night.</p>
+      <div style="background:radial-gradient(ellipse at 30% 0%,#222 0%,#000 70%);color:#fff;border:1px solid #2a2a2a;border-radius:14px;padding:14px;font-family:-apple-system,Helvetica,sans-serif;">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:10px;">
+          <span style="font-weight:300;font-size:15px;letter-spacing:4px;">JAC STUDIO</span>
+          <span style="background:rgba(255,255,255,0.08);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,0.2);border-radius:20px;padding:3px 12px;font-size:10px;box-shadow:0 0 18px rgba(255,255,255,0.12);">Qwen DPO ▾</span>
+        </div>
+        <div style="font-size:12px;">
+          <div style="text-align:right;margin:8px 0;"><span style="background:rgba(255,255,255,0.95);color:#000;border-radius:12px;padding:4px 12px;box-shadow:0 0 22px rgba(255,255,255,0.25);">Convert this dataclass to Jac</span></div>
+          <div style="margin:8px 0;">
+            <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:8px;font-family:monospace;font-size:11px;backdrop-filter:blur(4px);">node Person {<br>&nbsp;&nbsp;has name: str;<br>}</div>
+            <div style="font-size:9px;color:#777;margin-top:4px;letter-spacing:1px;">42 tok/s — 7.4s</div>
+          </div>
+        </div>
+        <div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:24px;padding:7px 12px;font-size:11px;color:#888;">Ask the model…</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="blueprint" onclick="toggleSelect(this)">
+    <div class="letter">F</div>
+    <div class="content">
+      <h3>Schematic</h3>
+      <p>Technical drawing on black: hairlines, dotted grid, crosshairs, annotation callouts. Engineering blueprint, grayscale.</p>
+      <div style="background:#050505;background-image:radial-gradient(#1c1c1c 1px,transparent 1px);background-size:14px 14px;color:#e8e8e8;border:1px solid #444;padding:14px;font-family:'SF Mono',Menlo,monospace;">
+        <div style="display:flex;justify-content:space-between;border-bottom:1px dashed #555;padding-bottom:8px;font-size:10px;">
+          <span>┌ JAC.STUDIO ─ fig.1</span>
+          <span>MODEL: QWEN_DPO ▾ ──○</span>
+        </div>
+        <div style="padding:12px 0;font-size:11px;">
+          <div style="text-align:right;margin:8px 0;"><span style="border:1px dashed #777;padding:3px 8px;">convert this dataclass to jac ◄</span></div>
+          <div style="margin:8px 0;">
+            <div style="border:1px solid #666;padding:8px;position:relative;">
+              <span style="position:absolute;top:-7px;left:8px;background:#050505;padding:0 6px;font-size:8px;color:#999;">OUTPUT.JAC</span>
+              node Person {<br>&nbsp;&nbsp;has name: str;<br>}
+            </div>
+            <div style="font-size:9px;color:#888;margin-top:4px;">└─ 42 tok/s · 312 tok · Δ7.4s</div>
+          </div>
+        </div>
+        <div style="border:1px solid #666;padding:6px;font-size:11px;color:#888;">≫ input _</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="print" onclick="toggleSelect(this)">
+    <div class="letter">G</div>
+    <div class="content">
+      <h3>Broadsheet</h3>
+      <p>Newspaper: condensed bold headlines, column rules, black blocks, halftone texture. Loud print poster.</p>
+      <div style="background:#f4f1ea;color:#111;border:1px solid #111;padding:0;font-family:Georgia,serif;">
+        <div style="border-bottom:3px double #111;padding:8px 12px;display:flex;justify-content:space-between;align-items:baseline;">
+          <span style="font-family:Impact,'Arial Black',sans-serif;font-size:20px;letter-spacing:1px;">THE JAC TIMES</span>
+          <span style="font-size:9px;font-style:italic;">Vol. 1 — Qwen DPO Edition ▾</span>
+        </div>
+        <div style="padding:10px 12px;font-size:12px;">
+          <div style="text-align:right;margin:6px 0;"><span style="background:#111;color:#f4f1ea;padding:3px 8px;font-family:Impact,sans-serif;font-size:11px;">CONVERT THIS DATACLASS TO JAC</span></div>
+          <div style="margin:6px 0;column-rule:1px solid #999;">
+            <div style="border:1px solid #111;padding:8px;font-family:monospace;font-size:11px;background:#fff;">node Person {<br>&nbsp;&nbsp;has name: str;<br>}</div>
+            <div style="font-size:9px;font-style:italic;color:#555;margin-top:4px;">— filed at 42 tok/s, 312 words, 7.4 seconds</div>
+          </div>
+        </div>
+        <div style="border-top:1px solid #111;padding:8px 12px;font-size:11px;font-style:italic;color:#777;">Submit your inquiry…</div>
+      </div>
+    </div>
+  </div>
+</div>
