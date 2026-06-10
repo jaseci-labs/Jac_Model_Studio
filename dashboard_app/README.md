@@ -1,14 +1,22 @@
 # Training Dashboard (jac-client / jac-desktop)
 
-Live GUI for the DataGeneration SFT→DPO pipeline. Three screens:
+Live GUI for the DataGeneration SFT→DPO pipeline. Five screens:
 
-- **Monitor** — live charts for a run (SFT or DPO): train/val loss, learning
-  rate, tokens/sec, the holdout test-pass learning curve, and the idiom
-  summary. Auto-refreshes every 2 s.
-- **Train** — pick base model + name + mode + hyperparameters, start/stop runs
-  (detached subprocess of `run_probe.sh` / `run_dpo.sh`), watch the run log.
-- **Ingest** — dataset stats, paged JSONL preview, run the Jac builders, and
-  append raw examples to the conversion sources.
+- **Monitor** — live-only: streams the currently-running run's charts
+  (train/val loss, lr, tokens/sec, holdout test-pass curve, idiom stats).
+  Auto-refreshes every 2.5 s; finished runs move to History.
+- **History** — browse any past run's metrics snapshot, plus the
+  compare-all-runs overlay (qwen vs gemma).
+- **Train** — split console: pick base model + name + mode + hyperparameters,
+  start/stop runs (detached subprocess of `run_probe.sh` / `run_dpo.sh`),
+  watch the run log.
+- **Ingest** — dataset stats, builder rail (pipeline order), paged JSONL
+  preview, append raw examples to the conversion sources.
+- **Dataset** — corpus browser: table + expandable rows with server-side
+  syntax-highlighted Python/Jac code.
+
+UI: sci-fi HUD design system (mono dark, semantic accents) — see
+`docs/superpowers/specs/2026-06-10-dashboard-hud-redesign-design.md`.
 
 It does **not** rewrite the training pipeline: the server walkers read the same
 artifacts `run_probe.sh` / `run_dpo.sh` already produce
