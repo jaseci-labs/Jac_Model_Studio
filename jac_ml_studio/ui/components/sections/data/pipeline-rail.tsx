@@ -70,7 +70,7 @@ export function PipelineRail({
                   {/* Warning under seed_conversion */}
                   {stage === "seed_conversion" && (
                     <div className="stat-line ml-8 mt-0.5 mb-1 border-l-2 border-neutral-600 pl-2">
-                      TRUNCATES sft.jsonl→32 · dpo.jsonl→2 — run idiomatic batches + graph_seeds after
+                      TRUNCATES sft.jsonl→32 · dpo.jsonl→2 — run idiomatic batches after, then downstream stages
                     </div>
                   )}
                 </div>

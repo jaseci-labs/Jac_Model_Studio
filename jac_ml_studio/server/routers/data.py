@@ -1,6 +1,6 @@
 """APIRouters for /api/dataset and /api/builders endpoints."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 import builders
@@ -29,7 +29,7 @@ def get_files():
 
 
 @dataset_router.get("/rows")
-def get_rows(path: str, offset: int = 0, limit: int = 25):
+def get_rows(path: str, offset: int = Query(default=0, ge=0), limit: int = Query(default=25, ge=1)):
     try:
         return datasets.rows(path, offset, limit)
     except ValueError as exc:

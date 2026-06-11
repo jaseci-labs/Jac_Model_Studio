@@ -264,9 +264,13 @@ def add_examples(target: str, text: str) -> dict:
     if valid:
         p = _abs(rel)
         p.parent.mkdir(parents=True, exist_ok=True)
-        existing = p.read_text() if p.exists() else ""
-        if existing and not existing.endswith("\n"):
-            existing += "\n"
-        p.write_text(existing + "\n".join(valid) + "\n")
+        if p.exists() and p.stat().st_size > 0:
+            with open(p, "rb") as f:
+                f.seek(-1, 2)
+                if f.read(1) != b"\n":
+                    with open(p, "a") as fa:
+                        fa.write("\n")
+        with open(p, "a") as fa:
+            fa.write("\n".join(valid) + "\n")
 
     return {"added": len(valid), "errors": errors, "total": _line_count(_abs(rel))}

@@ -101,6 +101,8 @@ def start_training(body: StartRequest):
     # Validate name
     if not procs.safe(name):
         raise HTTPException(400, "invalid name")
+    if name in config.EXCLUDED_RUN_DIRS:
+        raise HTTPException(400, "reserved name")
     # Validate mode
     if mode not in ("sft", "dpo"):
         raise HTTPException(400, "mode must be sft|dpo")
@@ -128,6 +130,10 @@ def start_training(body: StartRequest):
             val = body.opts[k]
             if procs.safe(val):
                 env_overrides[k] = val
+
+    # Collect ignored (non-whitelisted) opt keys for the response message
+    ignored = [k for k in body.opts if k not in keys]
+    msg = "ignored opts: " + ", ".join(sorted(ignored)) if ignored else "started"
 
     # Prepend venv bin to PATH
     venv_bin = str(config.data_root() / ".venv" / "bin")
@@ -166,7 +172,7 @@ def start_training(body: StartRequest):
         "cmd": inner,
     })
 
-    return _build_status(name, mode, "started")
+    return _build_status(name, mode, msg)
 
 
 @router.post("/stop")

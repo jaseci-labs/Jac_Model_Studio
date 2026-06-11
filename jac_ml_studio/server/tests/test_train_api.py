@@ -146,6 +146,25 @@ class TestStartTraining:
         assert r.status_code == 200
         assert r.json()["message"] == "already running"
 
+    def test_reserved_name_returns_400(self, client):
+        r = client.post("/api/train/start", json={
+            "name": "_evals",
+            "mode": "sft",
+            "model_id": "models/qwen-jac-fused-q8",
+        })
+        assert r.status_code == 400
+        assert "reserved" in r.json()["detail"].lower()
+
+    def test_bogus_opt_message_mentions_key(self, client, fake_root):
+        r = client.post("/api/train/start", json={
+            "opts": {"BOGUS": "1"},
+            "name": "qwen",
+            "mode": "sft",
+            "model_id": "models/qwen-jac-fused-q8",
+        })
+        assert r.status_code == 200
+        assert "BOGUS" in r.json()["message"]
+
     def test_restart_does_not_see_stale_exit_marker(self, client, fake_root):
         """Fix 1: runlog is truncated before spawn so a previous __EXIT__ 0 is erased.
 

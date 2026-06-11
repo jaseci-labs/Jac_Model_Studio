@@ -77,6 +77,20 @@ export function EvalCompare({ history }: EvalCompareProps) {
     if (best !== null) bestPerCol[holdout] = best;
   }
 
+  // For columns with no probe scores, highlight the lowest avg_sim idiom cell
+  const bestIdiomPerCol: Record<string, number> = {};
+  for (const holdout of holdouts) {
+    if (bestPerCol[holdout] != null) continue; // probe column already handled
+    let best: number | null = null;
+    for (const model of models) {
+      const cell = pivot[model][holdout];
+      if (cell?.kind === "idiom" && (best === null || cell.score < best)) {
+        best = cell.score;
+      }
+    }
+    if (best !== null) bestIdiomPerCol[holdout] = best;
+  }
+
   return (
     <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-4 pt-5">
       <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">
@@ -110,9 +124,12 @@ export function EvalCompare({ history }: EvalCompareProps) {
                 {holdouts.map((holdout) => {
                   const cell = pivot[model][holdout];
                   const isBest =
-                    cell?.kind === "probe" &&
-                    bestPerCol[holdout] != null &&
-                    cell.score === bestPerCol[holdout];
+                    (cell?.kind === "probe" &&
+                      bestPerCol[holdout] != null &&
+                      cell.score === bestPerCol[holdout]) ||
+                    (cell?.kind === "idiom" &&
+                      bestIdiomPerCol[holdout] != null &&
+                      cell.score === bestIdiomPerCol[holdout]);
                   return (
                     <td
                       key={holdout}

@@ -232,3 +232,13 @@ def test_add_examples_bad_target(dataset_root):
     client = make_client(dataset_root)
     r = client.post("/api/dataset/examples", json={"target": "evil", "text": "{}"})
     assert r.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# /api/dataset/rows  — validation
+# ---------------------------------------------------------------------------
+
+def test_rows_negative_offset_returns_422(dataset_root):
+    client = make_client(dataset_root)
+    r = client.get("/api/dataset/rows", params={"path": "dataset/conversion/sft.jsonl", "offset": -1})
+    assert r.status_code == 422
