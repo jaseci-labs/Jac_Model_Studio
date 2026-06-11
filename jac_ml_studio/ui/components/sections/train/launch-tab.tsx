@@ -41,9 +41,9 @@ export function LaunchTab({
   const optKeys = form.mode === "sft" ? sftKeys : dpoKeys;
 
   return (
-    <div className="flex gap-4 p-4 h-full min-h-0">
+    <div className="flex items-start gap-4 p-4 pt-5">
       {/* LEFT — LAUNCH.CONFIG */}
-      <div className="relative flex-1 rounded-md border border-neutral-800 bg-[#0d0d0d] p-4 pt-5 flex flex-col gap-3 min-w-0 overflow-y-auto">
+      <div className="relative flex-1 rounded-md border border-neutral-800 bg-[#0d0d0d] p-4 pt-5 flex flex-col gap-3 min-w-0">
         <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">LAUNCH.CONFIG</span>
 
         {form.mode === "sft" && (
@@ -110,7 +110,7 @@ export function LaunchTab({
       </div>
 
       {/* RIGHT — RUN.STATUS */}
-      <div className="relative flex-1 rounded-md border border-neutral-800 bg-[#0d0d0d] p-4 pt-5 flex flex-col gap-3 min-w-0 overflow-y-auto">
+      <div className="relative flex-1 rounded-md border border-neutral-800 bg-[#0d0d0d] p-4 pt-5 flex flex-col gap-3 min-w-0">
         <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">RUN.STATUS</span>
 
         <div className="flex items-center gap-3 flex-wrap">
