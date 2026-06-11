@@ -80,4 +80,6 @@ export const trainApi = {
     j<JobStatus>("/api/train/start", { method: "POST", body: JSON.stringify(body) }),
   stop: (name: string, mode: string) =>
     j<JobStatus>("/api/train/stop", { method: "POST", body: JSON.stringify({ name, mode }) }),
+  update: () =>
+    j<{ ok: boolean; message: string }>("/api/system/update", { method: "POST" }),
 };

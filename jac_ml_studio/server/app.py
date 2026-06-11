@@ -14,6 +14,7 @@ import db
 import generate
 import routers.evals
 import routers.runs
+import routers.system
 import routers.train
 import routers.data
 from model_manager import ModelManager
@@ -236,6 +237,7 @@ def create_app(loader=None, stream_fn=None) -> FastAPI:
         return json.loads(p.read_text())
 
     app.include_router(routers.runs.router)
+    app.include_router(routers.system.router)
     app.include_router(routers.train.router)
     app.include_router(routers.data.dataset_router)
     app.include_router(routers.data.builder_router)

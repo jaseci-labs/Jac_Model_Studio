@@ -45,14 +45,21 @@ export function useTrain(active: boolean) {
   const [stalledFor, setStalledFor] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
+  // History-specific state
+  const [historyView, setHistoryView] = useState<"runs" | "compare">("runs");
+  const [historySel, setHistorySel] = useState<{ name: string; mode: string } | null>(null);
+  const [historyMetrics, setHistoryMetrics] = useState<RunMetrics | null>(null);
+
   const lastIterRef = useRef<number>(-1);
   const samePollsRef = useRef<number>(0);
   // Keep a ref so the sessions poll callback can read current selected without closure staleness
   const selectedRef = useRef<{ name: string; mode: string } | null>(null);
   useEffect(() => { selectedRef.current = selected; });
 
+  const historySelRef = useRef<{ name: string; mode: string } | null>(null);
+  useEffect(() => { historySelRef.current = historySel; });
+
   // Sessions poll — always active when section is active.
-  // Auto-select is computed here (inside async callback, not synchronously in effect body).
   usePoll(
     async () => {
       try {
@@ -60,17 +67,20 @@ export function useTrain(active: boolean) {
         const all: Session[] = res.sessions;
         setSessions(all);
 
-        // Auto-select: pick best candidate if current selection is gone
+        // Monitor auto-select: only pick running sessions
         const running = all.filter((s) => s.status === "running");
         const cur = selectedRef.current;
         if (cur) {
-          const still = all.find((s) => s.name === cur.name && s.mode === cur.mode);
-          if (still) return; // selection still valid
+          // If selected session is no longer running, clear it (it moved to history)
+          const stillRunning = running.find((s) => s.name === cur.name && s.mode === cur.mode);
+          if (!stillRunning) {
+            setSelected(null);
+            lastIterRef.current = -1;
+            samePollsRef.current = 0;
+          }
         }
-        // Nothing valid — pick newest running, else first session
-        const candidate = running.length > 0 ? running[0] : all[0];
-        if (candidate) {
-          setSelected({ name: candidate.name, mode: candidate.mode });
+        if (!selectedRef.current && running.length > 0) {
+          setSelected({ name: running[0].name, mode: running[0].mode });
           lastIterRef.current = -1;
           samePollsRef.current = 0;
         }
@@ -145,6 +155,34 @@ export function useTrain(active: boolean) {
     return () => { cancelled = true; };
   }, [compareFetchActive, compareMode]);
 
+  // History runs view: fetch metrics once when historySel changes
+  useEffect(() => {
+    if (!active || tab !== "history" || historyView !== "runs" || !historySel) return;
+    let cancelled = false;
+    trainApi
+      .metrics(historySel.name, historySel.mode)
+      .then((m) => {
+        if (!cancelled) setHistoryMetrics(m);
+      })
+      .catch(() => { /* silent */ });
+    return () => { cancelled = true; };
+  }, [active, tab, historyView, historySel]);
+
+  // Auto-select first non-running session when entering history runs view with nothing selected.
+  // Deferred to avoid calling setState synchronously in the effect body.
+  useEffect(() => {
+    if (!active || tab !== "history" || historyView !== "runs") return;
+    if (historySelRef.current) return;
+    const candidate = sessions.find((s) => s.mode === compareMode && s.status !== "running");
+    if (!candidate) return;
+    const id = setTimeout(() => {
+      if (!historySelRef.current) {
+        setHistorySel({ name: candidate.name, mode: candidate.mode });
+      }
+    }, 0);
+    return () => clearTimeout(id);
+  }, [active, tab, historyView, sessions, compareMode]);
+
   // Actions
   const start = useCallback(async () => {
     const keys = form.mode === "sft" ? SFT_OPT_KEYS : DPO_OPT_KEYS;
@@ -191,6 +229,11 @@ export function useTrain(active: boolean) {
     setStalledFor(0);
   }, []);
 
+  const pickHistorySession = useCallback((name: string, mode: string) => {
+    setHistorySel({ name, mode });
+    setHistoryMetrics(null);
+  }, []);
+
   return {
     tab,
     setTab,
@@ -210,6 +253,11 @@ export function useTrain(active: boolean) {
     error,
     start,
     stop,
+    historyView,
+    setHistoryView,
+    historySel,
+    pickHistorySession,
+    historyMetrics,
     SFT_OPT_KEYS,
     DPO_OPT_KEYS,
   };
