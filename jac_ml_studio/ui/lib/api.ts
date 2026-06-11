@@ -15,7 +15,7 @@ export type StreamEvent =
   | { type: "error"; message: string }
   | { type: "done" };
 
-async function j<T>(path: string, init?: RequestInit): Promise<T> {
+export async function j<T>(path: string, init?: RequestInit): Promise<T> {
   const r = await fetch(`${BASE}${path}`, {
     headers: { "Content-Type": "application/json" },
     ...init,
