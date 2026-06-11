@@ -79,7 +79,7 @@ def _build_status(name: str, mode: str, message: str = "") -> dict:
         "name": name,
         "mode": mode,
         "status": job.get("status", "idle"),
-        "pid": int(job.get("pid", 0)),
+        "pid": int(job.get("pid") or 0),
         "started": str(job.get("started", "")),
         "last_iter": runlogs.last_iter(_train_log(name, mode)),
         "log_tail": runlogs.tail(rl, 40),
@@ -143,6 +143,10 @@ def start_training(body: StartRequest):
 
     cmd = procs.with_exit_marker(inner, _run_log(name, mode))
 
+    # Truncate the runlog so a previous run's __EXIT__ marker is erased.
+    # This prevents live_status from instantly marking the new run as done.
+    rl.write_text("")
+
     # Spawn
     pid = procs.spawn_detached(
         cmd,
@@ -175,7 +179,8 @@ def stop_training(body: StopRequest):
     if mode not in ("sft", "dpo"):
         raise HTTPException(400, "mode must be sft|dpo")
     jf = _job_file(name, mode)
-    procs.stop(jf)
+    rl = _run_log(name, mode)
+    procs.stop(jf, rl)
     return _build_status(name, mode, "stop signal sent")
 
 

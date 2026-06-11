@@ -103,7 +103,7 @@ def read_series(path: Path, ykey: str) -> list[dict]:
     return out
 
 
-def last_row(path: Path) -> dict | None:
+def last_row(path: Path) -> dict:
     """Return the last parseable JSON object in a JSONL file, or {} if none/missing."""
     last: dict = {}
     if not path.exists():

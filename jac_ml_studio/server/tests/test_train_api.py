@@ -146,6 +146,53 @@ class TestStartTraining:
         assert r.status_code == 200
         assert r.json()["message"] == "already running"
 
+    def test_restart_does_not_see_stale_exit_marker(self, client, fake_root):
+        """Fix 1: runlog is truncated before spawn so a previous __EXIT__ 0 is erased.
+
+        Sequence:
+        1. Start a job with an instant-exit script → wait for it to finish (status=done).
+        2. Overwrite the script with a long-sleep variant.
+        3. Start the SAME name+mode again.
+        4. Immediately poll status → must be "running", NOT "done".
+        """
+        # First run: instant-exit script (already set up by fake_scripts fixture)
+        client.post("/api/train/start", json={
+            "model_id": "models/qwen-jac-fused-q8",
+            "name": "restart_test",
+            "mode": "sft",
+        })
+        # Wait for first run to finish
+        deadline = time.time() + 5.0
+        status = "running"
+        while time.time() < deadline and status == "running":
+            r = client.get("/api/train/status?name=restart_test&mode=sft")
+            status = r.json()["status"]
+            if status == "running":
+                time.sleep(0.1)
+        assert status == "done", f"first run did not finish in time (status={status})"
+
+        # Overwrite script with a sleep variant so the second run stays alive
+        script = fake_root / "run_probe.sh"
+        script.write_text("#!/bin/bash\nsleep 30\n")
+        script.chmod(0o755)
+
+        # Second run — same name+mode
+        r2 = client.post("/api/train/start", json={
+            "model_id": "models/qwen-jac-fused-q8",
+            "name": "restart_test",
+            "mode": "sft",
+        })
+        assert r2.status_code == 200
+
+        # Immediately poll — must be "running" (stale __EXIT__ 0 must have been wiped)
+        r3 = client.get("/api/train/status?name=restart_test&mode=sft")
+        assert r3.json()["status"] == "running", (
+            f"stale __EXIT__ marker caused instant-done: {r3.json()}"
+        )
+
+        # Cleanup: stop the sleeping process
+        client.post("/api/train/stop", json={"name": "restart_test", "mode": "sft"})
+
 
 # ---------------------------------------------------------------------------
 # POST /api/train/stop
@@ -173,6 +220,35 @@ class TestStopTraining:
         assert r.status_code == 200
         # Status should be stopped (or done if process already exited)
         assert r.json()["status"] in ("stopped", "done", "failed")
+
+    def test_stop_on_done_job_keeps_done_status(self, client, fake_root):
+        """Fix 2: stop() on a terminal job must NOT overwrite status to 'stopped'.
+
+        Start an instant-exit job, wait for it to be done, then POST /stop.
+        The response status must still be 'done'.
+        """
+        # Start instant-exit job (fake_scripts already writes exit 0)
+        client.post("/api/train/start", json={
+            "model_id": "models/qwen-jac-fused-q8",
+            "name": "stop_done_test",
+            "mode": "sft",
+        })
+        # Wait for done
+        deadline = time.time() + 5.0
+        status = "running"
+        while time.time() < deadline and status == "running":
+            r = client.get("/api/train/status?name=stop_done_test&mode=sft")
+            status = r.json()["status"]
+            if status == "running":
+                time.sleep(0.1)
+        assert status == "done", f"job did not finish in time (status={status})"
+
+        # Now stop an already-done job
+        r = client.post("/api/train/stop", json={"name": "stop_done_test", "mode": "sft"})
+        assert r.status_code == 200
+        assert r.json()["status"] == "done", (
+            f"stop() overwrote terminal status: {r.json()}"
+        )
 
 
 # ---------------------------------------------------------------------------

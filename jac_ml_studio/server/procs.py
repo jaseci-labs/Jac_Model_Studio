@@ -124,7 +124,7 @@ def live_status(job_file: Path, runlog: Path) -> dict | None:
     if status != "running":
         return job
 
-    pid = int(job.get("pid", 0))
+    pid = int(job.get("pid") or 0)
     reap(pid)
 
     # Read last 80 lines of runlog
@@ -151,18 +151,34 @@ def live_status(job_file: Path, runlog: Path) -> dict | None:
 # Stop a running job
 # ---------------------------------------------------------------------------
 
-def stop(job_file: Path) -> dict | None:
+def stop(job_file: Path, runlog: Path | None = None) -> dict | None:
     """Send SIGTERM to the process group of the job in *job_file*.
 
     Falls back to ``os.kill(pid, SIGTERM)`` if ``killpg`` fails (e.g. the
     process has already changed its process group).  Marks status "stopped" in
-    the job json.  Returns None if *job_file* does not exist.
+    the job json only when the job is currently live (status "running").
+    If the job is already in a terminal state ("done", "failed", "stopped"),
+    the job dict is returned unchanged.  Returns None if *job_file* does not
+    exist.
+
+    If *runlog* is supplied it is used to perform a live_status refresh before
+    deciding whether to kill the process (so a completed job whose file still
+    says "running" is handled correctly).
     """
-    job = read_job(job_file)
+    # Refresh status before acting so we don't kill a completed process
+    if runlog is not None:
+        job = live_status(job_file, runlog)
+    else:
+        job = read_job(job_file)
     if job is None:
         return None
 
-    pid = int(job.get("pid", 0))
+    status = job.get("status", "idle")
+    if status != "running":
+        # Terminal state — do nothing
+        return job
+
+    pid = int(job.get("pid") or 0)
     if pid > 0 and alive(pid):
         try:
             os.killpg(os.getpgid(pid), signal.SIGTERM)

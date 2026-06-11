@@ -131,6 +131,12 @@ def compare_runs(mode: str = "sft"):
     trains = {}
     vals = {}
     curves = {}
+    def _last_y(series: list) -> float:
+        """Return the y value of the last point in *series*, or 0.0 if empty."""
+        if not series:
+            return 0.0
+        return float(series[-1]["y"])
+
     headline = []
     if base.exists():
         for child in sorted(base.iterdir()):
@@ -146,11 +152,6 @@ def compare_runs(mode: str = "sft"):
             trains[name] = m["train"]
             vals[name] = m["val"]
             curves[name] = m["curve"]
-            # last_y helper
-            def _last_y(series):
-                if not series:
-                    return 0.0
-                return float(series[-1]["y"])
             headline.append({
                 "name": name,
                 "final_pass": _last_y(m["curve"]),
