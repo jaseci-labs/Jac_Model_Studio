@@ -145,3 +145,19 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #4a4a4a;
 }
+
+@keyframes mono-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.pulse {
+  animation: mono-pulse 1.6s ease-in-out infinite;
+}
+
+.tok-kw { color: #d8d8d8; font-weight: 600; }
+.tok-type { color: #c4c4c4; }
+.tok-bi { color: #b0b0b0; }
+.tok-str { color: #9a9a9a; font-style: italic; }
+.tok-num { color: #b8b8b8; }
+.tok-com { color: #5a5a5a; }
