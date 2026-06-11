@@ -43,3 +43,19 @@ def dir_size_gb(p: Path) -> float:
 def total_ram_gb() -> float:
     # binary GiB so a "48GB" Mac reads 48, not 52 (decimal)
     return round(os.sysconf("SC_PHYS_PAGES") * os.sysconf("SC_PAGE_SIZE") / 1024**3)
+
+
+def results_dir() -> Path:
+    return data_root() / "results"
+
+
+def jac_bin() -> Path:
+    return data_root() / ".venv" / "bin" / "jac"
+
+
+HOLDOUTS = {
+    "function": "dataset/eval_holdout/conversion.jsonl",
+    "graph": "dataset/eval_holdout/graph_conversion.jsonl",
+}
+
+EXCLUDED_RUN_DIRS = {"comparison", "_builder", "_evals"}
