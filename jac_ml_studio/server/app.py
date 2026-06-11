@@ -12,6 +12,7 @@ from pydantic import BaseModel
 import config
 import db
 import generate
+import routers.evals
 import routers.runs
 import routers.train
 import routers.data
@@ -238,6 +239,7 @@ def create_app(loader=None, stream_fn=None) -> FastAPI:
     app.include_router(routers.train.router)
     app.include_router(routers.data.dataset_router)
     app.include_router(routers.data.builder_router)
+    app.include_router(routers.evals.router)
 
     return app
 

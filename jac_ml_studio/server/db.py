@@ -38,6 +38,19 @@ def init_db() -> None:
             pair_group TEXT,
             created_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
+        CREATE TABLE IF NOT EXISTS eval_runs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            kind TEXT NOT NULL,
+            model TEXT NOT NULL,
+            adapter TEXT,
+            holdout TEXT NOT NULL,
+            params_json TEXT,
+            pid INTEGER,
+            scores_json TEXT,
+            status TEXT NOT NULL DEFAULT 'running',
+            started TEXT NOT NULL DEFAULT (datetime('now')),
+            finished TEXT
+        );
         """)
 
 
@@ -101,3 +114,68 @@ def get_messages(chat_id: int) -> list[dict]:
         rs = con.execute("SELECT * FROM messages WHERE chat_id=? ORDER BY id",
                          (chat_id,)).fetchall()
         return [_row_msg(r) for r in rs]
+
+
+# ---------------------------------------------------------------------------
+# eval_runs CRUD
+# ---------------------------------------------------------------------------
+
+def _row_eval(r) -> dict:
+    return {
+        "id": r["id"],
+        "kind": r["kind"],
+        "model": r["model"],
+        "adapter": r["adapter"],
+        "holdout": r["holdout"],
+        "params": json.loads(r["params_json"]) if r["params_json"] else {},
+        "pid": r["pid"],
+        "scores": json.loads(r["scores_json"]) if r["scores_json"] else None,
+        "status": r["status"],
+        "started": r["started"],
+        "finished": r["finished"],
+    }
+
+
+def create_eval_run(kind: str, model: str, adapter: str | None,
+                    holdout: str, params: dict) -> dict:
+    with connect() as con:
+        cur = con.execute(
+            "INSERT INTO eval_runs (kind, model, adapter, holdout, params_json)"
+            " VALUES (?,?,?,?,?)",
+            (kind, model, adapter, holdout, json.dumps(params)))
+        r = con.execute("SELECT * FROM eval_runs WHERE id=?",
+                        (cur.lastrowid,)).fetchone()
+        return _row_eval(r)
+
+
+def get_eval_run(eval_id: int) -> dict | None:
+    with connect() as con:
+        r = con.execute("SELECT * FROM eval_runs WHERE id=?",
+                        (eval_id,)).fetchone()
+        return _row_eval(r) if r else None
+
+
+def list_eval_runs() -> list[dict]:
+    with connect() as con:
+        rs = con.execute(
+            "SELECT * FROM eval_runs ORDER BY id DESC").fetchall()
+        return [_row_eval(r) for r in rs]
+
+
+def set_eval_pid(eval_id: int, pid: int) -> None:
+    with connect() as con:
+        con.execute("UPDATE eval_runs SET pid=? WHERE id=?", (pid, eval_id))
+
+
+def finish_eval_run(eval_id: int, status: str,
+                    scores: dict | None) -> None:
+    with connect() as con:
+        con.execute(
+            "UPDATE eval_runs SET status=?, scores_json=?, finished=datetime('now')"
+            " WHERE id=?",
+            (status, json.dumps(scores) if scores is not None else None, eval_id))
+
+
+def delete_eval_run(eval_id: int) -> None:
+    with connect() as con:
+        con.execute("DELETE FROM eval_runs WHERE id=?", (eval_id,))
