@@ -41,4 +41,5 @@ def dir_size_gb(p: Path) -> float:
 
 
 def total_ram_gb() -> float:
-    return round(os.sysconf("SC_PHYS_PAGES") * os.sysconf("SC_PAGE_SIZE") / 1e9)
+    # binary GiB so a "48GB" Mac reads 48, not 52 (decimal)
+    return round(os.sysconf("SC_PHYS_PAGES") * os.sysconf("SC_PAGE_SIZE") / 1024**3)
