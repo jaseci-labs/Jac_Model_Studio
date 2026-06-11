@@ -37,26 +37,27 @@ const ORDER: Section[] = ["chat", "train", "data", "evals"];
 
 export function NavRail({ section, onSection }: { section: Section; onSection: (s: Section) => void }) {
   return (
-    <nav className="flex w-12 shrink-0 flex-col items-center border-r border-neutral-800 bg-[#0d0d0d] py-3">
-      <span className="micro-label mb-6 [writing-mode:vertical-lr]">JAC·ML</span>
+    <nav className="flex w-40 shrink-0 flex-col border-r border-neutral-800 bg-[#0d0d0d] px-2 py-3">
+      <span className="micro-label mb-6 px-2">JAC·ML STUDIO</span>
       <div className="flex flex-col gap-1">
         {ORDER.map((s) => (
           <button
             key={s}
-            title={LABELS[s]}
             onClick={() => onSection(s)}
-            className={`relative flex h-10 w-10 items-center justify-center rounded-md transition-colors ${
-              s === section ? "text-neutral-100" : "text-neutral-600 hover:text-neutral-300"
+            className={`relative flex h-9 items-center gap-3 rounded-md px-3 transition-colors ${
+              s === section
+                ? "bg-[#161616] text-neutral-100"
+                : "text-neutral-600 hover:bg-[#121212] hover:text-neutral-300"
             }`}
           >
             {s === section && <span className="absolute left-0 top-2 bottom-2 w-[2px] bg-neutral-100" />}
             {GLYPHS[s]}
-            <span className="sr-only">{LABELS[s]}</span>
+            <span className="font-mono text-[11px] tracking-[0.15em]">{LABELS[s]}</span>
           </button>
         ))}
       </div>
       <div className="flex-1" />
-      <span className="micro-label [writing-mode:vertical-lr]">v2</span>
+      <span className="micro-label px-2">v2</span>
     </nav>
   );
 }
