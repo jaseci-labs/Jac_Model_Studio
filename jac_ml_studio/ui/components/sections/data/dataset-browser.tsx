@@ -98,7 +98,7 @@ export function DatasetBrowser({
                 ← PREV
               </button>
               <span>
-                {browser.offset + 1}–{browser.offset + browser.rows.length} of {browser.total}
+                {browser.offset + 1} to {browser.offset + browser.rows.length} of {browser.total}
               </span>
               <button
                 disabled={!canNext}

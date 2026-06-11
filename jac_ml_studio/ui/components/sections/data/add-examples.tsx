@@ -36,8 +36,8 @@ export function AddExamples({
           onChange={(e) => onSetAddForm({ text: e.target.value })}
           placeholder={
             addForm.target === "sft"
-              ? `one JSON object per line — sft: {"messages":[...]}`
-              : `one JSON object per line — dpo: {"prompt","chosen","rejected"}`
+              ? `one JSON object per line · sft: {"messages":[...]}`
+              : `one JSON object per line · dpo: {"prompt","chosen","rejected"}`
           }
           className="w-full rounded-md border border-neutral-700 bg-[#121212] px-2 py-1.5 font-mono text-xs text-neutral-100 outline-none placeholder:text-neutral-600 focus:border-neutral-500 resize-none"
         />

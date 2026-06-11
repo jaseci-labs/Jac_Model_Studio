@@ -42,7 +42,7 @@ export function LaunchTab({
 
   return (
     <div className="flex items-start gap-4 p-4 pt-5">
-      {/* LEFT — LAUNCH.CONFIG */}
+      {/* LEFT: LAUNCH.CONFIG */}
       <div className="relative flex-1 rounded-md border border-neutral-800 bg-[#0d0d0d] p-4 pt-5 flex flex-col gap-3 min-w-0">
         <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">LAUNCH.CONFIG</span>
 
@@ -86,7 +86,7 @@ export function LaunchTab({
         ))}
 
         <p className="stat-line text-neutral-500 mt-1">
-          heavy workload — one training at a time, runs detached
+          heavy workload · one training at a time, runs detached
         </p>
 
         <div className="flex gap-2 mt-2">
@@ -109,7 +109,7 @@ export function LaunchTab({
         {error && <p className="stat-line text-neutral-400 mt-1">{error}</p>}
       </div>
 
-      {/* RIGHT — RUN.STATUS */}
+      {/* RIGHT: RUN.STATUS */}
       <div className="relative flex-1 rounded-md border border-neutral-800 bg-[#0d0d0d] p-4 pt-5 flex flex-col gap-3 min-w-0">
         <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">RUN.STATUS</span>
 

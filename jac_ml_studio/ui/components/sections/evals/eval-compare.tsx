@@ -19,7 +19,7 @@ function headlineNum(r: EvalRecord): number | null {
 }
 
 function formatCell(cell: CellValue): string {
-  if (!cell) return "—";
+  if (!cell) return "·";
   if (cell.kind === "probe") return `${cell.score}%`;
   return `sim ${cell.score}`;
 }

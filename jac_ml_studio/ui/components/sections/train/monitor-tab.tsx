@@ -101,15 +101,15 @@ export function MonitorTab({
             />
             <StatTile
               label="LOSS.TRAIN"
-              value={lastTrain ? lastTrain.y.toFixed(3) : "—"}
+              value={lastTrain ? lastTrain.y.toFixed(3) : "·"}
             />
             <StatTile
               label="LOSS.VAL"
-              value={lastVal ? lastVal.y.toFixed(3) : "—"}
+              value={lastVal ? lastVal.y.toFixed(3) : "·"}
             />
             <StatTile
               label="TOK/S"
-              value={lastTps ? lastTps.y.toFixed(0) : "—"}
+              value={lastTps ? lastTps.y.toFixed(0) : "·"}
             />
           </div>
 

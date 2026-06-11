@@ -31,7 +31,7 @@ export function EvalLaunch({ models, form, onForm, onStart, busy, error }: EvalL
             <span className="stat-line text-neutral-600">
               {form.kind === "probe"
                 ? "behavioral test-pass on holdout"
-                : "ROUGE-vs-transpile judge — idiomatic similarity score"}
+                : "ROUGE vs transpile judge: idiomatic similarity score"}
             </span>
           </div>
         </Field>
@@ -94,7 +94,7 @@ export function EvalLaunch({ models, form, onForm, onStart, busy, error }: EvalL
           />
         </Field>
 
-        {/* Sim threshold — only for idiom */}
+        {/* Sim threshold: only for idiom */}
         {form.kind === "idiom" && (
           <Field label="SIM THRESHOLD">
             <TextInput

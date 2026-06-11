@@ -28,7 +28,7 @@ export function Sidebar(props: {
   };
   return (
     <aside className="flex w-56 shrink-0 flex-col border-r border-neutral-800 bg-[#0d0d0d] p-3">
-      <div className="micro-label mb-3">JAC.STUDIO — fig.1</div>
+      <div className="micro-label mb-3">JAC.STUDIO · fig.1</div>
       <button
         onClick={gate(props.onNew)}
         className="mb-3 rounded-md border border-dashed border-neutral-600 py-1.5 text-xs text-neutral-300 hover:border-neutral-400 disabled:opacity-40"

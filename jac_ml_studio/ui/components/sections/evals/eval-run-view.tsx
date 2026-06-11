@@ -14,44 +14,44 @@ function ProbeScores({ scores }: { scores: Record<string, number | string> }) {
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       <StatTile
         label="TEST.PASS%"
-        value={scores.test_pass_pct != null ? `${scores.test_pass_pct}` : "—"}
+        value={scores.test_pass_pct != null ? `${scores.test_pass_pct}` : "·"}
       />
       <StatTile
         label="RUNS%"
-        value={scores.runs_pct != null ? `${scores.runs_pct}` : "—"}
+        value={scores.runs_pct != null ? `${scores.runs_pct}` : "·"}
       />
       <StatTile
         label="TOK/CORRECT"
-        value={scores.tokens_to_correct != null ? `${scores.tokens_to_correct}` : "—"}
+        value={scores.tokens_to_correct != null ? `${scores.tokens_to_correct}` : "·"}
       />
       <StatTile
         label="EVAL.TPS"
-        value={scores.eval_tps != null ? `${scores.eval_tps}` : "—"}
+        value={scores.eval_tps != null ? `${scores.eval_tps}` : "·"}
       />
     </div>
   );
 }
 
 function IdiomScores({ scores }: { scores: Record<string, number | string> }) {
-  const idiomatic = scores.idiomatic ?? "—";
-  const runs = scores.runs ?? "—";
+  const idiomatic = scores.idiomatic ?? "·";
+  const runs = scores.runs ?? "·";
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       <StatTile
         label="AVG.SIM"
-        value={scores.avg_sim != null ? `${scores.avg_sim}` : "—"}
+        value={scores.avg_sim != null ? `${scores.avg_sim}` : "·"}
       />
       <StatTile
         label="IDIOMATIC"
-        value={idiomatic !== "—" && runs !== "—" ? `${idiomatic}/${runs}` : "—"}
+        value={idiomatic !== "·" && runs !== "·" ? `${idiomatic}/${runs}` : "·"}
       />
       <StatTile
         label="PY.SHAPED"
-        value={scores.python_shaped != null ? `${scores.python_shaped}` : "—"}
+        value={scores.python_shaped != null ? `${scores.python_shaped}` : "·"}
       />
       <StatTile
         label="FEAT"
-        value={scores.avg_feat != null ? `${scores.avg_feat}` : "—"}
+        value={scores.avg_feat != null ? `${scores.avg_feat}` : "·"}
       />
     </div>
   );

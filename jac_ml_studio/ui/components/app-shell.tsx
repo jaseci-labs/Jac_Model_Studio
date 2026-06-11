@@ -15,7 +15,7 @@ function initialSection(): Section {
 function Placeholder({ name, phase }: { name: string; phase: number }) {
   return (
     <div className="flex h-full flex-1 items-center justify-center">
-      <p className="micro-label">{name} — PHASE {phase}</p>
+      <p className="micro-label">{name} · PHASE {phase}</p>
     </div>
   );
 }
