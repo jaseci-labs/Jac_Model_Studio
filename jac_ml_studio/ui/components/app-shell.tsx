@@ -30,6 +30,11 @@ const DataSection = dynamic(
   { ssr: false, loading: () => <Placeholder name="DATA" phase={3} /> }
 );
 
+const EvalsSection = dynamic(
+  () => import("@/components/sections/evals/evals-section"),
+  { ssr: false, loading: () => <Placeholder name="EVALS" phase={4} /> }
+);
+
 export default function AppShell() {
   const [section, setSection] = useState<Section>(initialSection);
   const [visited, setVisited] = useState<Set<Section>>(() => new Set([initialSection()]));
@@ -60,7 +65,7 @@ export default function AppShell() {
       )}
       {visited.has("evals") && (
         <div className={slot("evals")}>
-          <Placeholder name="EVALS" phase={4} />
+          <EvalsSection active={section === "evals"} />
         </div>
       )}
     </div>
