@@ -12,6 +12,8 @@ from pydantic import BaseModel
 import config
 import db
 import generate
+import routers.runs
+import routers.train
 from model_manager import ModelManager
 from sse import sse
 
@@ -230,6 +232,9 @@ def create_app(loader=None, stream_fn=None) -> FastAPI:
     def prompts():
         p = Path(__file__).parent / "prompts.json"
         return json.loads(p.read_text())
+
+    app.include_router(routers.runs.router)
+    app.include_router(routers.train.router)
 
     return app
 
