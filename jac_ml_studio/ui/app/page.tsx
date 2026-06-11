@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { NavRail, type Section } from "@/components/nav-rail";
 import { ChatSection } from "@/components/chat-section";
 
@@ -18,6 +19,11 @@ function Placeholder({ name, phase }: { name: string; phase: number }) {
     </div>
   );
 }
+
+const TrainSection = dynamic(
+  () => import("@/components/sections/train/train-section"),
+  { ssr: false, loading: () => <Placeholder name="TRAIN" phase={2} /> }
+);
 
 export default function Home() {
   const [section, setSection] = useState<Section>(initialSection);
@@ -39,7 +45,7 @@ export default function Home() {
       </div>
       {visited.has("train") && (
         <div className={slot("train")}>
-          <Placeholder name="TRAIN" phase={2} />
+          <TrainSection active={section === "train"} />
         </div>
       )}
       {visited.has("data") && (
