@@ -155,9 +155,10 @@ body {
   animation: mono-pulse 1.6s ease-in-out infinite;
 }
 
-.tok-kw { color: #d8d8d8; font-weight: 600; }
-.tok-type { color: #c4c4c4; }
-.tok-bi { color: #b0b0b0; }
-.tok-str { color: #9a9a9a; font-style: italic; }
-.tok-num { color: #b8b8b8; }
+/* code tokens: muted color, used only where highlight() runs (dataset browser) */
+.tok-kw { color: #b89ce8; font-weight: 600; }
+.tok-type { color: #6fc3b2; }
+.tok-bi { color: #7aa2f7; }
+.tok-str { color: #9ec98f; font-style: italic; }
+.tok-num { color: #d8a657; }
 .tok-com { color: #5a5a5a; }
