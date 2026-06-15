@@ -13,8 +13,9 @@ import type { CompareRow } from "@/lib/api-train";
 const MONO_FONT = "var(--font-geist-mono), monospace";
 const TICK = { fill: "#666", fontSize: 10, fontFamily: MONO_FONT };
 
-const STROKES = ["#ededed", "#8a8a8a", "#525252", "#b8b8b8"];
-const DASHES = ["", "5 3", "1 3", "7 2 1 2"];
+// distinct hues per run, muted to sit on the dark theme
+const STROKES = ["#7aa2f7", "#d8a657", "#9ec98f", "#b89ce8", "#6fc3b2", "#e08a8a"];
+const DASHES = ["", "", "", "", "", ""];
 
 export function MultiLineChart({
   title,

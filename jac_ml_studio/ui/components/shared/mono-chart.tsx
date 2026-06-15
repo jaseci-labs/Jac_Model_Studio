@@ -21,6 +21,7 @@ export function MonoChart({
   height = 180,
   yFmt,
   secondary,
+  accent = "#ededed",
 }: {
   title: string;
   data: Pt[];
@@ -28,6 +29,7 @@ export function MonoChart({
   height?: number;
   yFmt?: (v: number) => string;
   secondary?: Pt[];
+  accent?: string;
 }) {
   const last = data.length > 0 ? data[data.length - 1] : null;
 
@@ -86,7 +88,7 @@ export function MonoChart({
             <Line
               type="monotone"
               dataKey="y"
-              stroke="#ededed"
+              stroke={accent}
               strokeWidth={1.4}
               dot={false}
               isAnimationActive={false}
@@ -95,7 +97,7 @@ export function MonoChart({
               <Line
                 type="monotone"
                 dataKey="y2"
-                stroke="#ededed"
+                stroke={accent}
                 strokeWidth={1.4}
                 strokeDasharray="5 3"
                 dot={{ r: 2 }}
@@ -109,7 +111,7 @@ export function MonoChart({
                 y={last.y}
                 r={3}
                 fill="#0a0a0a"
-                stroke="#ededed"
+                stroke={accent}
               />
             )}
           </LineChart>
