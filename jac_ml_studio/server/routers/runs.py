@@ -56,6 +56,20 @@ def _get_run_metrics(name: str, mode: str) -> dict:
 
     idiom_sim = runlogs.read_series(idiom_path, "avg_sim") if idiom_path else []
 
+    # Both holdouts, surfaced separately
+    func_sum = runlogs.idiom_summary(rdir, mode, "function")
+    graph_sum = runlogs.idiom_summary(rdir, mode, "graph")
+
+    def _idiom_obj(s: dict) -> dict:
+        return {
+            "has": "avg_sim" in s,
+            "avg_sim": float(s.get("avg_sim", 0.0)),
+            "idiomatic": int(s.get("idiomatic", 0)),
+            "python_shaped": int(s.get("python_shaped", 0)),
+            "runs": int(s.get("runs", 0)),
+            "total": int(s.get("total", 0)),
+        }
+
     # Determine running status
     jf_sft = config.results_dir() / name / ".job-sft.json"
     jf_dpo = config.results_dir() / name / ".job-dpo.json"
@@ -88,6 +102,8 @@ def _get_run_metrics(name: str, mode: str) -> dict:
         "idiom_python": int(isum.get("python_shaped", 0)),
         "idiom_runs": int(isum.get("runs", 0)),
         "idiom_total": int(isum.get("total", 0)),
+        "func_idiom": _idiom_obj(func_sum),
+        "graph_idiom": _idiom_obj(graph_sum),
         "log_tail": runlogs.tail(log, 40),
     }
 
@@ -160,6 +176,9 @@ def compare_runs(mode: str = "sft"):
                 "idiomatic": m["idiom_idiomatic"],
                 "idiom_label": m["idiom_label"],
                 "has_idiom": m["has_idiom"],
+                "func_idiom": m["func_idiom"],
+                "graph_idiom": m["graph_idiom"],
+                "last_iter": m["last_iter"],
             })
     return {
         "names": names,

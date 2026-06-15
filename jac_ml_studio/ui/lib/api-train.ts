@@ -29,7 +29,18 @@ export type RunMetrics = {
   idiom_python: number;
   idiom_runs: number;
   idiom_total: number;
+  func_idiom: IdiomSummary;
+  graph_idiom: IdiomSummary;
   log_tail: string;
+};
+
+export type IdiomSummary = {
+  has: boolean;
+  avg_sim: number;
+  idiomatic: number;
+  python_shaped: number;
+  runs: number;
+  total: number;
 };
 
 export type JobStatus = {
@@ -67,6 +78,9 @@ export type CompareResult = {
     idiomatic: number;
     idiom_label: string;
     has_idiom: boolean;
+    func_idiom: IdiomSummary;
+    graph_idiom: IdiomSummary;
+    last_iter: number;
   }[];
 };
 

@@ -17,10 +17,10 @@ export function RunDetail({ metrics, live }: { metrics: RunMetrics; live: boolea
   const lastVal = metrics.val?.length ? metrics.val[metrics.val.length - 1] : null;
   const lastTps = metrics.tps?.length ? metrics.tps[metrics.tps.length - 1] : null;
   const lastAcc = metrics.curve?.length ? metrics.curve[metrics.curve.length - 1] : null;
-  const idiomPct =
-    metrics.idiom_runs > 0
-      ? Math.round((metrics.idiom_idiomatic / metrics.idiom_runs) * 100)
-      : null;
+  const fi = metrics.func_idiom;
+  const gi = metrics.graph_idiom;
+  const idiomPct = (s: typeof fi) =>
+    s.has && s.runs > 0 ? `${Math.round((s.idiomatic / s.runs) * 100)}%` : "·";
 
   return (
     <>
@@ -31,32 +31,34 @@ export function RunDetail({ metrics, live }: { metrics: RunMetrics; live: boolea
           value={lastAcc ? `${lastAcc.y}%` : "·"}
           sub="cross-compiled holdout"
         />
-        <StatTile
-          label="IDIOMATIC%"
-          value={idiomPct != null ? `${idiomPct}%` : "·"}
-          sub={metrics.has_idiom ? `sim ${metrics.idiom_avg_sim}` : "no idiom data"}
-        />
         <StatTile label="LAST.ITER" value={metrics.last_iter} />
         <StatTile
           label="FINAL.LOSS"
           value={lastTrain ? lastTrain.y.toFixed(3) : "·"}
           sub={lastVal ? `val ${lastVal.y.toFixed(3)}` : undefined}
         />
+        <StatTile label="TOK/S" value={lastTps ? lastTps.y.toFixed(0) : "·"} />
       </div>
 
-      {/* Secondary tiles */}
-      <div className="grid grid-cols-4 gap-3">
-        <StatTile label="LOSS.TRAIN" value={lastTrain ? lastTrain.y.toFixed(3) : "·"} />
-        <StatTile label="LOSS.VAL" value={lastVal ? lastVal.y.toFixed(3) : "·"} />
-        <StatTile label="TOK/S" value={lastTps ? lastTps.y.toFixed(0) : "·"} />
+      {/* Holdout idiom tiles: function + graph side by side */}
+      <div className="grid grid-cols-2 gap-3">
         <StatTile
-          label="IDIOM.SPLIT"
-          value={
-            metrics.has_idiom
-              ? `${metrics.idiom_idiomatic}/${metrics.idiom_python}`
-              : "·"
+          label="FUNCTION HOLDOUT · IDIOMATIC"
+          value={fi.has ? idiomPct(fi) : "·"}
+          sub={
+            fi.has
+              ? `${fi.idiomatic}/${fi.runs} idiomatic · sim ${fi.avg_sim} · ${fi.total} tasks`
+              : "no function-holdout eval"
           }
-          sub={metrics.has_idiom ? "idiomatic/py-shaped" : undefined}
+        />
+        <StatTile
+          label="GRAPH HOLDOUT · IDIOMATIC"
+          value={gi.has ? idiomPct(gi) : "·"}
+          sub={
+            gi.has
+              ? `${gi.idiomatic}/${gi.runs} idiomatic · sim ${gi.avg_sim} · ${gi.total} tasks`
+              : "no graph-holdout eval"
+          }
         />
       </div>
 

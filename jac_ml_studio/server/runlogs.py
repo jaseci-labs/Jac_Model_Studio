@@ -152,6 +152,28 @@ def pick_idiom(run_dir: Path, mode: str) -> Path | None:
     return None
 
 
+def idiom_summary(run_dir: Path, mode: str, kind: str) -> dict:
+    """Last-row idiom summary for a specific holdout.
+
+    kind is "function" or "graph". Returns the summary dict, or {} if no file
+    with an "avg_sim" key exists. Filenames vary across runs, so the graph
+    holdout checks both graph-idiom-metrics.jsonl and graph-idiom.jsonl.
+    """
+    base = run_dir / "dpo" if mode == "dpo" else run_dir
+    if kind == "function":
+        candidates = [base / "idiom-metrics.jsonl"]
+    else:
+        candidates = [
+            base / "graph-idiom-metrics.jsonl",
+            base / "graph-idiom.jsonl",
+        ]
+    for cand in candidates:
+        row = last_row(cand)
+        if row and "avg_sim" in row:
+            return row
+    return {}
+
+
 def stages(run_dir: Path) -> list[str]:
     """Return the ordered list of completed stage names for *run_dir*.
 
