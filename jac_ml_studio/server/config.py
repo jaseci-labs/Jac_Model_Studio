@@ -6,7 +6,7 @@ them — everything resolves against JAC_STUDIO_DATA_ROOT (the main checkout).
 import os
 from pathlib import Path
 
-DEFAULT_ROOT = "/Users/ayush/Downloads/JaseciLabs/DataGeneration"
+DEFAULT_ROOT = "/Volumes/ExtremePro/JaseciLabs/DataGeneration"
 
 MODELS = [
     {"id": "qwen-dpo", "label": "Qwen · DPO", "path": "models/qwen-jac-dpo-fused-q8"},
