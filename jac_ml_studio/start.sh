@@ -3,9 +3,10 @@
 set -e
 cd "$(dirname "$0")"
 
-export JAC_STUDIO_DATA_ROOT="${JAC_STUDIO_DATA_ROOT:-/Volumes/ExtremePro/JaseciLabs/DataGeneration}"
+export JAC_STUDIO_DATA_ROOT="${JAC_STUDIO_DATA_ROOT:-/Volumes/Extreme Pro/JaseciLabs/DataGeneration}"
 
-server/.venv/bin/uvicorn app:app --app-dir server --host 127.0.0.1 --port 8400 &
+# python -m: venv console-scripts have stale absolute shebangs after the dir was renamed
+server/.venv/bin/python -m uvicorn app:app --app-dir server --host 127.0.0.1 --port 8400 &
 SERVER_PID=$!
 
 (cd ui && npm run dev) &
