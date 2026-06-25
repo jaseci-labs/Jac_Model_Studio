@@ -1,0 +1,59 @@
+{
+  "categories": [
+    {
+      "id": "py2jac",
+      "label": "Python \u2192 Jac",
+      "prompts": [
+        "Convert this Python to idiomatic Jac:\n\n```python\ndef normalize_vector(vector):\n    total = sum(vector)\n    normalized_vector = [round(element / total) for element in vector]\n    return normalized_vector\n```",
+        "Convert this Python to idiomatic Jac:\n\n```python\ndef is_prime_gt_100(value):\n    if value <= 100:\n        return False\n\n    for i in range(2, int(math.sqrt(value)) + 1):\n        if value % i == 0:\n            return False\n\n    return True\n```",
+        "Convert this Python to idiomatic Jac:\n\n```python\ndef calculate_average(numbers):\n    total_sum = sum(numbers)\n    num_elements = len(numbers)\n    average = total_sum / num_elements\n    return average\n```",
+        "Convert this Python to idiomatic Jac:\n\n```python\ndef generate_cubes_dict(n):\n    if not isinstance(n, int) or n <= 0:\n        raise InvalidInputError(\"Invalid input. Please provide a positive integer value.\")\n\n    cubes_dict = {}\n    for i in range(1, n + 1):\n        cubes_dict[i] = i ** 3\n\n    return cubes_dict\n```",
+        "Convert this Python to idiomatic Jac:\n\n```python\ndef replace_characters(string):\n    result = ''\n    for char in string:\n        if char.isalpha():\n            if char.islower():\n                new_char = chr((ord(char) - ord('a') + 1) % 26 + ord('a'))\n            else:\n                new_char = chr((ord(char) - ord('A') + 1) % 26 + ord('A'))\n            result += new_char\n        else:\n            result += char\n    return result\n```",
+        "Convert this Python to idiomatic Jac:\n\n```python\ndef is_palindrome(lst):\n    clean_list = [str(x).lower() for x in lst if str(x).isalnum()]\n    left = 0\n    right = len(clean_list) - 1\n\n    while left <= right:\n        if clean_list[left] != clean_list[right]:\n            return False\n        left += 1\n        right -= 1\n\n    return True\n```",
+        "Convert this Python to idiomatic Jac:\n\n```python\ndef sum_of_rows(arr):\n    row_sums = []  # to store the sum of each row\n    for row in arr:\n        current_sum = 0  # initialize the sum for the current row\n        for element in row:\n            current_sum += element  # add each element to the sum\n        row_sums.append(current_sum)  # add the sum of the current row to the row_sums list\n    return row_sums\n```",
+        "Convert this Python to idiomatic Jac:\n\n```python\ndef reverse_words(input_str):\n    # Split the input string into a list of words\n    words = input_str.split()\n    \n    # Reverse the order of words\n    words.reverse()\n    \n    # Join the words into a string\n    output_str = ' '.join(words)\n    \n    return output_str.strip()\n```",
+        "Convert this Python to idiomatic Jac:\n\n```python\ndef is_num_even(number):\n    if not isinstance(number, (int, float)):\n        raise InvalidInputError(\"Input must be a number\")\n    \n    number = round(number)\n    return number % 2 == 0\n```",
+        "Convert this Python to idiomatic Jac:\n\n```python\ndef reverse_and_remove_duplicates(text):\n    words = text.split()  # Split the text into a list of words\n    reversed_words = list(reversed(words))  # Reverse the order of the words\n    unique_words = list(set(reversed_words))  # Remove duplicate words\n    result = ' '.join(unique_words)  # Join the unique words back into a string\n    return result\n```",
+        "Convert this Python to idiomatic Jac:\n\n```python\ndef is_prime(n):\n    if n < 2:\n        return False\n    for i in range(2, int(math.sqrt(n))+1):\n        if n % i == 0:\n            return False\n    return True\n```",
+        "Convert this Python to idiomatic Jac:\n\n```python\ndef factorial(n):\n    if not isinstance(n, int) or n <= 0:\n        raise InvalidInputError(\"Input must be a positive integer\")\n    result = 1\n    for i in range(1, n + 1):\n        result *= i\n    return result\n```"
+      ]
+    },
+    {
+      "id": "idioms",
+      "label": "Jac idioms",
+      "prompts": [
+        "Write a Jac walker named Greeter that visits every node connected to root and prints each node's name.",
+        "Define a Jac node type Person with has fields name: str and age: int, plus an ability that prints a greeting when a walker visits.",
+        "Write Jac code that creates 5 City nodes, connects them in a chain with ++> edges, then spawns a walker that counts them.",
+        "Show idiomatic Jac for a typed edge: define an edge Road with has miles: float and connect two City nodes with it.",
+        "Write a Jac object (obj) called Stack with push, pop, and peek methods backed by a list.",
+        "Write a Jac walker that does breadth-first traversal from root and collects node names into a list, then reports it on exit.",
+        "Use a Jac impl block: declare def fib(n: int) -> int; in one place and implement it in an impl block.",
+        "Write Jac with entry code that filters a list of numbers with a comprehension and prints the evens."
+      ]
+    },
+    {
+      "id": "explain",
+      "label": "Explain Jac",
+      "prompts": [
+        "Explain what this Jac code does:\n\n```jac\nwalker Counter {\n    has count: int = 0;\n    can count_nodes with `root entry {\n        visit [-->];\n    }\n    can tally with entry {\n        self.count += 1;\n    }\n}\n```",
+        "What does the ++> operator do in Jac? Show a small example.",
+        "Explain the difference between a node, an edge, and a walker in Jac's object-spatial model.",
+        "What does this Jac do?\n\n```jac\nnode Person {\n    has name: str;\n    can greet with Visitor entry {\n        print(f\"hello {self.name}\");\n    }\n}\n```",
+        "Explain what an impl block is in Jac and why you would separate declaration from implementation.",
+        "What is the root node in Jac and how do walkers start from it?"
+      ]
+    },
+    {
+      "id": "general",
+      "label": "General code",
+      "prompts": [
+        "Write a Python function that merges two sorted lists into one sorted list without using sort().",
+        "Explain the difference between BFS and DFS and when you'd pick each.",
+        "Write a Python function to check whether a string is a valid palindrome, ignoring case and punctuation.",
+        "What does this regex match: ^\\d{3}-\\d{2}-\\d{4}$ ? Suggest a clearer alternative.",
+        "Write a Python generator that yields the running average of a stream of numbers."
+      ]
+    }
+  ]
+}

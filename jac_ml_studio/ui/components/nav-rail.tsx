@@ -1,7 +1,7 @@
 "use client";
 import React from "react";
 
-export type Section = "chat" | "train" | "data" | "evals";
+export type Section = "chat" | "train" | "data" | "evals" | "rl";
 
 const GLYPHS: Record<Section, React.ReactNode> = {
   chat: (
@@ -30,10 +30,17 @@ const GLYPHS: Record<Section, React.ReactNode> = {
       <path d="M9.5 11l1.5 1.5L13.5 9" />
     </svg>
   ),
+  rl: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.25">
+      <path d="M2 13h12" stroke="#444" />
+      <path d="M2 11l3-3 3 2 5-6" strokeLinejoin="miter" />
+      <circle cx="13" cy="4" r="1.2" fill="currentColor" stroke="none" />
+    </svg>
+  ),
 };
 
-const LABELS: Record<Section, string> = { chat: "CHAT", train: "TRAIN", data: "DATA", evals: "EVALS" };
-const ORDER: Section[] = ["chat", "train", "data", "evals"];
+const LABELS: Record<Section, string> = { chat: "CHAT", train: "TRAIN", data: "DATA", evals: "EVALS", rl: "RL" };
+const ORDER: Section[] = ["chat", "train", "data", "evals", "rl"];
 
 export function NavRail({ section, onSection }: { section: Section; onSection: (s: Section) => void }) {
   return (

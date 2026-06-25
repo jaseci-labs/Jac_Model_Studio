@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { NavRail, type Section } from "@/components/nav-rail";
 import { ChatSection } from "@/components/chat-section";
 
-const SECTIONS: Section[] = ["chat", "train", "data", "evals"];
+const SECTIONS: Section[] = ["chat", "train", "data", "evals", "rl"];
 
 function initialSection(): Section {
   if (typeof window === "undefined") return "chat";
@@ -33,6 +33,11 @@ const DataSection = dynamic(
 const EvalsSection = dynamic(
   () => import("@/components/sections/evals/evals-section"),
   { ssr: false, loading: () => <Placeholder name="EVALS" phase={4} /> }
+);
+
+const RlSection = dynamic(
+  () => import("@/components/sections/rl/rl-section"),
+  { ssr: false, loading: () => <Placeholder name="RL" phase={5} /> }
 );
 
 export default function AppShell() {
@@ -66,6 +71,11 @@ export default function AppShell() {
       {visited.has("evals") && (
         <div className={slot("evals")}>
           <EvalsSection active={section === "evals"} />
+        </div>
+      )}
+      {visited.has("rl") && (
+        <div className={slot("rl")}>
+          <RlSection />
         </div>
       )}
     </div>
