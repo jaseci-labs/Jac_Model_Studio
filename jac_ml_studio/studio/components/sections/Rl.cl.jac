@@ -40,7 +40,7 @@ glob FAILS: list[dict] = [
 glob STROKES: list[str] = ["#7aa2f7", "#d8a657", "#9ec98f"];
 
 def _tick() -> dict {
-    return {"fill": "#666", "fontSize": 10, "fontFamily": "ui-monospace, monospace"};
+    return {"fill": "#666", "fontSize": 10, "fontFamily": "'Geist Mono', ui-monospace, monospace"};
 }
 
 def _lineChart(title: str, rows: list[dict]) -> JsxElement {
@@ -51,7 +51,7 @@ def _lineChart(title: str, rows: list[dict]) -> JsxElement {
                 <CartesianGrid stroke="#1c1c1f" vertical={False} />
                 <XAxis dataKey="x" tick={_tick()} tickLine={False} axisLine={{"stroke": "#333"}} />
                 <YAxis tick={_tick()} tickLine={False} axisLine={False} width={40} domain={["auto", "auto"]} />
-                <Tooltip contentStyle={{"background": "#0a0a0c", "border": "1px solid #333", "borderRadius": 0, "fontFamily": "ui-monospace, monospace", "fontSize": 11}} />
+                <Tooltip cursor={{"stroke": "#333", "strokeDasharray": "3 3"}} contentStyle={{"background": "#0a0a0c", "border": "1px solid #333", "borderRadius": 0, "fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 11}} labelStyle={{"color": "#777"}} itemStyle={{"color": "#fafafa"}} />
                 <Line type="monotone" dataKey="qwen3coder" stroke={STROKES[0]} strokeWidth={1.4} dot={False} isAnimationActive={False} />
                 <Line type="monotone" dataKey="jac-qwen3coder" stroke={STROKES[1]} strokeWidth={1.4} dot={False} isAnimationActive={False} />
             </LineChart>
@@ -104,8 +104,8 @@ def:pub Rl -> JsxElement {
                         <CartesianGrid stroke="#1c1c1f" vertical={False} />
                         <XAxis dataKey="model" tick={_tick()} tickLine={False} axisLine={{"stroke": "#333"}} />
                         <YAxis tick={_tick()} tickLine={False} axisLine={False} width={32} domain={[0, "auto"]} />
-                        <Tooltip contentStyle={{"background": "#0a0a0c", "border": "1px solid #333", "borderRadius": 0, "fontFamily": "ui-monospace, monospace", "fontSize": 11}} />
-                        <Legend wrapperStyle={{"fontFamily": "ui-monospace, monospace", "fontSize": 10, "color": "#777"}} />
+                        <Tooltip cursor={{"fill": "#ffffff08"}} contentStyle={{"background": "#0a0a0c", "border": "1px solid #333", "borderRadius": 0, "fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 11}} labelStyle={{"color": "#777"}} itemStyle={{"color": "#fafafa"}} />
+                        <Legend wrapperStyle={{"fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 10, "color": "#777"}} />
                         <Bar dataKey="BASE" fill={STROKES[0]} isAnimationActive={False} />
                         <Bar dataKey="WARM" fill={STROKES[1]} isAnimationActive={False} />
                         <Bar dataKey="GRPO" fill={STROKES[2]} isAnimationActive={False} />

@@ -10,6 +10,13 @@ def _now() -> str {
     return datetime.datetime.now(datetime.UTC).replace(tzinfo=None).isoformat() + "Z";
 }
 
+"""Current UTC date as YYYY-MM-DD — the sidebar groups chats by day and labels the
+current day TODAY. Computed server-side so the client needs no Date object (both
+this and chat timestamps are UTC, so the grouping lines up)."""
+def:pub today_utc() -> str {
+    return datetime.datetime.now(datetime.UTC).date().isoformat();
+}
+
 obj ChatView {
     has id: str = "",
         title: str = "",
@@ -66,13 +73,13 @@ def _find_chat(chat_id: str) -> Chat | None {
     return None;
 }
 
-"""All chats, newest first."""
+"""All chats, most-recently-updated first (matches old `ORDER BY updated_at DESC`)."""
 def:pub list_chats() -> list[ChatView] {
     out: list[ChatView] = [];
     for c in [root -->][?:Chat] {
         out.append(c.to_view());
     }
-    out.reverse();
+    out.sort(key=lambda v: ChatView -> str { return v.updated_at; }, reverse=True);
     return out;
 }
 
@@ -86,6 +93,7 @@ def:pub rename_chat(chat_id: str, title: str) -> bool {
     c = _find_chat(chat_id);
     if c {
         c.title = title;
+        c.updated_at = _now();
         return True;
     }
     return False;

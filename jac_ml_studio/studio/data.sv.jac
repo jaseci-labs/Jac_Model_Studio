@@ -7,6 +7,7 @@ lands with the jobs module. All code fields returned as raw strings.
 import json;
 import re;
 import models;
+import from pathlib { Path }
 
 glob PREVIEW_FILES: list[list[str]] = [
     ["dataset/conversion/sft.jsonl", "SFT idiomatic core"],
@@ -33,7 +34,7 @@ obj DataRowView {
         jac: str = "", chosen: str = "", rejected: str = "", raw: str = "";
 }
 
-def _abs(rel: str) -> any {
+def _abs(rel: str) -> Path {
     return models.data_root() / rel;
 }
 
@@ -192,4 +193,60 @@ def:pub dataset_rows(path: str, offset: int, limit: int) -> dict {
         i += 1;
     }
     return {"rows": result, "total": total};
+}
+
+"""Append valid JSONL rows to *target* (key in APPEND_TARGETS — sft/dpo). Each
+non-empty line is validated as JSON with the required schema (DPO needs
+prompt/chosen/rejected; SFT needs a messages list). Returns {added, errors, total}.
+
+# studio: the original used a binary seek(-1, 2) to test for a trailing newline;
+# here read_text().endswith is simpler and the file is small (also re-read by
+# _line_count). Unknown targets return an error dict instead of raising."""
+def:pub add_examples(target: str, jsonl: str) -> dict {
+    if target not in APPEND_TARGETS {
+        return {"added": 0, "errors": [f"unknown target: {target}"], "total": 0};
+    }
+    rel = str(APPEND_TARGETS[target]);
+    is_dpo = target == "dpo";
+    valid: list[str] = [];
+    errors: list[str] = [];
+    n = 0;
+    for raw in jsonl.split("\n") {
+        if not raw.strip() {
+            continue;
+        }
+        n += 1;
+        rec: any = None;
+        try {
+            rec = json.loads(raw);
+        } except Exception {
+            errors.append(f"line {n}: not valid JSON");
+            continue;
+        }
+        if is_dpo {
+            if not ("prompt" in rec and "chosen" in rec and "rejected" in rec) {
+                errors.append(f"line {n}: DPO row needs prompt/chosen/rejected");
+                continue;
+            }
+        } elif "messages" not in rec {
+            errors.append(f"line {n}: SFT row needs a messages list");
+            continue;
+        }
+        valid.append(json.dumps(rec));
+    }
+    if valid {
+        p = _abs(rel);
+        p.parent.mkdir(parents=True, exist_ok=True);
+        if p.exists() and p.stat().st_size > 0 {
+            if not p.read_text().endswith("\n") {
+                with open(p, "a") as fa {
+                    fa.write("\n");
+                }
+            }
+        }
+        with open(p, "a") as fb {
+            fb.write("\n".join(valid) + "\n");
+        }
+    }
+    return {"added": len(valid), "errors": errors, "total": _line_count(rel)};
 }

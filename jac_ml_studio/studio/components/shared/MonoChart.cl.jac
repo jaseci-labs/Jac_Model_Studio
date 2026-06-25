@@ -8,7 +8,7 @@ import from "recharts" {
     ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceDot
 }
 
-glob MONO: str = "ui-monospace, monospace";
+glob MONO: str = "'Geist Mono', ui-monospace, monospace";
 
 def _tick() -> dict {
     return {"fill": "#666", "fontSize": 10, "fontFamily": MONO};
@@ -47,7 +47,7 @@ def:pub MonoChart(
                     <CartesianGrid stroke="#1c1c1f" vertical={False} />
                     <XAxis dataKey="x" tick={_tick()} tickLine={False} axisLine={{"stroke": "#333"}} />
                     <YAxis tick={_tick()} tickLine={False} axisLine={False} width={46} domain={["auto", "auto"]} tickFormatter={yfmt} />
-                    <Tooltip contentStyle={{"background": "#0a0a0c", "border": "1px solid #333", "borderRadius": 0, "fontFamily": MONO, "fontSize": 11}} labelStyle={{"color": "#777"}} itemStyle={{"color": "#fafafa"}} />
+                    <Tooltip cursor={{"stroke": "#333", "strokeDasharray": "3 3"}} contentStyle={{"background": "#0a0a0c", "border": "1px solid #333", "borderRadius": 0, "fontFamily": MONO, "fontSize": 11}} labelStyle={{"color": "#777"}} itemStyle={{"color": "#fafafa"}} />
                     <Line type="monotone" dataKey="y" stroke={accent} strokeWidth={1.4} dot={False} isAnimationActive={False} />
                     {secondary and len(secondary) > 0 and <Line type="monotone" dataKey="y2" stroke={accent} strokeWidth={1.4} strokeDasharray="5 3" dot={{"r": 2}} isAnimationActive={False} connectNulls={True} />}
                     {live and last and <ReferenceDot x={last["x"]} y={last["y"]} r={3} fill="#0a0a0a" stroke={accent} />}

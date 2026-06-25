@@ -2,24 +2,34 @@
 
 One-stop local ML workbench for the Jac fine-tuning project: chat with the
 trained models, launch + monitor training, run the data pipeline, and run
-evals — all in one monochrome UI. Supersedes web_app/ (chat only) and
-dashboard_app/ (jac-client training dashboard), both now deprecated.
+evals — all in one monochrome UI. Written in **pure Jac** (full-stack: server
++ React-in-Jac client from one codebase). Supersedes the old FastAPI + Next.js
+app (deleted) and the earlier web_app/ + dashboard_app/.
 
 ## Run
 
-    ./jac_ml_studio/start.sh      # API :8400 + UI :3000
-    open http://localhost:3000
+    ./jac_ml_studio/start.sh      # one process: API :8001 + Vite UI :8000
+    open http://localhost:8000
 
 Models/dataset/results are read from `JAC_STUDIO_DATA_ROOT` (default: the
 main DataGeneration checkout — those dirs are gitignored, worktrees lack them).
 
 ## Layout
 
-- `server/` — FastAPI + mlx_lm + job orchestration. SQLite in `server/data/`.
-- `ui/` — Next.js + shadcn, Soft Mono × Schematic theme. Sections: CHAT /
-  TRAIN / DATA / EVALS behind the left icon rail.
+Everything lives in `studio/`:
+
+- `*.sv.jac` — server endpoints. `models`/`inference` (resident MLX + token
+  stream), `chat` (SSE), `persistence` (OSP graph: chats/messages, replaces
+  SQLite), `data`/`builders` (dataset + pipeline), `evals` (OSP EvalRun graph),
+  `train`/`runs` (job control + metrics), `jobs` (detached subprocess engine,
+  port of procs.py), `metrics` (log/metric parsers, port of runlogs.py),
+  `prompts`.
+- `components/**/*.cl.jac` — the UI. Sections CHAT / TRAIN / DATA / EVALS / RL
+  behind the left icon rail; shared chart/form/log primitives; monochrome
+  Geist-Mono schematic theme (`global.css`).
+- `main.jac` — registers every endpoint + mounts the client app.
 
 ## Test
 
-    cd jac_ml_studio/server && .venv/bin/pytest
-    ./jac_ml_studio/smoke.sh      # while running
+    cd jac_ml_studio/studio && jac check main.jac   # type-check the whole app
+    ./jac_ml_studio/smoke.sh                         # while running
