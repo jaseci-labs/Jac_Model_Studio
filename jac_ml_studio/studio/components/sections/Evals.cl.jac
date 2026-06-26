@@ -282,7 +282,7 @@ def:pub Evals -> JsxElement {
                             STOP
                         </button>}
                     </div>
-                    {run.scores and _scoreTiles(run)}
+                    {run.scores and _scoreTiles({"run": run})}
                     <LogView text={str(run.log_tail)} maxH="16rem" />
                 </div>
                 skip;
@@ -425,7 +425,7 @@ def:pub Evals -> JsxElement {
                         {for mdl in modelsU {
                             <tr key={str(mdl)} className="border-b border-neutral-900">
                                 <td className="max-w-[160px] truncate py-1.5 pr-4 font-mono text-neutral-500" title={str(mdl)}>{_stripModels(str(mdl))}</td>
-                                {[_cell(done, mdl, h, bestProbe, bestIdiom) for h in holdouts]}
+                                {[_cell({"done": done, "mdl": mdl, "h": h, "bestProbe": bestProbe, "bestIdiom": bestIdiom}) for h in holdouts]}
                             </tr>
                         }}
                     </tbody>

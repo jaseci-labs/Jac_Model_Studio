@@ -57,7 +57,7 @@ def:pub NavRail(section: str, onSection: Callable[([str], None)]) -> JsxElement 
                     )}
                 >
                     {s == section and <span className="absolute left-0 top-2 bottom-2 w-[2px] bg-neutral-100" />}
-                    {_glyph(s)}
+                    {_glyph({"s": s})}
                     <span className="font-mono text-[11px] tracking-[0.15em]">{LABELS[s]}</span>
                 </button>
             }}

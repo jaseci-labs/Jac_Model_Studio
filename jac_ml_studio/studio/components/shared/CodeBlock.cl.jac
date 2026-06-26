@@ -3,9 +3,10 @@ COPY→COPIED button. Ports ui/components/shared/code-block.tsx + lib/highlight.
 
 The highlighter mirrors highlight.tsx: a single tokenizer regex over comments /
 strings / numbers / words, emitting <span> nodes with .tok-kw/.tok-type/.tok-bi/
-.tok-str/.tok-num/.tok-com classes (defined in global.css)."""
+.tok-str/.tok-num/.tok-com classes (defined in global.css).
 
-import re;
+# studio: client port uses JS RegExp.matchAll instead of Python `re` — `import re`
+# is unresolvable in the Vite/esbuild bundle. RegExp(pat,"g") (no `new`) is valid JS."""
 
 glob KW: set = {
     "def", "return", "if", "else", "elif", "for", "while", "import", "from",
@@ -46,17 +47,20 @@ def _highlight(code: str) -> list {
     nodes: list = [];
     last = 0;
     key = 0;
-    for m in re.finditer(TOKEN_RE, code) {
-        idx = int(str(m.start()));
+    rx: any = RegExp;
+    arr: any = Array;
+    matches: any = arr.from(code.matchAll(rx(TOKEN_RE, "g")));
+    for m in matches {
+        idx = int(str(m.index));
         if idx > last {
             nodes.append(<span key={str(key)}>{code[last:idx]}</span>);
             key += 1;
         }
-        full = str(m.group(0));
-        com: any = m.group(1);
-        strg: any = m.group(2);
-        num: any = m.group(3);
-        word: any = m.group(4);
+        full = str(m[0]);
+        com: any = m[1];
+        strg: any = m[2];
+        num: any = m[3];
+        word: any = m[4];
         cls = "";
         if com {
             cls = "tok-com";
@@ -73,7 +77,7 @@ def _highlight(code: str) -> list {
             nodes.append(<span key={str(key)}>{full}</span>);
         }
         key += 1;
-        last = int(str(m.end()));
+        last = idx + len(full);
     }
     if last < len(code) {
         nodes.append(<span key={str(key)}>{code[last:]}</span>);

@@ -93,8 +93,8 @@ def:pub Rl -> JsxElement {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-                {_lineChart("STaR · pass@1 greedy · by round", STAR1)}
-                {_lineChart("STaR · pass@4 sampled · by round", STAR4)}
+                {_lineChart({"title": "STaR · pass@1 greedy · by round", "rows": STAR1})}
+                {_lineChart({"title": "STaR · pass@4 sampled · by round", "rows": STAR4})}
             </div>
 
             <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-3 pt-4">

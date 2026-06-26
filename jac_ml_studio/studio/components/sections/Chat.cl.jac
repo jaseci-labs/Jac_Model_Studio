@@ -12,6 +12,7 @@ sv import from ...models {
     list_models, system_ram, loaded_model, warm_model, ModelView
 }
 sv import from ...prompts { list_prompts }
+sv import from ...data { add_examples }
 sv import from ...persistence {
     create_chat, list_chats, delete_chat, get_messages, add_message, today_utc,
     ChatView, MsgView
@@ -292,6 +293,18 @@ def:pub Chat -> JsxElement {
         await refreshLoaded();
     }
 
+# Capture a user→assistant turn as an SFT example (sft.jsonl) via the Data backend.
+    async def saveExample(userText: str, asstText: str) -> None {
+        if not userText or not asstText {
+            return;
+        }
+        rec = JSON.stringify({"messages": [
+            {"role": "user", "content": userText},
+            {"role": "assistant", "content": asstText}
+        ]});
+        await add_examples(target="sft", jsonl=rec);
+    }
+
     def pickChip(catId: str) -> None {
         for cat in prompts {
             if str(cat["id"]) == catId {
@@ -318,7 +331,7 @@ def:pub Chat -> JsxElement {
                 onPick={loadModel}
                 onPickCompare={lambda id: str { compareId = id; }}
             />
-            <Thread messages={messages} labels={labelMap()} />
+            <Thread messages={messages} labels={labelMap()} onSave={saveExample} />
             <Composer
                 value={draft} busy={streaming} categories={prompts}
                 onSet={lambda v: str { draft = v; }}

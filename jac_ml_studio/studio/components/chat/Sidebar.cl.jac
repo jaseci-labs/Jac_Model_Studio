@@ -90,6 +90,6 @@ def:pub Sidebar(
                 </div>
             }}
         </div>
-        {_mem_gauge(residentGb, ramGb)}
+        {_mem_gauge({"used": residentGb, "total": ramGb})}
     </aside>;
 }

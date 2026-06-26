@@ -164,13 +164,13 @@ def _compareTable(headline: list) -> JsxElement {
                 </tr>
             </thead>
             <tbody>
-                {_cmpRow("ACCURACY · TEST-PASS%", accCells, accNums, "max")}
-                {_cmpRow("FINAL LOSS", lossCells, lossNums, "min")}
-                {_cmpRow("ITERATIONS", iterCells, iterNums, "max")}
-                {_cmpRow("FUNCTION HOLDOUT · IDIOMATIC%", fpctCells, fpctNums, "max")}
-                {_cmpRow("FUNCTION HOLDOUT · SIM", fsimCells, nullNums, "min")}
-                {_cmpRow("GRAPH HOLDOUT · IDIOMATIC%", gpctCells, gpctNums, "max")}
-                {_cmpRow("GRAPH HOLDOUT · SIM", gsimCells, nullNums, "min")}
+                {_cmpRow({"label": "ACCURACY · TEST-PASS%", "cells": accCells, "nums": accNums, "best": "max"})}
+                {_cmpRow({"label": "FINAL LOSS", "cells": lossCells, "nums": lossNums, "best": "min"})}
+                {_cmpRow({"label": "ITERATIONS", "cells": iterCells, "nums": iterNums, "best": "max"})}
+                {_cmpRow({"label": "FUNCTION HOLDOUT · IDIOMATIC%", "cells": fpctCells, "nums": fpctNums, "best": "max"})}
+                {_cmpRow({"label": "FUNCTION HOLDOUT · SIM", "cells": fsimCells, "nums": nullNums, "best": "min"})}
+                {_cmpRow({"label": "GRAPH HOLDOUT · IDIOMATIC%", "cells": gpctCells, "nums": gpctNums, "best": "max"})}
+                {_cmpRow({"label": "GRAPH HOLDOUT · SIM", "cells": gsimCells, "nums": nullNums, "best": "min"})}
             </tbody>
         </table>
     </div>;
@@ -216,7 +216,7 @@ def:pub Train(active: bool) -> JsxElement {
     async def _pollStatus(nm: str, md: str) -> None {
         try {
             j = await get_status(name=nm, mode=md);
-            job = dict(j);
+            job = j;
             error = "";
         } except Exception {
             error = "fetch error";
@@ -225,7 +225,7 @@ def:pub Train(active: bool) -> JsxElement {
     async def _pollMetrics(nm: str, md: str, tracker: dict) -> None {
         try {
             m = await get_run(name=nm, mode=md);
-            metrics = dict(m);
+            metrics = m;
             if not bool(m["found"]) or not bool(m["running"]) {
                 feed = "nofeed";
                 return;
@@ -249,13 +249,13 @@ def:pub Train(active: bool) -> JsxElement {
     async def _fetchCompare(cm: str) -> None {
         try {
             r = await compare_runs(mode=cm);
-            compare = dict(r);
+            compare = r;
         } except Exception {}
     }
     async def _fetchHistMetrics(nm: str, md: str) -> None {
         try {
             m = await get_run(name=nm, mode=md);
-            historyMetrics = dict(m);
+            historyMetrics = m;
         } except Exception {}
     }
 
@@ -327,8 +327,6 @@ def:pub Train(active: bool) -> JsxElement {
 
     # ---- actions ----
     def onTab(t: str) -> None { tab = t.lower(); }
-    def setHistoryView(v: str) -> None { historyView = v; }
-    def setCompareMode(m: str) -> None { compareMode = m; }
     def updateForm(key: str, value: str) -> None {
         if key == "modelId" { formModelId = value; }
         elif key == "name" { formName = value; }
@@ -352,7 +350,7 @@ def:pub Train(active: bool) -> JsxElement {
         mid = formModelId if formMode == "sft" else "";
         try {
             j = await start_training(name=formName, mode=formMode, model_id=mid, opts=filtered);
-            job = dict(j);
+            job = j;
             error = "";
         } except Exception {
             error = "start failed";
@@ -361,7 +359,7 @@ def:pub Train(active: bool) -> JsxElement {
     async def doStop() -> None {
         try {
             j = await stop_training(name=formName, mode=formMode);
-            job = dict(j);
+            job = j;
         } except Exception {
             error = "stop failed";
         }
@@ -558,11 +556,11 @@ def:pub Train(active: bool) -> JsxElement {
         hasData = compare is not None and len(list(compare["names"])) > 0;
         return <>
             <div className="flex items-center gap-3">
-                <Segmented options={["sft", "dpo"]} value={compareMode} onSet={lambda v: str { setCompareMode(v); }} />
+                <Segmented options={["sft", "dpo"]} value={compareMode} onSet={lambda v: str { compareMode = v; }} />
             </div>
             {not hasData and <div className="flex flex-1 items-center justify-center"><span className="micro-label">NO PAST RUNS</span></div>}
             {hasData and <>
-                {_compareTable(list(compare["headline"]))}
+                {_compareTable({"headline": list(compare["headline"])})}
                 <div className="grid grid-cols-1 gap-4">
                     <MultiLineChart title="ACCURACY · TEST-PASS%" rows={list(compare["curve"])} names={list(compare["names"])} />
                     <MultiLineChart title="LOSS.TRAIN" rows={list(compare["train"])} names={list(compare["names"])} />
@@ -576,10 +574,10 @@ def:pub Train(active: bool) -> JsxElement {
         pastSessions: list = [s for s in sessions if str(s["status"]) != "running"];
         return <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto p-4">
             <div className="flex flex-wrap items-center gap-3">
-                <Segmented options={["runs", "compare"]} value={historyView} onSet={lambda v: str { setHistoryView(v); }} />
+                <Segmented options={["runs", "compare"]} value={historyView} onSet={lambda v: str { historyView = v; }} />
                 <span className="stat-line text-neutral-600">{"inspect one finished run in detail" if historyView == "runs" else "overlay every run of one stage"}</span>
             </div>
-            {historyView == "runs" and _historyRuns(pastSessions)}
+            {historyView == "runs" and _historyRuns({"pastSessions": pastSessions})}
             {historyView == "compare" and _historyCompare()}
         </div>;
     }

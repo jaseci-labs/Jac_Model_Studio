@@ -283,7 +283,7 @@ def:pub Data -> JsxElement {
                                 <span className="truncate text-neutral-500">{row["source"]}</span>
                                 <span className="truncate text-neutral-600">{row["preview"]}</span>
                             </div>
-                            {(expanded == int(row["idx"])) and <div className="mb-1">{_detail(row)}</div>}
+                            {(expanded == int(row["idx"])) and <div className="mb-1">{_detail({"row": row})}</div>}
                         </div>
                     }}
                 </div>

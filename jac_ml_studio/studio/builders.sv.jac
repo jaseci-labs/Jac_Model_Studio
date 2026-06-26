@@ -1,6 +1,6 @@
 """studio - builder pipeline job management. Ports server/builders.py.
 
-The 13 dataset build stages are run as detached `jac run srccurrent/jacgen/<stage>.jac`
+The 13 dataset build stages are run as detached `jac run sft_dpo/jacgen/<stage>.jac`
 subprocesses via jobs.sv.jac (spawn_detached + with_exit_marker + write_job). Stage
 status is resolved live from the run log's `__EXIT__` marker / pid liveness by
 jobs.live_status; log tails come from metrics.tail. Endpoints are client-facing.
@@ -81,7 +81,7 @@ def:pub list_builders() -> list[BuilderView] {
     return out;
 }
 
-"""Spawn `<jac_bin> run srccurrent/jacgen/<stage>.jac` as a detached builder job
+"""Spawn `<jac_bin> run sft_dpo/jacgen/<stage>.jac` as a detached builder job
 (cwd = data root, .venv/bin prepended to PATH). No-op with message="already running"
 if the job is live; the run log is truncated first so a stale __EXIT__ marker from a
 previous run can't immediately mark the new run done/failed."""
@@ -101,7 +101,7 @@ def:pub run_builder(stage: str) -> BuilderView {
     (models.results_dir() / "_builder").mkdir(parents=True, exist_ok=True);
     # Erase any stale __EXIT__ marker from a prior run.
     rl.write_text("");
-    target = f"srccurrent/jacgen/{shlex.quote(stage)}.jac";
+    target = f"sft_dpo/jacgen/{shlex.quote(stage)}.jac";
     inner_cmd = f"{shlex.quote(str(models.jac_bin()))} run {target}";
     cmd = jobs.with_exit_marker(inner_cmd, rl);
     venv_bin = str(models.data_root() / ".venv" / "bin");
