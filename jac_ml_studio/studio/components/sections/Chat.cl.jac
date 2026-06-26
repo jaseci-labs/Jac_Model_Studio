@@ -242,8 +242,11 @@ def:pub Chat -> JsxElement {
                 "modelId": legModel, "pairGroup": pg, "streaming": False, "error": errtext
             };
             messages = list(work);
-        } elif acc {
-            sj = JSON.stringify(donestats) if donestats else "";
+        }
+        # Persist any assistant content so the reply shows in history on reopen — even a
+        # partial reply that then errored mid-stream. Only skip when nothing was generated.
+        if acc {
+            sj = JSON.stringify(donestats) if donestats and not errtext else "";
             await add_message(cid, "assistant", acc, legModel, sj, pg);
         }
     }
