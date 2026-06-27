@@ -50,7 +50,7 @@ and launch the in-browser shooter - all of it hits real Jac.
 main.jac              cl{} app delegate + na{} rlgl shooter (-> main.wasm)
 frontend.cl.jac       app shell: shared state, section order, sv handler decls
 frontend.impl.jac     handler bodies (root spawn ... walkers)
-server.jac            object-spatial backend: Visitor/Topic nodes, walkers
+guestbook.jac         object-spatial backend: Day/Visitor nodes, guestbook/explore walkers
 raylib_shim.cl.jac    WebGL/DOM shim for the wasm shooter
 capture.jac           the automation script (below)
 components/           Nav, SectionShell, CodeBlock, StatBar + one file per section
