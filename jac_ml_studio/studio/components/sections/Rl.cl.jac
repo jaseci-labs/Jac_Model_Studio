@@ -83,16 +83,24 @@ def _archiveLine(props: dict) -> JsxElement {
 def:pub Rl -> JsxElement {
     has cells: list = [],
         curve: list = [],
-        keys: list = [];
+        keys: list = [],
+        sgcells: list = [],
+        sgcurve: list = [],
+        sgkeys: list = [];
 
     async can with entry {
         d = await get_rl_ladder();
         cells = list(d["cells"]);
         curve = list(d["curve"]);
         keys = list(d["curve_keys"]);
+        sgd = d["sg"];
+        sgcells = list(sgd["cells"]);
+        sgcurve = list(sgd["curve"]);
+        sgkeys = list(sgd["curve_keys"]);
     }
 
     has_live = len(cells) > 0;
+    has_sg = len(sgcells) > 0;
 
     return <div className="flex h-full min-w-0 flex-1 flex-col">
         <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-2.5">
@@ -133,6 +141,32 @@ def:pub Rl -> JsxElement {
                 <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">LADDER</span>
                 <p className="text-sm text-neutral-400">No ladder results yet. Run <span className="font-mono text-neutral-200">JAC_LADDER_GO=1 jac run rl/run_ladder.jac</span> — cells stream into this graph as evals land.</p>
             </div>)}
+
+            {(<div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-3 pt-4">
+                <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">STEP 7 · SG-IDIOM HOLDOUT (sg walkers held out file-disjoint)</span>
+                {_ladderChart({"rows": sgcurve, "keys": sgkeys})}
+                <table className="mt-3 w-full font-mono text-xs">
+                    <thead>
+                        <tr className="text-neutral-500">
+                            <th className="py-1 text-left">model</th><th className="text-left">rung</th>
+                            <th className="text-left">cond</th><th className="text-right">gen@1</th>
+                            <th className="text-right">gen@k</th><th className="text-right">n</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {for c in sgcells {
+                            <tr key={"sg" + str(c["model"]) + str(c["rung"]) + str(c["cond"])} className="border-t border-neutral-900 text-neutral-300">
+                                <td className="py-1">{c["model"]}</td><td>{c["rung"]}</td>
+                                <td className="text-neutral-500">{c["cond"]}</td>
+                                <td className="text-right text-neutral-100">{_n(c["gen_pass1"])}</td>
+                                <td className="text-right">{_n(c["gen_passk"])}</td>
+                                <td className="text-right text-neutral-600">{c["n"] if c["n"] != None else "·"}</td>
+                            </tr>
+                        }}
+                    </tbody>
+                </table>
+                <div className="stat-line mt-2 text-neutral-600">Held-out sg slice is the hard frontier (0/5 base). Fresh qwen3coder SFT at rung-all is the only cell to crack it: sg 0→1/5, overall 14.3%→28.6%.</div>
+            </div>) if has_sg else <span></span>}
 
             <div className="mt-2 border-t border-neutral-800 pt-3">
                 <span className="micro-label text-neutral-500">— WEEKEND ARCHIVE · GRPO + WARM-START + STaR (Jun 20–21) —</span>

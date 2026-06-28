@@ -1,11 +1,13 @@
-"""RL ladder results backend — reads the live ladder output (results/rl_ladder.jsonl
-in the repo root, written by rl/run_ladder.jac) and pivots it into chart-ready
-structures for the RL section. This replaces the static weekend-only data with the
-real, updating SFT/GRPO ladder curve.
+"""RL ladder results backend — reads the live ladder output and pivots it into
+chart-ready structures for the RL section. Replaces the static weekend-only data.
+
+Two runs are surfaced:
+  - primary: results/rl_ladder.jsonl  (gb+lib file-disjoint holdout)
+  - sg:      results/rl_ladder_sg.jsonl (step 7, sg idiom held out file-disjoint)
 
 Each ladder eval appends one row tagged r<N>/<model>/<cond>/<gen|mem>. We collapse
-to one cell per (model, rung, cond) and emit: a flat cell list (the table), a
-rung-indexed curve (one line per model·cond, gen pass@1), and the line keys.
+to one cell per (model, rung, cond) and emit, per run: a flat cell list (the table),
+a rung-indexed curve (one line per model·cond, gen pass@1), and the line keys.
 
 # ponytail: reads external JSON (json.loads -> Any), so strict `jac check` can't
 # type the dict pivot — same as rl/eval_rl.jac / rl/show_ladder.jac. Bar is
@@ -20,17 +22,11 @@ import from pathlib { Path }
 glob RL_REPO: str = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))));
 glob RUNG_ORDER: list = ["1", "3", "5", "10", "20", "all"];
 
-def _results_path() -> str {
-    return os.environ.get("JAC_RL_RESULTS", os.path.join(RL_REPO, "results", "rl_ladder.jsonl"));
-}
-
-def:pub get_rl_ladder() -> dict {
-    p = _results_path();
+def _pivot(p: str) -> dict {
     if not os.path.exists(p) {
-        return {"cells": [], "curve": [], "curve_keys": [], "families": [], "count": 0, "source": p};
+        return {"cells": [], "curve": [], "curve_keys": [], "families": [], "count": 0};
     }
-    # pivot — last write wins per (model,rung,cond,kind)
-    cells: dict = {};
+    cells: dict = {};   # last write wins per (model,rung,cond,kind)
     for line in Path(p).read_text().split("\n") {
         s = str(line).strip();
         if not s { continue; }
@@ -47,7 +43,6 @@ def:pub get_rl_ladder() -> dict {
         slot[kind] = rec;
         cells[key] = slot;
     }
-
     out_cells: list = [];
     curve_map: dict = {};
     keys: set = set();
@@ -77,13 +72,19 @@ def:pub get_rl_ladder() -> dict {
     for r in RUNG_ORDER {
         if r in curve_map { curve.append(curve_map[r]); }
     }
-    # cells sorted by model, then ladder rung order, then cond
     def _rk(row: dict) -> int {
         return RUNG_ORDER.index(str(row["rung"])) if str(row["rung"]) in RUNG_ORDER else 99;
     }
     out_cells.sort(key=lambda r: r and (str(r["model"]), _rk(r), str(r["cond"])));
+    return {"cells": out_cells, "curve": curve, "curve_keys": sorted(keys), "families": sorted(fams), "count": len(out_cells)};
+}
+
+def:pub get_rl_ladder() -> dict {
+    primary = _pivot(os.environ.get("JAC_RL_RESULTS", os.path.join(RL_REPO, "results", "rl_ladder.jsonl")));
+    sg = _pivot(os.path.join(RL_REPO, "results", "rl_ladder_sg.jsonl"));
     return {
-        "cells": out_cells, "curve": curve, "curve_keys": sorted(keys),
-        "families": sorted(fams), "count": len(out_cells), "source": p
+        "cells": primary["cells"], "curve": primary["curve"], "curve_keys": primary["curve_keys"],
+        "families": primary["families"], "count": primary["count"],
+        "sg": sg
     };
 }
