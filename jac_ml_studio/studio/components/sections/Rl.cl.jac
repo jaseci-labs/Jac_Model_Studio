@@ -34,7 +34,14 @@ glob FAILS: list[dict] = [
     {"t": "STaR flicker didn't hold", "b": "qwen3coder pass@4 touched 25% at round 1 then fell back; greedy never left the 16.7% SFT floor."}
 ];
 glob STROKES: list[str] = ["#7aa2f7", "#d8a657", "#9ec98f"];
-glob LCOLORS: list[str] = ["#7aa2f7", "#d8a657", "#9ec98f", "#e07a8b", "#a78bdb", "#6fb8c9"];
+# Color encodes CONDITION (stable by name, not list index — so the same cond is
+# the same color across every chart). Model is encoded by line style instead:
+# solid = jac- finetuned, dashed = base model. See _colorFor / _dashFor.
+glob COND_COLOR: dict = {
+    "base": "#9aa0a6", "sft": "#7aa2f7", "raw_grpo": "#d8a657",
+    "sft_grpo": "#9ec98f", "sft_grpo_tuned": "#e07a8b"
+};
+glob PCT_TICKS: list[int] = [0, 25, 50, 75, 100];
 
 def _tick() -> dict {
     return {"fill": "#666", "fontSize": 10, "fontFamily": "'Geist Mono', ui-monospace, monospace"};
@@ -44,23 +51,64 @@ def _n(v: any) -> str {
     return (str(v) + "%") if v != None else "·";
 }
 
+def _condOf(key: str) -> str {
+    parts = str(key).split("·");
+    return str(parts[1]) if len(parts) > 1 else str(key);
+}
+
+def _colorFor(key: str) -> str {
+    return COND_COLOR.get(_condOf(key), "#a78bdb");
+}
+
+# solid line = jac- finetuned model; dashed = base model. Lets two series that
+# share a condition color stay distinguishable where they overlap.
+def _dashFor(key: str) -> str {
+    return "" if str(key).startswith("jac-") else "5 3";
+}
+
+# Custom tooltip: lists EVERY series at the hovered rung, with an explicit N/A
+# (dim, dotted swatch) for any series that had no eval there. Recharts clones
+# this element injecting active/payload/label; `keys` is the full series list.
+def _LadderTip(props: dict) -> JsxElement {
+    if not props.get("active") { return <span></span>; }
+    payload: list = list(props.get("payload") or []);
+    keys: list = list(props.get("keys") or []);
+    present: dict = {};
+    for p in payload {
+        if p.get("value") != None { present[str(p.get("dataKey"))] = p.get("value"); }
+    }
+    return <div className="rounded-sm border border-neutral-700 bg-[#0a0a0c] px-2.5 py-2" style={{"fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 11}}>
+        <div className="micro-label mb-1 text-neutral-500">rung {props.get("label")} · pass@1</div>
+        {for k in keys {
+            <div key={k} className="flex items-center justify-between gap-4 leading-5">
+                <span className="flex items-center gap-1.5">
+                    <span style={{"display": "inline-block", "width": 14, "borderTop": (("2px dashed " + _colorFor(k)) if _dashFor(k) else ("2px solid " + _colorFor(k)))}}></span>
+                    <span style={{"color": _colorFor(k)}}>{k}</span>
+                </span>
+                {(<span className="text-neutral-100">{str(present[k]) + "%"}</span>) if (k in present) else (<span className="rounded-sm border border-dashed border-neutral-600 px-1 italic text-neutral-500">N/A</span>)}
+            </div>
+        }}
+    </div>;
+}
+
 def _ladderChart(props: dict) -> JsxElement {
     rows = props["rows"];
     keys: list = list(props["keys"]);
     return <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-3 pt-4">
-        <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">HOLDOUT pass@1 · by rung (train-N)</span>
-        <ResponsiveContainer width="100%" height={220}>
+        <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">HOLDOUT pass@1 % · by rung (train-N) · Y axis 0–100</span>
+        <ResponsiveContainer width="100%" height={260}>
             <LineChart data={rows} margin={{"top": 10, "right": 14, "left": 0, "bottom": 0}}>
                 <CartesianGrid stroke="#1c1c1f" vertical={False} />
                 <XAxis dataKey="x" tick={_tick()} tickLine={False} axisLine={{"stroke": "#333"}} />
-                <YAxis tick={_tick()} tickLine={False} axisLine={False} width={40} domain={[0, "auto"]} />
-                <Tooltip cursor={{"stroke": "#333", "strokeDasharray": "3 3"}} contentStyle={{"background": "#0a0a0c", "border": "1px solid #333", "borderRadius": 0, "fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 11}} labelStyle={{"color": "#777"}} itemStyle={{"color": "#fafafa"}} />
+                <YAxis tick={_tick()} tickLine={False} axisLine={False} width={40} domain={[0, 100]} ticks={PCT_TICKS} unit="%" />
+                <Tooltip cursor={{"stroke": "#333", "strokeDasharray": "3 3"}} content={<_LadderTip keys={keys}/>} />
                 <Legend wrapperStyle={{"fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 10}} />
-                {for (i, k) in enumerate(keys) {
-                    <Line key={k} type="monotone" dataKey={k} stroke={LCOLORS[i % len(LCOLORS)]} strokeWidth={1.4} dot={True} isAnimationActive={False} connectNulls={True} />
+                {for k in keys {
+                    <Line key={k} type="monotone" dataKey={k} stroke={_colorFor(k)} strokeDasharray={_dashFor(k)} strokeWidth={1.8} dot={{"r": 3.2, "fill": _colorFor(k), "strokeWidth": 0}} activeDot={{"r": 4.5}} isAnimationActive={False} connectNulls={False} />
                 }}
             </LineChart>
         </ResponsiveContainer>
+        <div className="stat-line mt-2 text-neutral-600">color = condition (base / sft / raw_grpo / sft_grpo / sft_grpo_tuned) · solid = jac- finetuned, dashed = base model · a broken line / lone dot = that series was only evaluated at that rung; gaps = N/A (hover for the full per-series breakdown incl. N/A) · coincident lines mean equal scores, not a render bug.</div>
     </div>;
 }
 
@@ -71,10 +119,11 @@ def _archiveLine(props: dict) -> JsxElement {
             <LineChart data={props["rows"]} margin={{"top": 10, "right": 14, "left": 0, "bottom": 0}}>
                 <CartesianGrid stroke="#1c1c1f" vertical={False} />
                 <XAxis dataKey="x" tick={_tick()} tickLine={False} axisLine={{"stroke": "#333"}} />
-                <YAxis tick={_tick()} tickLine={False} axisLine={False} width={40} domain={["auto", "auto"]} />
+                <YAxis tick={_tick()} tickLine={False} axisLine={False} width={40} domain={[0, 100]} ticks={PCT_TICKS} unit="%" />
                 <Tooltip cursor={{"stroke": "#333", "strokeDasharray": "3 3"}} contentStyle={{"background": "#0a0a0c", "border": "1px solid #333", "borderRadius": 0, "fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 11}} labelStyle={{"color": "#777"}} itemStyle={{"color": "#fafafa"}} />
-                <Line type="monotone" dataKey="qwen3coder" stroke={STROKES[0]} strokeWidth={1.4} dot={False} isAnimationActive={False} />
-                <Line type="monotone" dataKey="jac-qwen3coder" stroke={STROKES[1]} strokeWidth={1.4} dot={False} isAnimationActive={False} />
+                <Legend wrapperStyle={{"fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 10}} />
+                <Line type="monotone" dataKey="qwen3coder" stroke={STROKES[0]} strokeDasharray="5 3" strokeWidth={1.8} dot={{"r": 2.6, "fill": STROKES[0], "strokeWidth": 0}} isAnimationActive={False} />
+                <Line type="monotone" dataKey="jac-qwen3coder" stroke={STROKES[1]} strokeWidth={1.8} dot={{"r": 2.6, "fill": STROKES[1], "strokeWidth": 0}} isAnimationActive={False} />
             </LineChart>
         </ResponsiveContainer>
     </div>;
@@ -86,7 +135,10 @@ def:pub Rl -> JsxElement {
         keys: list = [],
         sgcells: list = [],
         sgcurve: list = [],
-        sgkeys: list = [];
+        sgkeys: list = [],
+        v84cells: list = [],
+        v84curve: list = [],
+        v84keys: list = [];
 
     async can with entry {
         d = await get_rl_ladder();
@@ -97,10 +149,15 @@ def:pub Rl -> JsxElement {
         sgcells = list(sgd["cells"]);
         sgcurve = list(sgd["curve"]);
         sgkeys = list(sgd["curve_keys"]);
+        v84d = d["v84"];
+        v84cells = list(v84d["cells"]);
+        v84curve = list(v84d["curve"]);
+        v84keys = list(v84d["curve_keys"]);
     }
 
     has_live = len(cells) > 0;
     has_sg = len(sgcells) > 0;
+    has_v84 = len(v84cells) > 0;
 
     return <div className="flex h-full min-w-0 flex-1 flex-col">
         <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-2.5">
@@ -168,6 +225,34 @@ def:pub Rl -> JsxElement {
                 <div className="stat-line mt-2 text-neutral-600">Held-out sg slice is the hard frontier (0/5 base). Fresh qwen3coder SFT at rung-all is the only cell to crack it: sg 0→1/5, overall 14.3%→28.6%.</div>
             </div>) if has_sg else <span></span>}
 
+            {(<div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-3 pt-4">
+                <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">84-TASK HIGHER-POWER RE-RUN (null reproduced on a 2nd corpus)</span>
+                {_ladderChart({"rows": v84curve, "keys": v84keys})}
+                <table className="mt-3 w-full font-mono text-xs">
+                    <thead>
+                        <tr className="text-neutral-500">
+                            <th className="py-1 text-left">model</th><th className="text-left">rung</th>
+                            <th className="text-left">cond</th><th className="text-right">gen@1</th>
+                            <th className="text-right">gen@k</th><th className="text-right">mem</th>
+                            <th className="text-right">n</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {for c in v84cells {
+                            <tr key={"v84" + str(c["model"]) + str(c["rung"]) + str(c["cond"])} className="border-t border-neutral-900 text-neutral-300">
+                                <td className="py-1">{c["model"]}</td><td>{c["rung"]}</td>
+                                <td className="text-neutral-500">{c["cond"]}</td>
+                                <td className="text-right text-neutral-100">{_n(c["gen_pass1"])}</td>
+                                <td className="text-right">{_n(c["gen_passk"])}</td>
+                                <td className="text-right text-neutral-500">{_n(c["mem_pass1"])}</td>
+                                <td className="text-right text-neutral-600">{c["n"] if c["n"] != None else "·"}</td>
+                            </tr>
+                        }}
+                    </tbody>
+                </table>
+                <div className="stat-line mt-2 text-neutral-600">Corpus squeezed 66→84 tasks for power. Same null: SFT moves cells, GRPO does not.</div>
+            </div>) if has_v84 else <span></span>}
+
             <div className="mt-2 border-t border-neutral-800 pt-3">
                 <span className="micro-label text-neutral-500">— WEEKEND ARCHIVE · GRPO + WARM-START + STaR (Jun 20–21) —</span>
             </div>
@@ -190,7 +275,7 @@ def:pub Rl -> JsxElement {
                     <BarChart data={PHASE1} margin={{"top": 10, "right": 14, "left": 0, "bottom": 0}}>
                         <CartesianGrid stroke="#1c1c1f" vertical={False} />
                         <XAxis dataKey="model" tick={_tick()} tickLine={False} axisLine={{"stroke": "#333"}} />
-                        <YAxis tick={_tick()} tickLine={False} axisLine={False} width={32} domain={[0, "auto"]} />
+                        <YAxis tick={_tick()} tickLine={False} axisLine={False} width={40} domain={[0, 100]} ticks={PCT_TICKS} unit="%" />
                         <Tooltip cursor={{"fill": "#ffffff08"}} contentStyle={{"background": "#0a0a0c", "border": "1px solid #333", "borderRadius": 0, "fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 11}} labelStyle={{"color": "#777"}} itemStyle={{"color": "#fafafa"}} />
                         <Legend wrapperStyle={{"fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 10, "color": "#777"}} />
                         <Bar dataKey="BASE" fill={STROKES[0]} isAnimationActive={False} />

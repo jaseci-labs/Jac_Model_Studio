@@ -68,9 +68,19 @@ def _pivot(p: str) -> dict {
             curve_map[c["rung"]] = cp;
         }
     }
+    # Densify: every rung row carries every series key (None where that
+    # model·cond had no eval at this rung) so the client can render an explicit
+    # N/A marker instead of silently dropping the series from the tooltip.
+    all_keys: list = sorted(keys);
     curve: list = [];
     for r in RUNG_ORDER {
-        if r in curve_map { curve.append(curve_map[r]); }
+        if r in curve_map {
+            cp: dict = curve_map[r];
+            for lk in all_keys {
+                if lk not in cp { cp[lk] = None; }
+            }
+            curve.append(cp);
+        }
     }
     def _rk(row: dict) -> int {
         return RUNG_ORDER.index(str(row["rung"])) if str(row["rung"]) in RUNG_ORDER else 99;
@@ -82,9 +92,10 @@ def _pivot(p: str) -> dict {
 def:pub get_rl_ladder() -> dict {
     primary = _pivot(os.environ.get("JAC_RL_RESULTS", os.path.join(RL_REPO, "results", "rl_ladder.jsonl")));
     sg = _pivot(os.path.join(RL_REPO, "results", "rl_ladder_sg.jsonl"));
+    v84 = _pivot(os.path.join(RL_REPO, "results", "rl_ladder_v84.jsonl"));
     return {
         "cells": primary["cells"], "curve": primary["curve"], "curve_keys": primary["curve_keys"],
         "families": primary["families"], "count": primary["count"],
-        "sg": sg
+        "sg": sg, "v84": v84
     };
 }
