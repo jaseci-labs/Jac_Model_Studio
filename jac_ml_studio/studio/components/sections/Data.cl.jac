@@ -10,7 +10,7 @@ dataset-browser,row-detail,stats-tiles}. The 13 build stages run as detached job
 # 3s while mounted — a touch more network, but correct and far simpler.
 """
 
-sv import from ...data { dataset_stats, dataset_files, dataset_rows, add_examples, FileRefView, DataRowView }
+sv import from ...data { dataset_stats, dataset_files, dataset_rows, add_examples, rl_dataset_files, rl_dataset_rows, FileRefView, DataRowView }
 sv import from ...builders { list_builders, run_builder, BuilderView }
 import from ..shared.StatTile { StatTile }
 import from ..shared.StatusGlyph { StatusGlyph }
@@ -28,7 +28,8 @@ glob GROUPS: list[dict] = [
     {"label": "AUDIT", "stages": ["dataset_stats", "verify_dataset"]}
 ];
 
-glob KIND_LABEL: dict = {"sft": "SFT", "dpo": "DPO", "holdout": "HOLD", "raw": "RAW"};
+glob KIND_LABEL: dict = {"sft": "SFT", "dpo": "DPO", "holdout": "HOLD", "raw": "RAW", "rltask": "RL"};
+glob RL_SOURCES: list[str] = ["SFT", "GRPO", "conversion", "synthetic", "splits"];
 
 def:pub Data -> JsxElement {
     has stats: any = None,
@@ -44,13 +45,20 @@ def:pub Data -> JsxElement {
         addText: str = "",
         addResult: any = None,
         addBusy: bool = False,
+        dataView: str = "core",
+        rlSource: str = "SFT",
         pollId: any = None;
 
-    # `p`/`off` are passed explicitly — reading the `path`/`offset` state right
-    # after setting it returns the stale value (React state writes are async).
-    async def _fetch(p: str, off: int) -> None {
+    # `p`/`off`/`view`/`src` are passed explicitly — reading the state right after
+    # setting it returns the stale value (React state writes are async).
+    async def _fetch(p: str, off: int, view: str, src: str) -> None {
         limit = 25;
-        r = await dataset_rows(p, off, limit);
+        r: dict = {};
+        if view == "rl" {
+            r = await rl_dataset_rows(src, p, off, limit);
+        } else {
+            r = await dataset_rows(p, off, limit);
+        }
         rows = list(r["rows"]);
         total = int(r["total"]);
     }
@@ -59,7 +67,35 @@ def:pub Data -> JsxElement {
         path = p;
         offset = 0;
         expanded = -1;
-        await _fetch(p, 0);
+        await _fetch(p, 0, dataView, rlSource);
+    }
+
+    async def _loadView(view: str, src: str) -> None {
+        fs: list = [];
+        if view == "rl" {
+            fs = await rl_dataset_files(src);
+        } else {
+            fs = await dataset_files();
+        }
+        files = fs;
+        expanded = -1;
+        offset = 0;
+        if len(list(fs)) > 0 {
+            path = str(fs[0].path);
+            await _fetch(str(fs[0].path), 0, view, src);
+        } else {
+            path = ""; rows = []; total = 0;
+        }
+    }
+
+    async def switchView(v: str) -> None {
+        dataView = v;
+        await _loadView(v, rlSource);
+    }
+
+    async def switchRlSource(s: str) -> None {
+        rlSource = s;
+        await _loadView("rl", s);
     }
 
     async def loadBuilders() -> None {
@@ -112,7 +148,7 @@ def:pub Data -> JsxElement {
             noff = max(0, offset - 25);
             offset = noff;
             expanded = -1;
-            await _fetch(path, noff);
+            await _fetch(path, noff, dataView, rlSource);
         }
     }
 
@@ -121,7 +157,7 @@ def:pub Data -> JsxElement {
             noff = offset + 25;
             offset = noff;
             expanded = -1;
-            await _fetch(path, noff);
+            await _fetch(path, noff, dataView, rlSource);
         }
     }
 
@@ -313,8 +349,14 @@ def:pub Data -> JsxElement {
                     </div>}
                 </div>
                 <div className="flex flex-col gap-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="micro-label text-neutral-600">DATASET</span>
+                        <Segmented options={["core", "rl"]} value={dataView} onSet={lambda v: str { switchView(v); }} />
+                        {(dataView == "rl") and <Segmented options={RL_SOURCES} value={rlSource} onSet={lambda v: str { switchRlSource(v); }} />}
+                    </div>
+                    {(dataView == "rl") and <div className="stat-line text-neutral-600">RL training data (read-only) — SFT gold · GRPO reward tasks · python→jac · synthetic · splits. See RL_FINDINGS.md.</div>}
                     {_browser()}
-                    {_addExamples()}
+                    {(dataView == "core") and _addExamples()}
                 </div>
             </div>
         </div>

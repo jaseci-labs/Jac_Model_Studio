@@ -4,10 +4,15 @@ Read-only browser (stats/files/rows) + append. Builder pipeline (subprocess)
 lands with the jobs module. All code fields returned as raw strings.
 """
 
+import os;
 import json;
 import re;
 import models;
 import from pathlib { Path }
+
+# RL data lives in THIS repo (jac_ml_studio), not the studio's data_root (which points
+# at the DataGeneration checkout). Resolve RL files against the repo root, like rl.sv.jac.
+glob RL_ROOT: str = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))));
 
 glob PREVIEW_FILES: list[list[str]] = [
     ["dataset/conversion/sft.jsonl", "SFT idiomatic core"],
@@ -22,6 +27,17 @@ glob PREVIEW_FILES: list[list[str]] = [
 ];
 glob APPEND_TARGETS: dict = {
     "sft": "dataset/conversion/sft.jsonl", "dpo": "dataset/conversion/dpo.jsonl"
+};
+
+# RL data pipeline — grouped by training use. SFT=gold {messages}; the rest are the
+# {prompt, answer} task pool (GRPO reward / eval). See RL_FINDINGS.md.
+glob RL_SOURCES: list[str] = ["SFT", "GRPO", "conversion", "synthetic", "splits"];
+glob RL_PREVIEW_FILES: dict = {
+    "SFT": [["dataset/rl/rft/train.jsonl", "RFT gold · train"], ["dataset/rl/rft/valid.jsonl", "RFT gold · valid"]],
+    "GRPO": [["dataset/rl/tasks.jsonl", "reward tasks · all"], ["dataset/rl/train.jsonl", "GRPO train pool"], ["dataset/rl/valid.jsonl", "GRPO valid"]],
+    "conversion": [["dataset/rl_conv/tasks.jsonl", "python→jac · all"], ["dataset/rl_conv/train.jsonl", "conv train"], ["dataset/rl_conv/holdout.jsonl", "conv holdout"]],
+    "synthetic": [["dataset/rl/synthetic.jsonl", "synthetic · fresh (32)"]],
+    "splits": [["dataset/rl/holdout.jsonl", "holdout n=18"], ["dataset/rl/holdout_big.jsonl", "holdout n=32 (+syn)"], ["dataset/rl/train_big.jsonl", "train pool (+syn)"]]
 };
 
 obj FileRefView {
@@ -131,6 +147,16 @@ def _build_row(idx: int, rec: any) -> DataRowView {
         py = str(rec["python"]);
         prompt = str(rec.get("prompt", ""));
         nm = str(rec.get("func_name", "")) or _funcname(py);
+    } elif "answer" in rec {
+        # RL task: {prompt, answer=json-string {id, source, expected_output, timeout}}
+        kind = "rltask";
+        prompt = str(rec.get("prompt", ""));
+        ad: dict = {};
+        try { ad = json.loads(str(rec["answer"])); } except Exception {}
+        nm = str(ad.get("id", ""));
+        src = str(ad.get("source", src));
+        jc = str(ad.get("expected_output", "")).strip();
+        raw = json.dumps(ad, indent=2);
     } else {
         raw = json.dumps(rec, indent=2);
     }
@@ -182,6 +208,52 @@ def:pub dataset_rows(path: str, offset: int, limit: int) -> dict {
     }
     cap = max(1, min(limit, 40));
     lines = _read_lines(path);
+    total = len(lines);
+    result: list[DataRowView] = [];
+    i = offset;
+    while i < total and i < offset + cap {
+        try {
+            rec = json.loads(str(lines[i]));
+            result.append(_build_row(i, rec));
+        } except Exception {}
+        i += 1;
+    }
+    return {"rows": result, "total": total};
+}
+
+def _rl_allowed(source: str, rel: str) -> bool {
+    for pair in RL_PREVIEW_FILES.get(source, []) {
+        if pair[0] == rel { return True; }
+    }
+    return False;
+}
+
+def _rl_read_lines(rel: str) -> list {
+    p = Path(RL_ROOT) / rel;
+    if not p.exists() { return []; }
+    out: list = [];
+    for line in p.read_text().split("\n") {
+        if line.strip() { out.append(line); }
+    }
+    return out;
+}
+
+"""RL dataset sources (SFT/GRPO/conversion/synthetic/splits) with their files + counts."""
+def:pub rl_dataset_files(source: str) -> list[FileRefView] {
+    out: list[FileRefView] = [];
+    for pair in RL_PREVIEW_FILES.get(source, []) {
+        out.append(FileRefView(path=pair[0], label=pair[1], count=len(_rl_read_lines(pair[0]))));
+    }
+    return out;
+}
+
+"""A page of parsed rows from an RL dataset file (cap 40), gated by source."""
+def:pub rl_dataset_rows(source: str, path: str, offset: int, limit: int) -> dict {
+    if not _rl_allowed(source, path) {
+        return {"rows": [], "total": 0};
+    }
+    cap = max(1, min(limit, 40));
+    lines = _rl_read_lines(path);
     total = len(lines);
     result: list[DataRowView] = [];
     i = offset;

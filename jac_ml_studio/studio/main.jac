@@ -10,7 +10,7 @@ import from persistence {
     ChatView, MsgView,
     create_chat, list_chats, rename_chat, delete_chat, get_messages, add_message, today_utc
 }
-import from data { FileRefView, DataRowView, dataset_stats, dataset_files, dataset_rows, add_examples }
+import from data { FileRefView, DataRowView, dataset_stats, dataset_files, dataset_rows, add_examples, rl_dataset_files, rl_dataset_rows }
 import from builders { BuilderView, list_builders, run_builder, get_builder }
 import from prompts { list_prompts }
 import from evals { EvalView, create_eval, list_evals, get_eval, stop_eval, delete_eval }
