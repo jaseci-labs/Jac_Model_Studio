@@ -5,7 +5,7 @@ the ladder runs) and renders the holdout pass@1 curve over rungs + the per-cell
 table. The archive below is the static weekend GRPO/STaR result, kept for context.
 """
 
-sv import from ...rl { get_rl_ladder, rl_generate }
+sv import from ...rl { get_rl_ladder, get_rl_corrected, rl_generate }
 
 import from "recharts" {
     ResponsiveContainer, LineChart, Line, BarChart, Bar,
@@ -139,6 +139,9 @@ def:pub Rl -> JsxElement {
         v84cells: list = [],
         v84curve: list = [],
         v84keys: list = [],
+        corrLadder: list = [],
+        corrHold: list = [],
+        corrNote: str = "",
         genPrompt: str = "Write a Jac function `add(a: int, b: int) -> int` that returns their sum.",
         genJac: str = "",
         genNote: str = "",
@@ -165,6 +168,10 @@ def:pub Rl -> JsxElement {
         v84cells = list(v84d["cells"]);
         v84curve = list(v84d["curve"]);
         v84keys = list(v84d["curve_keys"]);
+        cr = await get_rl_corrected();
+        corrLadder = list(cr["ladder"]);
+        corrHold = list(cr["holdouts"]);
+        corrNote = str(cr["note"]);
     }
 
     has_live = len(cells) > 0;
@@ -178,11 +185,9 @@ def:pub Rl -> JsxElement {
         </div>
 
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
-            <div className="rounded-md border border-amber-700/60 bg-amber-950/30 px-3 py-2 text-amber-200/90" style={{"fontSize": 12}}>
-                <b>⚠️ These charts are from the INVALIDATED broken-eval runs</b> (the body
-                extractor grabbed the driver docstring → ~3.5× undercount). Corrected
-                (fixed eval+reward): <b>SFT lifts greedy 39%→61%, best-of-k ships ~78%</b>.
-                See <span className="font-mono">RL_FINDINGS.md</span> for the real numbers.
+            <div className="rounded-md border border-emerald-800/50 bg-emerald-950/20 px-3 py-2 text-emerald-200/90" style={{"fontSize": 12}}>
+                <b>✅ CORRECTED results (fixed eval+reward).</b> {corrNote if corrNote else "SFT lifts greedy 39%→61%; best-of-k+compiler-verifier ships ~78%; conversion+SFT peaks 82%."}
+                {" "}The broken-eval charts further down are kept for record, flagged ⚠️. Full write-up: <span className="font-mono">RL_FINDINGS.md</span>.
             </div>
 
             <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-3 pt-4">
@@ -201,6 +206,44 @@ def:pub Rl -> JsxElement {
                 </div>
                 {(<pre className="mt-3 overflow-x-auto rounded-sm border border-neutral-800 bg-[#0a0a0a] p-3 font-mono text-xs text-neutral-100">{genJac}</pre>) if genJac else <span></span>}
                 <div className="stat-line mt-2 text-neutral-600">the jac compiler is the verifier — returns the first of 8 samples that compiles+runs. On the holdout this reaches ~78% vs ~55% greedy. Loads the SFT model per call (~1–2 min).</div>
+            </div>
+
+            <div className="relative rounded-md border border-emerald-900/40 bg-[#0d0d0d] p-3 pt-4">
+                <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2 text-emerald-500/80">CORRECTED LADDER · greedy vs pass@8 · pure-fn holdout (n=18) · jac-qwen3coder</span>
+                <ResponsiveContainer width="100%" height={230}>
+                    <BarChart data={corrLadder} margin={{"top": 10, "right": 14, "left": 0, "bottom": 0}}>
+                        <CartesianGrid stroke="#1c1c1f" vertical={False} />
+                        <XAxis dataKey="cell" tick={_tick()} tickLine={False} axisLine={{"stroke": "#333"}} />
+                        <YAxis tick={_tick()} tickLine={False} axisLine={False} width={40} domain={[0, 100]} ticks={PCT_TICKS} unit="%" />
+                        <Tooltip cursor={{"fill": "#ffffff08"}} contentStyle={{"background": "#0a0a0c", "border": "1px solid #333", "borderRadius": 0, "fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 11}} labelStyle={{"color": "#777"}} itemStyle={{"color": "#fafafa"}} />
+                        <Legend wrapperStyle={{"fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 10, "color": "#777"}} />
+                        <Bar dataKey="greedy" name="greedy pass@1" fill="#7aa2f7" isAnimationActive={False} />
+                        <Bar dataKey="passk" name="pass@8 (~best-of-k)" fill="#9ec98f" isAnimationActive={False} />
+                    </BarChart>
+                </ResponsiveContainer>
+                <div className="stat-line mt-1 text-neutral-600">SFT lifts greedy 39%→61% (peak rung-20); GRPO≈SFT; raw-GRPO=base. The v1 "SFT does nothing" was the eval bug.</div>
+            </div>
+
+            <div className="relative rounded-md border border-emerald-900/40 bg-[#0d0d0d] p-3 pt-4">
+                <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2 text-emerald-500/80">BEST-OF-K + COMPILER VERIFIER · base vs SFT · across 3 holdouts</span>
+                <ResponsiveContainer width="100%" height={230}>
+                    <BarChart data={corrHold} margin={{"top": 10, "right": 14, "left": 0, "bottom": 0}}>
+                        <CartesianGrid stroke="#1c1c1f" vertical={False} />
+                        <XAxis dataKey="name" tick={_tick()} tickLine={False} axisLine={{"stroke": "#333"}} />
+                        <YAxis tick={_tick()} tickLine={False} axisLine={False} width={40} domain={[0, 100]} ticks={PCT_TICKS} unit="%" />
+                        <Tooltip cursor={{"fill": "#ffffff08"}} contentStyle={{"background": "#0a0a0c", "border": "1px solid #333", "borderRadius": 0, "fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 11}} labelStyle={{"color": "#777"}} itemStyle={{"color": "#fafafa"}} />
+                        <Legend wrapperStyle={{"fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 10, "color": "#777"}} />
+                        <Bar dataKey="greedy_base" name="greedy·base" fill="#4b5563" isAnimationActive={False} />
+                        <Bar dataKey="greedy_sft" name="greedy·SFT" fill="#7aa2f7" isAnimationActive={False} />
+                        <Bar dataKey="bok_base" name="best-of-k·base" fill="#6b8f5e" isAnimationActive={False} />
+                        <Bar dataKey="bok_sft" name="best-of-k·SFT" fill="#9ec98f" isAnimationActive={False} />
+                    </BarChart>
+                </ResponsiveContainer>
+                <div className="stat-line mt-1 text-neutral-600">best-of-k+compiler-verifier is the universal win (deploy==oracle: the compiler is a perfect picker). Conversion+SFT peaks at 82%. Fresh model dead (gap 0).</div>
+            </div>
+
+            <div className="mt-1 border-t border-neutral-800 pt-2">
+                <span className="micro-label text-amber-500/70">⚠️ ARCHIVE BELOW · INVALIDATED broken-eval runs (~3.5× undercount) · kept for record</span>
             </div>
 
             {(<div className="flex flex-col gap-4">

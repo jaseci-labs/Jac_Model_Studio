@@ -103,6 +103,15 @@ def:pub get_rl_ladder() -> dict {
     };
 }
 
+def:pub get_rl_corrected() -> dict {
+    # The corrected results (fixed eval+reward) — assembled by rl/make_summary.py.
+    p = os.path.join(RL_REPO, "resultspub", "rl", "corrected_summary.json");
+    if not os.path.exists(p) {
+        return {"ladder": [], "holdouts": [], "headline": {}, "note": ""};
+    }
+    return json.loads(Path(p).read_text());
+}
+
 def:pub rl_generate(prompt: str, k: int = 8) -> dict {
     # Best-of-k Jac generation: sample k from the SFT model, return the first the jac
     # compiler accepts (rl/generate.py). Loads a 30B model per call (~1-2 min) — this
