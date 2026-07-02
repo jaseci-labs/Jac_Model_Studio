@@ -141,6 +141,8 @@ def:pub Rl -> JsxElement {
         v84keys: list = [],
         corrLadder: list = [],
         corrHold: list = [],
+        corrJourney: list = [],
+        corrKscale: list = [],
         corrNote: str = "",
         genPrompt: str = "Write a Jac function `add(a: int, b: int) -> int` that returns their sum.",
         genJac: str = "",
@@ -171,6 +173,8 @@ def:pub Rl -> JsxElement {
         cr = await get_rl_corrected();
         corrLadder = list(cr["ladder"]);
         corrHold = list(cr["holdouts"]);
+        corrJourney = list(cr["journey"]);
+        corrKscale = list(cr["kscale"]);
         corrNote = str(cr["note"]);
     }
 
@@ -188,6 +192,19 @@ def:pub Rl -> JsxElement {
             <div className="rounded-md border border-emerald-800/50 bg-emerald-950/20 px-3 py-2 text-emerald-200/90" style={{"fontSize": 12}}>
                 <b>✅ CORRECTED results (fixed eval+reward).</b> {corrNote if corrNote else "SFT lifts greedy 39%→61%; best-of-k+compiler-verifier ships ~78%; conversion+SFT peaks 82%."}
                 {" "}The broken-eval charts further down are kept for record, flagged ⚠️. Full write-up: <span className="font-mono">RL_FINDINGS.md</span>.
+            </div>
+
+            <div className="relative rounded-md border border-emerald-900/40 bg-[#0d0d0d] p-3 pt-4">
+                <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2 text-emerald-500/80">THE STORY · a measurement bug hid an 11%→94% Jac generator</span>
+                <ResponsiveContainer width="100%" height={210}>
+                    <LineChart data={corrJourney} margin={{"top": 14, "right": 20, "left": 0, "bottom": 0}}>
+                        <CartesianGrid stroke="#1c1c1f" vertical={False} />
+                        <XAxis dataKey="stage" tick={{"fill": "#888", "fontSize": 9, "fontFamily": "'Geist Mono', ui-monospace, monospace"}} tickLine={False} axisLine={{"stroke": "#333"}} interval={0} />
+                        <YAxis tick={_tick()} tickLine={False} axisLine={False} width={40} domain={[0, 100]} ticks={PCT_TICKS} unit="%" />
+                        <Tooltip cursor={{"fill": "#ffffff08"}} contentStyle={{"background": "#0a0a0c", "border": "1px solid #333", "borderRadius": 0, "fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 11}} labelStyle={{"color": "#777"}} itemStyle={{"color": "#fafafa"}} />
+                        <Line type="monotone" dataKey="acc" name="holdout accuracy %" stroke="#9ec98f" strokeWidth={2} dot={{"r": 4, "fill": "#9ec98f"}} isAnimationActive={False} />
+                    </LineChart>
+                </ResponsiveContainer>
             </div>
 
             <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-3 pt-4">
@@ -239,7 +256,21 @@ def:pub Rl -> JsxElement {
                         <Bar dataKey="bok_sft" name="best-of-k·SFT" fill="#9ec98f" isAnimationActive={False} />
                     </BarChart>
                 </ResponsiveContainer>
-                <div className="stat-line mt-1 text-neutral-600">best-of-k+compiler-verifier is the universal win (deploy==oracle: the compiler is a perfect picker). Conversion+SFT peaks at 82%. Fresh model dead (gap 0).</div>
+                <div className="stat-line mt-1 text-neutral-600">best-of-k+compiler-verifier is the universal win (deploy==oracle: the compiler is a perfect picker). Conversion+SFT peaks at 82%. Fresh model dead (gap 0). clean n=16 → 94%.</div>
+            </div>
+
+            <div className="relative rounded-md border border-emerald-900/40 bg-[#0d0d0d] p-3 pt-4">
+                <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2 text-emerald-500/80">SAMPLING BUDGET vs ACCURACY · more samples, more solved (compiler picks)</span>
+                <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={corrKscale} margin={{"top": 10, "right": 14, "left": 0, "bottom": 0}}>
+                        <CartesianGrid stroke="#1c1c1f" vertical={False} />
+                        <XAxis dataKey="k" tick={_tick()} tickLine={False} axisLine={{"stroke": "#333"}} />
+                        <YAxis tick={_tick()} tickLine={False} axisLine={False} width={40} domain={[0, 100]} ticks={PCT_TICKS} unit="%" />
+                        <Tooltip cursor={{"fill": "#ffffff08"}} contentStyle={{"background": "#0a0a0c", "border": "1px solid #333", "borderRadius": 0, "fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 11}} labelStyle={{"color": "#777"}} itemStyle={{"color": "#fafafa"}} />
+                        <Bar dataKey="acc" name="pure-fn accuracy %" fill="#7aa2f7" isAnimationActive={False} />
+                    </BarChart>
+                </ResponsiveContainer>
+                <div className="stat-line mt-1 text-neutral-600">greedy 39% → k=8 72% → k=32 89%. The correct Jac is reachable; the compiler finds it among samples.</div>
             </div>
 
             <div className="mt-1 border-t border-neutral-800 pt-2">
