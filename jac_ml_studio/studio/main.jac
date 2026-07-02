@@ -19,7 +19,7 @@ import from evals { EvalView, create_eval, list_evals, get_eval, stop_eval, dele
 import from train { start_training, stop_training, get_status, list_sessions }
 import from runs { list_runs, get_run, compare_runs }
 # Live RL ladder results — consumed by the RL section's `sv import` RPC stub.
-import from rl { get_rl_ladder }
+import from rl { get_rl_ladder, rl_generate }
 # Streaming chat endpoint — consumed by a raw fetch reader on the client (not an
 # `sv import` RPC stub), so register it explicitly at the top level.
 import from chat { chat_stream }

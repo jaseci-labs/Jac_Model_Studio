@@ -16,11 +16,14 @@ a rung-indexed curve (one line per model·cond, gen pass@1), and the line keys.
 
 import os;
 import json;
+import subprocess;
 import from pathlib { Path }
 
 # rl.sv.jac lives at studio/ root = <repo>/jac_ml_studio/studio ; results/ is at <repo>.
 glob RL_REPO: str = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))));
 glob RUNG_ORDER: list = ["1", "3", "5", "10", "20", "all"];
+glob GEN_PY: str = os.path.join(RL_REPO, ".venv", "bin", "python3") if os.path.exists(os.path.join(RL_REPO, ".venv", "bin", "python3")) else "python3";
+glob GEN_MODEL: str = os.path.join(RL_REPO, "models", "jac-qwen3coder-r20-rft-q4");
 
 def _pivot(p: str) -> dict {
     if not os.path.exists(p) {
@@ -98,4 +101,30 @@ def:pub get_rl_ladder() -> dict {
         "families": primary["families"], "count": primary["count"],
         "sg": sg, "v84": v84
     };
+}
+
+def:pub rl_generate(prompt: str, k: int = 8) -> dict {
+    # Best-of-k Jac generation: sample k from the SFT model, return the first the jac
+    # compiler accepts (rl/generate.py). Loads a 30B model per call (~1-2 min) — this
+    # is the deployable artifact from RL_FINDINGS.md (~78% vs 55% greedy).
+    if not os.path.exists(GEN_MODEL) {
+        return {"ok": False, "verified": False, "jac": "", "note": "SFT model missing: " + GEN_MODEL};
+    }
+    env = dict(os.environ);
+    env["JAC_GEN_MODEL"] = GEN_MODEL;
+    env["K"] = str(k);
+    try {
+        p = subprocess.run(
+            [GEN_PY, os.path.join(RL_REPO, "rl", "generate.py"), "--prompt", prompt],
+            capture_output=True, text=True, timeout=900, cwd=RL_REPO, env=env
+        );
+        raw = str(p.stdout);
+        verified = "verified by jac" in raw;
+        parts = raw.split("\n\n", 1);
+        note = str(parts[0]).strip().lstrip("# ") if parts else "";
+        jac = str(parts[1]).strip() if len(parts) > 1 else raw.strip();
+        return {"ok": True, "verified": verified, "jac": jac, "note": note, "k": k};
+    } except Exception as e {
+        return {"ok": False, "verified": False, "jac": "", "note": str(e)};
+    }
 }

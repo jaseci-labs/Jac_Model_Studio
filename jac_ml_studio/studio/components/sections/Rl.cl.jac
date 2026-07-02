@@ -5,7 +5,7 @@ the ladder runs) and renders the holdout pass@1 curve over rungs + the per-cell
 table. The archive below is the static weekend GRPO/STaR result, kept for context.
 """
 
-sv import from ...rl { get_rl_ladder }
+sv import from ...rl { get_rl_ladder, rl_generate }
 
 import from "recharts" {
     ResponsiveContainer, LineChart, Line, BarChart, Bar,
@@ -138,7 +138,19 @@ def:pub Rl -> JsxElement {
         sgkeys: list = [],
         v84cells: list = [],
         v84curve: list = [],
-        v84keys: list = [];
+        v84keys: list = [],
+        genPrompt: str = "Write a Jac function `add(a: int, b: int) -> int` that returns their sum.",
+        genJac: str = "",
+        genNote: str = "",
+        genBusy: bool = False;
+
+    async def doGen() -> None {
+        genBusy = True; genJac = ""; genNote = "sampling 8 completions + compiler-verifying (~1-2 min, loads the model)…";
+        r = await rl_generate(genPrompt, 8);
+        genBusy = False;
+        genJac = str(r["jac"]);
+        genNote = ("✓ " + str(r["note"])) if r["verified"] else ("⚠ " + str(r["note"]));
+    }
 
     async can with entry {
         d = await get_rl_ladder();
@@ -172,6 +184,25 @@ def:pub Rl -> JsxElement {
                 (fixed eval+reward): <b>SFT lifts greedy 39%→61%, best-of-k ships ~78%</b>.
                 See <span className="font-mono">RL_FINDINGS.md</span> for the real numbers.
             </div>
+
+            <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-3 pt-4">
+                <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">GENERATE JAC · best-of-k + compiler verifier (~78%)</span>
+                <textarea
+                    className="w-full resize-y rounded-sm border border-neutral-800 bg-[#0a0a0a] p-2 font-mono text-xs text-neutral-200 outline-none focus:border-neutral-600"
+                    rows={3} value={genPrompt} onChange={lambda e: ChangeEvent { genPrompt = str(e.target.value); }}
+                    placeholder="Describe the Jac function to generate…" />
+                <div className="mt-2 flex items-center gap-3">
+                    <button
+                        className="rounded-sm border border-neutral-700 bg-neutral-900 px-3 py-1 font-mono text-xs text-neutral-100 hover:border-neutral-500 disabled:opacity-40"
+                        disabled={genBusy} onClick={lambda e: MouseEvent { doGen(); }}>
+                        {"generating…" if genBusy else "▷ generate (sample 8, keep the one that compiles+runs)"}
+                    </button>
+                    {(<span className="stat-line text-neutral-500">{genNote}</span>) if genNote else <span></span>}
+                </div>
+                {(<pre className="mt-3 overflow-x-auto rounded-sm border border-neutral-800 bg-[#0a0a0a] p-3 font-mono text-xs text-neutral-100">{genJac}</pre>) if genJac else <span></span>}
+                <div className="stat-line mt-2 text-neutral-600">the jac compiler is the verifier — returns the first of 8 samples that compiles+runs. On the holdout this reaches ~78% vs ~55% greedy. Loads the SFT model per call (~1–2 min).</div>
+            </div>
+
             {(<div className="flex flex-col gap-4">
                 {_ladderChart({"rows": curve, "keys": keys})}
                 <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-3 pt-4">
