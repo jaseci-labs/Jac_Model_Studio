@@ -71,8 +71,8 @@ def _dashFor(key: str) -> str {
 # this element injecting active/payload/label; `keys` is the full series list.
 def _LadderTip(props: dict) -> JsxElement {
     if not props.get("active") { return <span></span>; }
-    payload: list = list(props.get("payload") or []);
-    keys: list = list(props.get("keys") or []);
+    payload: list = list(props["payload"] or []);
+    keys: list = list(props["keys"] or []);
     present: dict = {};
     for p in payload {
         if p.get("value") != None { present[str(p.get("dataKey"))] = p.get("value"); }
@@ -166,6 +166,12 @@ def:pub Rl -> JsxElement {
         </div>
 
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
+            <div className="rounded-md border border-amber-700/60 bg-amber-950/30 px-3 py-2 text-amber-200/90" style={{"fontSize": 12}}>
+                <b>⚠️ These charts are from the INVALIDATED broken-eval runs</b> (the body
+                extractor grabbed the driver docstring → ~3.5× undercount). Corrected
+                (fixed eval+reward): <b>SFT lifts greedy 39%→61%, best-of-k ships ~78%</b>.
+                See <span className="font-mono">RL_FINDINGS.md</span> for the real numbers.
+            </div>
             {(<div className="flex flex-col gap-4">
                 {_ladderChart({"rows": curve, "keys": keys})}
                 <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-3 pt-4">
