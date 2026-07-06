@@ -47,6 +47,8 @@ def:pub Data -> JsxElement {
         addBusy: bool = False,
         dataView: str = "core",
         rlSource: str = "SFT",
+        doneCount: int = 0,
+        runningStage: str = "",
         pollId: any = None;
 
     # `p`/`off`/`view`/`src` are passed explicitly — reading the state right after
@@ -101,6 +103,19 @@ def:pub Data -> JsxElement {
     async def loadBuilders() -> None {
         bs = await list_builders();
         builders = bs;
+        dc = 0;
+        rs = "";
+        for b in bs {
+            st = str(b.status);
+            if st == "done" or st == "finished" {
+                dc += 1;
+            }
+            if st == "running" {
+                rs = str(b.stage);
+            }
+        }
+        doneCount = dc;
+        runningStage = rs;
     }
 
     def selectStage(s: str) -> None {
@@ -195,9 +210,21 @@ def:pub Data -> JsxElement {
     }
 
     def _rail() -> JsxElement {
+        nstages = len(builders) if len(builders) > 0 else 13;
+        pct = (doneCount * 100.0) / nstages if nstages > 0 else 0.0;
         return <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-3 pt-4">
             <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">PIPELINE</span>
-            <div className="flex flex-col gap-0.5">
+            <div className="mb-3 flex flex-col gap-1.5">
+                <div className="flex items-center justify-between">
+                    <span className="stat-line text-neutral-500">{str(doneCount)}/{str(nstages)} DONE</span>
+                    {runningStage and <span className="micro-label pulse text-neutral-300">⦿ {runningStage}</span>}
+                </div>
+                <div className="h-1 w-full rounded-full bg-neutral-800">
+                    <div className="h-1 rounded-full bg-neutral-300 transition-all" style={{"width": str(pct) + "%"}}></div>
+                </div>
+            </div>
+            <div className="relative flex flex-col gap-0.5 pl-3">
+                <div className="absolute bottom-1 left-0 top-1 w-px bg-neutral-800"></div>
                 {for group in GROUPS {
                     <div key={str(group["label"])} className="mt-2 first:mt-0">
                         <div className="mb-1 flex items-center gap-2">

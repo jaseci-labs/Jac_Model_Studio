@@ -143,7 +143,6 @@ def:pub Rl -> JsxElement {
         corrHold: list = [],
         corrJourney: list = [],
         corrKscale: list = [],
-        corrNote: str = "",
         genPrompt: str = "Write a Jac function `add(a: int, b: int) -> int` that returns their sum.",
         genJac: str = "",
         genNote: str = "",
@@ -175,7 +174,6 @@ def:pub Rl -> JsxElement {
         corrHold = list(cr["holdouts"]);
         corrJourney = list(cr["journey"]);
         corrKscale = list(cr["kscale"]);
-        corrNote = str(cr["note"]);
     }
 
     has_live = len(cells) > 0;
@@ -189,11 +187,6 @@ def:pub Rl -> JsxElement {
         </div>
 
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
-            <div className="rounded-md border border-emerald-800/50 bg-emerald-950/20 px-3 py-2 text-emerald-200/90" style={{"fontSize": 12}}>
-                <b>✅ CORRECTED results (fixed eval+reward).</b> {corrNote if corrNote else "SFT lifts greedy 39%→61%; best-of-k+compiler-verifier ships ~78%; conversion+SFT peaks 82%."}
-                {" "}The broken-eval charts further down are kept for record, flagged ⚠️. Full write-up: <span className="font-mono">RL_FINDINGS.md</span>.
-            </div>
-
             <div className="relative rounded-md border border-emerald-900/40 bg-[#0d0d0d] p-3 pt-4">
                 <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2 text-emerald-500/80">THE STORY · a measurement bug hid an 11%→94% Jac generator</span>
                 <ResponsiveContainer width="100%" height={210}>
