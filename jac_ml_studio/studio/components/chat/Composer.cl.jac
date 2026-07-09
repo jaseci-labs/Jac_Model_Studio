@@ -18,6 +18,7 @@ def:pub Composer(
     categories: list,
     onSet: Callable[([str], None)],
     onSend: Callable[([str], None)],
+    onStop: Callable[([], None)],
     onChip: Callable[([str], None)]
 ) -> JsxElement {
     return <div className="px-6 pb-4">
@@ -45,11 +46,11 @@ def:pub Composer(
                 className="max-h-48 flex-1 resize-none bg-transparent px-2 py-1 text-sm text-neutral-200 outline-none placeholder:text-neutral-600"
             />
             <button
-                onClick={lambda e: MouseEvent { onSend(value); }}
-                disabled={busy or not value.strip()}
+                onClick={lambda e: MouseEvent { if busy { onStop(); } else { onSend(value); } }}
+                disabled={(not busy) and not value.strip()}
                 className="rounded-lg border border-neutral-600 px-3 py-1 font-mono text-[10px] text-neutral-300 hover:border-neutral-400 disabled:opacity-30"
             >
-                {"…" if busy else "⏎ SEND"}
+                {"■ STOP" if busy else "⏎ SEND"}
             </button>
         </div>
     </div>;

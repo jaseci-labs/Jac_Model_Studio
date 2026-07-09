@@ -15,7 +15,8 @@ glob MODELS: list[dict] = [
     {"id": "qwen-dpo", "label": "Qwen · DPO", "path": "models/qwen-jac-dpo-fused-q8"},
     {"id": "gemma-dpo", "label": "Gemma · DPO", "path": "models/gemma-jac-dpo-fused-q8"},
     {"id": "qwen-sft", "label": "Qwen · SFT", "path": "models/qwen-jac-fused-q8"},
-    {"id": "gemma-sft", "label": "Gemma · SFT", "path": "models/gemma-jac-fused-q8"}
+    {"id": "gemma-sft", "label": "Gemma · SFT", "path": "models/gemma-jac-fused-q8"},
+    {"id": "qwen3coder-rl", "label": "Qwen3-Coder · RL", "path": "models/jac-qwen3coder-r20-rft-q4"}
 ];
 
 # Eval holdout sets (rel to data root) + run dirs that are NOT training runs.

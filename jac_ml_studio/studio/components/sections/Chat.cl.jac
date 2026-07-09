@@ -41,6 +41,8 @@ def:pub Chat -> JsxElement {
         compareId: str = "",
         draft: str = "",
         streaming: bool = False,
+        stopRequested: bool = False,
+        activeReader: any = None,
         temperature: float = 0.2,
         topP: float = 0.9,
         maxTokens: int = 1024,
@@ -182,10 +184,12 @@ def:pub Chat -> JsxElement {
                 }
             );
             reader: any = resp.body.getReader();
+            activeReader = reader;
             dec: any = new(TextDecoder);
             nl = String.fromCharCode(10);
             sep = nl + nl;
             buf = "";
+            streamEnded = False;
             while True {
                 chunk: any = await reader.read();
                 if chunk.done {
@@ -197,12 +201,25 @@ def:pub Chat -> JsxElement {
                 i = 0;
                 while i < len(parts) - 1 {
                     data = "";
+                    evt = "message";
                     for line in parts[i].split(nl) {
                         if len(line) >= 5 and line[:5] == "data:" {
                             data = data + line[5:].strip();
+                        } elif len(line) >= 6 and line[:6] == "event:" {
+                            evt = line[6:].strip();
                         }
                     }
-                    if data {
+                    # The jaclang SSE framing closes a generator-backed endpoint with a
+                    # sentinel "event: end" (or "event: error") frame rather than closing
+                    # the socket — the connection is left open for the client to close.
+                    # Without this check the read loop waits forever on a chunk.done that
+                    # never comes, which is what froze the composer after every answer.
+                    if evt == "end" {
+                        streamEnded = True;
+                    } elif evt == "error" {
+                        errtext = str(data) if data else "stream failed";
+                        streamEnded = True;
+                    } elif data {
                         try {
                             msg: any = JSON.parse(data);
                             if msg.kind == "token" {
@@ -232,22 +249,43 @@ def:pub Chat -> JsxElement {
                     }
                     i += 1;
                 }
+                if streamEnded {
+                    try {
+                        await reader.cancel();
+                    } except Exception { }
+                    break;
+                }
             }
         } except Exception as e {
             errtext = "stream failed";
         }
-        if errtext {
-            work[ai] = {
-                "role": "assistant", "content": acc, "stats": None,
-                "modelId": legModel, "pairGroup": pg, "streaming": False, "error": errtext
-            };
-            messages = list(work);
-        }
+        activeReader = None;
+        # Unconditional finalize covers three endings: a normal "done" frame (re-asserts
+        # the same values), a mid-stream error (errtext set), and an early stop via
+        # reader.cancel() (neither done nor error frame arrives, so this is what clears
+        # the streaming flag on the bubble).
+        work[ai] = {
+            "role": "assistant", "content": acc, "stats": donestats,
+            "modelId": legModel, "pairGroup": pg, "streaming": False, "error": errtext
+        };
+        messages = list(work);
         # Persist any assistant content so the reply shows in history on reopen — even a
-        # partial reply that then errored mid-stream. Only skip when nothing was generated.
+        # partial reply that then errored mid-stream or was stopped early. Only skip when
+        # nothing was generated.
         if acc {
             sj = JSON.stringify(donestats) if donestats and not errtext else "";
             await add_message(cid, "assistant", acc, legModel, sj, pg);
+        }
+    }
+
+    # Cancel the in-flight stream (if any) so the composer frees up immediately.
+    async def stop -> None {
+        stopRequested = True;
+        r: any = activeReader;
+        if r {
+            try {
+                await r.cancel();
+            } except Exception { }
         }
     }
 
@@ -258,6 +296,7 @@ def:pub Chat -> JsxElement {
         }
         draft = "";
         streaming = True;
+        stopRequested = False;
         cid = chatId;
         if not cid {
             c = await create_chat(prompt[:40]);
@@ -285,13 +324,17 @@ def:pub Chat -> JsxElement {
         messages = list(work);
         await add_message(cid, "user", prompt, "", "", "");
 
-        await runLeg(work, histBase, prompt, modelId, cid, pg);
-        if cmp {
-            await runLeg(work, histBase, prompt, cmp, cid, pg);
-        }
-
-        cs = await list_chats();
-        chats = cs;
+        # Everything below can throw (network hiccup, backend restart mid-stream); an
+        # empty catch here is what guarantees `streaming` always gets released instead of
+        # sticking True forever and permanently blocking the composer.
+        try {
+            await runLeg(work, histBase, prompt, modelId, cid, pg);
+            if cmp and not stopRequested {
+                await runLeg(work, histBase, prompt, cmp, cid, pg);
+            }
+            cs = await list_chats();
+            chats = cs;
+        } except Exception { }
         streaming = False;
         await refreshLoaded();
     }
@@ -339,6 +382,7 @@ def:pub Chat -> JsxElement {
                 value={draft} busy={streaming} categories={prompts}
                 onSet={lambda v: str { draft = v; }}
                 onSend={send}
+                onStop={stop}
                 onChip={pickChip}
             />
         </main>
