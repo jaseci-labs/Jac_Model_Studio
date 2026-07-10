@@ -8,7 +8,7 @@ app (deleted) and the earlier web_app/ + dashboard_app/.
 
 ## Run
 
-    ./jac_ml_studio/start.sh      # one process: API :8001 + Vite UI :8000
+    ./studio/start.sh             # one process: API :8001 + Vite UI :8000
     open http://localhost:8000
 
 Models/dataset/results are read from `JAC_STUDIO_DATA_ROOT` (default: the
@@ -16,7 +16,7 @@ main DataGeneration checkout — those dirs are gitignored, worktrees lack them)
 
 ## Layout
 
-Everything lives in `studio/`:
+Everything lives in this directory (`studio/` at the repo root):
 
 - `*.sv.jac` — server endpoints. `models`/`inference` (resident MLX + token
   stream), `chat` (SSE), `persistence` (OSP graph: chats/messages, replaces
@@ -31,5 +31,5 @@ Everything lives in `studio/`:
 
 ## Test
 
-    cd jac_ml_studio/studio && jac check main.jac   # type-check the whole app
-    ./jac_ml_studio/smoke.sh                         # while running
+    cd studio && jac check main.jac   # type-check the whole app
+    ./studio/smoke.sh                 # while running
