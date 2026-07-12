@@ -1,6 +1,6 @@
 """studio - model registry + data-root resolution.
 
-Ports server/config.py. models/ and dataset/ are gitignored and resolve against
+Ports server/config.py. models/ is gitignored and resolves against
 JAC_STUDIO_DATA_ROOT (the main checkout). `list_models` is the client-facing
 endpoint; the rest are helpers used by chat/eval/train modules.
 """
@@ -9,7 +9,7 @@ import os;
 import inference;
 import from pathlib { Path }
 
-glob DEFAULT_ROOT: str = "/Volumes/ExtremePro/JaseciLabs/DataGeneration";
+glob DEFAULT_ROOT: str = "/Volumes/ExtremePro/JaseciLabs/jac_ml_studio";
 
 glob MODELS: list[dict] = [
     {"id": "qwen-dpo", "label": "Qwen · DPO", "path": "models/qwen-jac-dpo-fused-q8"},
@@ -21,8 +21,8 @@ glob MODELS: list[dict] = [
 
 # Eval holdout sets (rel to data root) + run dirs that are NOT training runs.
 glob HOLDOUTS: dict = {
-    "function": "dataset/eval_holdout/conversion.jsonl",
-    "graph": "dataset/eval_holdout/graph_conversion.jsonl"
+    "function": "01-sft-dpo/dataset/eval_holdout/conversion.jsonl",
+    "graph": "01-sft-dpo/dataset/eval_holdout/graph_conversion.jsonl"
 };
 glob EXCLUDED_RUN_DIRS: list[str] = ["comparison", "_builder", "_evals"];
 

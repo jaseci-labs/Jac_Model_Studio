@@ -93,9 +93,9 @@ def _pivot(p: str) -> dict {
 }
 
 def:pub get_rl_ladder() -> dict {
-    primary = _pivot(os.environ.get("JAC_RL_RESULTS", os.path.join(RL_REPO, "results", "rl_ladder.jsonl")));
-    sg = _pivot(os.path.join(RL_REPO, "results", "rl_ladder_sg.jsonl"));
-    v84 = _pivot(os.path.join(RL_REPO, "results", "rl_ladder_v84.jsonl"));
+    primary = _pivot(os.environ.get("JAC_RL_RESULTS", os.path.join(RL_REPO, "02-rl-grpo", "results", "rl_ladder.jsonl")));
+    sg = _pivot(os.path.join(RL_REPO, "02-rl-grpo", "results", "rl_ladder_sg.jsonl"));
+    v84 = _pivot(os.path.join(RL_REPO, "02-rl-grpo", "results", "rl_ladder_v84.jsonl"));
     return {
         "cells": primary["cells"], "curve": primary["curve"], "curve_keys": primary["curve_keys"],
         "families": primary["families"], "count": primary["count"],

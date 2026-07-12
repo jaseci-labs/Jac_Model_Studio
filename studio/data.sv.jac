@@ -22,8 +22,8 @@ glob PREVIEW_FILES: list[list[str]] = [
     ["01-sft-dpo/dataset/mlx/valid.jsonl", "MLX SFT valid"],
     ["01-sft-dpo/dataset/mlx_dpo/train.jsonl", "MLX DPO train"],
     ["01-sft-dpo/dataset/mlx_dpo/valid.jsonl", "MLX DPO valid"],
-    ["dataset/eval_holdout/conversion.jsonl", "Holdout (function)"],
-    ["dataset/eval_holdout/graph_conversion.jsonl", "Holdout (graph)"]
+    ["01-sft-dpo/dataset/eval_holdout/conversion.jsonl", "Holdout (function)"],
+    ["01-sft-dpo/dataset/eval_holdout/graph_conversion.jsonl", "Holdout (graph)"]
 ];
 glob APPEND_TARGETS: dict = {
     "sft": "01-sft-dpo/dataset/conversion/sft.jsonl", "dpo": "01-sft-dpo/dataset/conversion/dpo.jsonl"
@@ -183,8 +183,8 @@ def:pub dataset_stats() -> dict {
         "mlx_valid": _line_count("01-sft-dpo/dataset/mlx/valid.jsonl"),
         "dpo_train": _line_count("01-sft-dpo/dataset/mlx_dpo/train.jsonl"),
         "dpo_valid": _line_count("01-sft-dpo/dataset/mlx_dpo/valid.jsonl"),
-        "holdout": _line_count("dataset/eval_holdout/conversion.jsonl"),
-        "graph_holdout": _line_count("dataset/eval_holdout/graph_conversion.jsonl")
+        "holdout": _line_count("01-sft-dpo/dataset/eval_holdout/conversion.jsonl"),
+        "graph_holdout": _line_count("01-sft-dpo/dataset/eval_holdout/graph_conversion.jsonl")
     };
     return {
         "sft_files": sft_files, "sft_total": grand,
