@@ -217,7 +217,7 @@ def:pub Evals -> JsxElement {
                     </div>
                 </Field>
                 <Field label="ADAPTER (optional)">
-                    <TextInput value={adapter} onSet={lambda v: str { adapter = v; }} placeholder="e.g. adapters/qwen-probe" mono={True} />
+                    <TextInput value={adapter} onSet={lambda v: str { adapter = v; }} placeholder="e.g. 01-sft-dpo/adapters/qwen-probe" mono={True} />
                 </Field>
                 <Field label="HOLDOUT">
                     <Segmented options={["function", "graph"]} value={holdout} onSet={lambda v: str { holdout = v; }} />

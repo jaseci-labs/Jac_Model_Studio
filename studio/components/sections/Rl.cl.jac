@@ -300,7 +300,7 @@ def:pub Rl -> JsxElement {
                 </div>
             </div>) if has_live else (<div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-4 pt-5">
                 <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">LADDER</span>
-                <p className="text-sm text-neutral-400">No ladder results yet. Run <span className="font-mono text-neutral-200">JAC_LADDER_GO=1 jac run rl/run_ladder.jac</span> — cells stream into this graph as evals land.</p>
+                <p className="text-sm text-neutral-400">No ladder results yet. Run <span className="font-mono text-neutral-200">JAC_LADDER_GO=1 jac run 02-rl-grpo/rl/run_ladder.jac</span> — cells stream into this graph as evals land.</p>
             </div>)}
 
             {(<div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-3 pt-4">

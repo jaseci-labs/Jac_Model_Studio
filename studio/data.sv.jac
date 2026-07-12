@@ -15,29 +15,29 @@ import from pathlib { Path }
 glob RL_ROOT: str = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))));
 
 glob PREVIEW_FILES: list[list[str]] = [
-    ["dataset/conversion/sft.jsonl", "SFT idiomatic core"],
-    ["dataset/conversion/sft_auto.jsonl", "SFT transpile volume"],
-    ["dataset/conversion/dpo.jsonl", "DPO pairs"],
-    ["dataset/mlx/train.jsonl", "MLX SFT train"],
-    ["dataset/mlx/valid.jsonl", "MLX SFT valid"],
-    ["dataset/mlx_dpo/train.jsonl", "MLX DPO train"],
-    ["dataset/mlx_dpo/valid.jsonl", "MLX DPO valid"],
+    ["01-sft-dpo/dataset/conversion/sft.jsonl", "SFT idiomatic core"],
+    ["01-sft-dpo/dataset/conversion/sft_auto.jsonl", "SFT transpile volume"],
+    ["01-sft-dpo/dataset/conversion/dpo.jsonl", "DPO pairs"],
+    ["01-sft-dpo/dataset/mlx/train.jsonl", "MLX SFT train"],
+    ["01-sft-dpo/dataset/mlx/valid.jsonl", "MLX SFT valid"],
+    ["01-sft-dpo/dataset/mlx_dpo/train.jsonl", "MLX DPO train"],
+    ["01-sft-dpo/dataset/mlx_dpo/valid.jsonl", "MLX DPO valid"],
     ["dataset/eval_holdout/conversion.jsonl", "Holdout (function)"],
     ["dataset/eval_holdout/graph_conversion.jsonl", "Holdout (graph)"]
 ];
 glob APPEND_TARGETS: dict = {
-    "sft": "dataset/conversion/sft.jsonl", "dpo": "dataset/conversion/dpo.jsonl"
+    "sft": "01-sft-dpo/dataset/conversion/sft.jsonl", "dpo": "01-sft-dpo/dataset/conversion/dpo.jsonl"
 };
 
 # RL data pipeline — grouped by training use. SFT=gold {messages}; the rest are the
 # {prompt, answer} task pool (GRPO reward / eval). See RL_FINDINGS.md.
 glob RL_SOURCES: list[str] = ["SFT", "GRPO", "conversion", "synthetic", "splits"];
 glob RL_PREVIEW_FILES: dict = {
-    "SFT": [["dataset/rl/rft/train.jsonl", "RFT gold · train"], ["dataset/rl/rft/valid.jsonl", "RFT gold · valid"]],
-    "GRPO": [["dataset/rl/tasks.jsonl", "reward tasks · all"], ["dataset/rl/train.jsonl", "GRPO train pool"], ["dataset/rl/valid.jsonl", "GRPO valid"]],
-    "conversion": [["dataset/rl_conv/tasks.jsonl", "python→jac · all"], ["dataset/rl_conv/train.jsonl", "conv train"], ["dataset/rl_conv/holdout.jsonl", "conv holdout"]],
-    "synthetic": [["dataset/rl/synthetic.jsonl", "synthetic · fresh (32)"]],
-    "splits": [["dataset/rl/holdout.jsonl", "holdout n=18"], ["dataset/rl/holdout_big.jsonl", "holdout n=32 (+syn)"], ["dataset/rl/train_big.jsonl", "train pool (+syn)"]]
+    "SFT": [["02-rl-grpo/dataset/rl/rft/train.jsonl", "RFT gold · train"], ["02-rl-grpo/dataset/rl/rft/valid.jsonl", "RFT gold · valid"]],
+    "GRPO": [["02-rl-grpo/dataset/rl/tasks.jsonl", "reward tasks · all"], ["02-rl-grpo/dataset/rl/train.jsonl", "GRPO train pool"], ["02-rl-grpo/dataset/rl/valid.jsonl", "GRPO valid"]],
+    "conversion": [["02-rl-grpo/dataset/rl_conv/tasks.jsonl", "python→jac · all"], ["02-rl-grpo/dataset/rl_conv/train.jsonl", "conv train"], ["02-rl-grpo/dataset/rl_conv/holdout.jsonl", "conv holdout"]],
+    "synthetic": [["02-rl-grpo/dataset/rl/synthetic.jsonl", "synthetic · fresh (32)"]],
+    "splits": [["02-rl-grpo/dataset/rl/holdout.jsonl", "holdout n=18"], ["02-rl-grpo/dataset/rl/holdout_big.jsonl", "holdout n=32 (+syn)"], ["02-rl-grpo/dataset/rl/train_big.jsonl", "train pool (+syn)"]]
 };
 
 obj FileRefView {
@@ -170,7 +170,7 @@ def _build_row(idx: int, rec: any) -> DataRowView {
 
 """Dataset statistics: counts per SFT file, DPO pairs, split sizes."""
 def:pub dataset_stats() -> dict {
-    sft_rels = ["dataset/conversion/sft.jsonl", "dataset/conversion/sft_auto.jsonl"];
+    sft_rels = ["01-sft-dpo/dataset/conversion/sft.jsonl", "01-sft-dpo/dataset/conversion/sft_auto.jsonl"];
     sft_files: list = [];
     grand = 0;
     for rel in sft_rels {
@@ -179,16 +179,16 @@ def:pub dataset_stats() -> dict {
         grand += n;
     }
     splits = {
-        "mlx_train": _line_count("dataset/mlx/train.jsonl"),
-        "mlx_valid": _line_count("dataset/mlx/valid.jsonl"),
-        "dpo_train": _line_count("dataset/mlx_dpo/train.jsonl"),
-        "dpo_valid": _line_count("dataset/mlx_dpo/valid.jsonl"),
+        "mlx_train": _line_count("01-sft-dpo/dataset/mlx/train.jsonl"),
+        "mlx_valid": _line_count("01-sft-dpo/dataset/mlx/valid.jsonl"),
+        "dpo_train": _line_count("01-sft-dpo/dataset/mlx_dpo/train.jsonl"),
+        "dpo_valid": _line_count("01-sft-dpo/dataset/mlx_dpo/valid.jsonl"),
         "holdout": _line_count("dataset/eval_holdout/conversion.jsonl"),
         "graph_holdout": _line_count("dataset/eval_holdout/graph_conversion.jsonl")
     };
     return {
         "sft_files": sft_files, "sft_total": grand,
-        "dpo_pairs": _line_count("dataset/conversion/dpo.jsonl"), "splits": splits
+        "dpo_pairs": _line_count("01-sft-dpo/dataset/conversion/dpo.jsonl"), "splits": splits
     };
 }
 
