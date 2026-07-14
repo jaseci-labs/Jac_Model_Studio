@@ -20,7 +20,8 @@ import subprocess;
 import from pathlib { Path }
 
 # rl.sv.jac lives at studio/ root = <repo>/jac_ml_studio/studio ; results/ is at <repo>.
-glob RL_REPO: str = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))));
+# studio/ sits directly at repo root (post Jul-10 flatten) → two dirnames up.
+glob RL_REPO: str = os.path.dirname(os.path.dirname(os.path.abspath(__file__)));
 glob RUNG_ORDER: list = ["1", "3", "5", "10", "20", "all"];
 glob GEN_PY: str = os.path.join(RL_REPO, ".venv", "bin", "python3") if os.path.exists(os.path.join(RL_REPO, ".venv", "bin", "python3")) else "python3";
 glob GEN_MODEL: str = os.path.join(RL_REPO, "models", "jac-qwen3coder-r20-rft-q4");

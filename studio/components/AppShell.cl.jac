@@ -1,8 +1,12 @@
-"""App shell — ports ui/components/app-shell.tsx.
+"""App shell — workspace switcher + the active workspace's active section.
 
-Left nav rail + the active section. All sections stay mounted and are shown/
-hidden (CSS) so per-section state (chat history, loaded evals) survives tab
-switches, matching the original's `visited` behavior.
+Three per-attempt workspaces (01 SFT/DPO, 02 RL/GRPO, 03 CPT). The rail switches
+workspace (top) and section (below). All 11 section instances stay mounted and are
+shown/hidden (CSS) so per-section state survives switches — critically, an in-flight
+chat SSE stream keeps writing when you peek at another workspace. The last workspace
+is remembered in localStorage; first-ever visit lands on 03 (current active work).
+Each workspace's Chat gets its own history (persistence scopes by workspace) + a
+default model.
 """
 
 sv import from ..models { system_ram }
@@ -12,10 +16,17 @@ import from .sections.Chat { Chat }
 import from .sections.Train { Train }
 import from .sections.Data { Data }
 import from .sections.Evals { Evals }
-import from .sections.Rl { Rl }
+import from .sections.RlData { RlData }
+import from .sections.Results { Results }
+import from .sections.Generate { Generate }
+import from .sections.CptData { CptData }
+import from .sections.Plan { Plan }
+
+glob WS_DEFAULT_MODEL: dict = {"01": "qwen-dpo", "02": "qwen3coder-rl", "03": "qwen-q4"};
 
 def:pub AppShell -> JsxElement {
-    has section: str = "chat",
+    has workspace: str = "03",
+        sections: dict = {"01": "chat", "02": "chat", "03": "chat"},
         online: int = -1;  # -1 unknown, 0 offline, 1 online
 
     async def probe -> None {
@@ -28,23 +39,48 @@ def:pub AppShell -> JsxElement {
     }
 
     # Enable the `dark` variant + font antialiasing (the old app set these on
-    # <html>/<body> in layout.tsx; we have no static HTML shell to edit). Then
-    # probe the backend on mount and re-probe every 3s so a dropped server flips
-    # the whole shell to the Offline card and reconnects automatically.
+    # <html>/<body> in layout.tsx; we have no static HTML shell to edit). Restore
+    # the last workspace from localStorage (first-ever visit stays on 03). Then
+    # probe the backend on mount and re-probe every 3s.
     async can with entry {
         doc: any = document;
         doc.documentElement.classList.add("dark");
         doc.body.classList.add("antialiased");
+        try {
+            saved: any = window.localStorage.getItem("jacml.workspace");
+            if saved == "01" or saved == "02" or saved == "03" {
+                workspace = str(saved);
+            }
+        } except Exception { }
         await probe();
         setInterval(lambda -> None { probe(); }, 3000);
     }
 
-    def go(s: str) -> None {
-        section = s;
+    def goWorkspace(w: str) -> None {
+        workspace = w;
+        try {
+            window.localStorage.setItem("jacml.workspace", w);
+        } except Exception { }
     }
 
-    def slot(s: str) -> str {
-        return "flex min-w-0 flex-1" if s == section else "hidden";
+    # `sections` is per-workspace; rebuild a fresh dict from the fixed keys (never
+    # mutate state in place; never `for k in sections` — iterating a `has dict`
+    # compiles to for-of on a plain JS object → "sections is not iterable"; never
+    # name the local `sections` — a same-name local compiles to setSections during
+    # render → infinite re-render).
+    def go(s: str) -> None {
+        nd: dict = {
+            "01": str(sections["01"]),
+            "02": str(sections["02"]),
+            "03": str(sections["03"])
+        };
+        nd[workspace] = s;
+        sections = nd;
+    }
+
+    def slot(ws: str, s: str) -> str {
+        vis = ws == workspace and s == str(sections[ws]);
+        return "flex min-w-0 flex-1" if vis else "hidden";
     }
 
     if online == 0 {
@@ -53,12 +89,21 @@ def:pub AppShell -> JsxElement {
     if online == -1 {
         return <div className="h-screen bg-[#0a0a0a]" />;
     }
-    return <div className="flex h-screen overflow-hidden">
-        <NavRail section={section} onSection={go} />
-        <div className={slot("chat")}><Chat /></div>
-        <div className={slot("train")}><Train active={section == "train"} /></div>
-        <div className={slot("data")}><Data /></div>
-        <div className={slot("evals")}><Evals /></div>
-        <div className={slot("rl")}><Rl /></div>
+    return <div className="flex h-screen overflow-hidden" data-ws={workspace}>
+        <NavRail workspace={workspace} section={sections[workspace]} onWorkspace={goWorkspace} onSection={go} />
+
+        <div className={slot("01", "chat")}><Chat workspace="01" defaultModel={str(WS_DEFAULT_MODEL["01"])} /></div>
+        <div className={slot("01", "data")}><Data /></div>
+        <div className={slot("01", "train")}><Train active={workspace == "01" and str(sections["01"]) == "train"} /></div>
+        <div className={slot("01", "evals")}><Evals /></div>
+
+        <div className={slot("02", "chat")}><Chat workspace="02" defaultModel={str(WS_DEFAULT_MODEL["02"])} /></div>
+        <div className={slot("02", "data")}><RlData /></div>
+        <div className={slot("02", "results")}><Results /></div>
+        <div className={slot("02", "generate")}><Generate /></div>
+
+        <div className={slot("03", "chat")}><Chat workspace="03" defaultModel={str(WS_DEFAULT_MODEL["03"])} /></div>
+        <div className={slot("03", "data")}><CptData /></div>
+        <div className={slot("03", "plan")}><Plan /></div>
     </div>;
 }

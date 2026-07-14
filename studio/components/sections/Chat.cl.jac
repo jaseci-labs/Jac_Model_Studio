@@ -32,7 +32,7 @@ def _uuid() -> str {
     return str(c.randomUUID());
 }
 
-def:pub Chat -> JsxElement {
+def:pub Chat(workspace: str, defaultModel: str) -> JsxElement {
     has models: list[ModelView] = [],
         chats: list = [],
         chatId: str = "",
@@ -60,15 +60,23 @@ def:pub Chat -> JsxElement {
     async can with entry {
         ms = await list_models();
         models = ms;
+        # Prefer this workspace's default model if it's on disk; else first available.
+        pick = "";
         for m in ms {
             if m.available {
-                modelId = m.id;
-                break;
+                if m.id == defaultModel {
+                    pick = m.id;
+                    break;
+                }
+                if not pick {
+                    pick = m.id;
+                }
             }
         }
+        modelId = pick;
         ramGb = float(await system_ram());
         todayIso = await today_utc();
-        cs = await list_chats();
+        cs = await list_chats(workspace=workspace);
         chats = cs;
         pr = await list_prompts();
         prompts = list(pr["categories"]);
@@ -112,7 +120,7 @@ def:pub Chat -> JsxElement {
 
     async def removeChat(id: str) -> None {
         await delete_chat(id);
-        cs = await list_chats();
+        cs = await list_chats(workspace=workspace);
         chats = cs;
         if id == chatId {
             chatId = "";
@@ -299,7 +307,7 @@ def:pub Chat -> JsxElement {
         stopRequested = False;
         cid = chatId;
         if not cid {
-            c = await create_chat(prompt[:40]);
+            c = await create_chat(prompt[:40], workspace);
             cid = c.id;
             chatId = cid;
         }
@@ -332,7 +340,7 @@ def:pub Chat -> JsxElement {
             if cmp and not stopRequested {
                 await runLeg(work, histBase, prompt, cmp, cid, pg);
             }
-            cs = await list_chats();
+            cs = await list_chats(workspace=workspace);
             chats = cs;
         } except Exception { }
         streaming = False;

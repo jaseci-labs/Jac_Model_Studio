@@ -152,3 +152,10 @@ body {
 .tok-str { color: #9ec98f; font-style: italic; }
 .tok-num { color: #d8a657; }
 .tok-com { color: #5a5a5a; }
+
+/* Per-workspace accent (nav tile dots + active-bars only; interiors stay
+   monochrome). --ws-accent is stamped by data-ws on the shell root. */
+:root { --ws01: #7aa2f7; --ws02: #9ec98f; --ws03: #d8a657; --ws-accent: #7aa2f7; }
+[data-ws="01"] { --ws-accent: var(--ws01); }
+[data-ws="02"] { --ws-accent: var(--ws02); }
+[data-ws="03"] { --ws-accent: var(--ws03); }

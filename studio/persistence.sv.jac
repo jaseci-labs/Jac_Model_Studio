@@ -20,6 +20,7 @@ def:pub today_utc() -> str {
 obj ChatView {
     has id: str = "",
         title: str = "",
+        workspace: str = "01",
         created_at: str = "",
         updated_at: str = "";
 }
@@ -36,12 +37,13 @@ obj MsgView {
 
 node Chat {
     has title: str = "",
+        workspace: str = "01",
         created_at: str = "",
         updated_at: str = "";
 
     def to_view -> ChatView {
         return ChatView(
-            id=jid(self), title=self.title,
+            id=jid(self), title=self.title, workspace=self.workspace,
             created_at=self.created_at, updated_at=self.updated_at
         );
     }
@@ -73,19 +75,34 @@ def _find_chat(chat_id: str) -> Chat | None {
     return None;
 }
 
-"""All chats, most-recently-updated first (matches old `ORDER BY updated_at DESC`)."""
-def:pub list_chats() -> list[ChatView] {
+"""Workspace of a chat. Pre-workspace nodes lack the field on disk; the dataclass
+default resolves them to "01" via class-attr lookup (verified in the jaclang 0.16.1
+serializer). try/except is belt-and-braces against any future default_factory."""
+def _ws_of(c: Chat) -> str {
+    try {
+        w = c.workspace;
+        return w if w else "01";
+    } except Exception {
+        return "01";
+    }
+}
+
+"""Chats in one workspace, most-recently-updated first (matches old
+`ORDER BY updated_at DESC`). Old chats with no workspace field read as "01"."""
+def:pub list_chats(workspace: str = "01") -> list[ChatView] {
     out: list[ChatView] = [];
     for c in [root -->][?:Chat] {
-        out.append(c.to_view());
+        if _ws_of(c) == workspace {
+            out.append(c.to_view());
+        }
     }
     out.sort(key=lambda v: ChatView -> str { return v.updated_at; }, reverse=True);
     return out;
 }
 
-def:pub create_chat(title: str) -> ChatView {
+def:pub create_chat(title: str, workspace: str = "01") -> ChatView {
     now = _now();
-    c = (root ++> Chat(title=title, created_at=now, updated_at=now))[0];
+    c = (root ++> Chat(title=title, workspace=workspace, created_at=now, updated_at=now))[0];
     return c.to_view();
 }
 

@@ -12,7 +12,8 @@ import from pathlib { Path }
 
 # RL data lives in THIS repo (jac_ml_studio), not the studio's data_root (which points
 # at the DataGeneration checkout). Resolve RL files against the repo root, like rl.sv.jac.
-glob RL_ROOT: str = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))));
+# studio/ sits directly at repo root (post Jul-10 flatten) → two dirnames up.
+glob RL_ROOT: str = os.path.dirname(os.path.dirname(os.path.abspath(__file__)));
 
 glob PREVIEW_FILES: list[list[str]] = [
     ["01-sft-dpo/dataset/conversion/sft.jsonl", "SFT idiomatic core"],

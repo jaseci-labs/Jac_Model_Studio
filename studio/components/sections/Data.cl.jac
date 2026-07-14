@@ -1,22 +1,24 @@
-"""DATA section — pipeline rail + add-examples (left) | dataset browser (right).
+"""DATA section (workspace 01 SFT/DPO) — pipeline rail + add-examples (left) |
+dataset browser (right).
 
 Ports ui/components/sections/data/{data-section,pipeline-rail,add-examples,
 dataset-browser,row-detail,stats-tiles}. The 13 build stages run as detached jobs
 (builders.sv.jac); the browser is read-only over the preview-allowed files
-(data.sv.jac); appends go through add_examples. Row detail renders code via CodeBlock.
+(data.sv.jac); appends go through add_examples. Rows render via the shared RowBrowser.
+The RL dataset browser lives in the 02 workspace's RlData section now.
 
 # studio: the tsx polls builders only while a stage is running (usePoll). Reproducing
 # that gate needs a fresh closure over state; instead we poll unconditionally every
 # 3s while mounted — a touch more network, but correct and far simpler.
 """
 
-sv import from ...data { dataset_stats, dataset_files, dataset_rows, add_examples, rl_dataset_files, rl_dataset_rows, FileRefView, DataRowView }
+sv import from ...data { dataset_stats, dataset_files, dataset_rows, add_examples, FileRefView, DataRowView }
 sv import from ...builders { list_builders, run_builder, BuilderView }
 import from ..shared.StatTile { StatTile }
 import from ..shared.StatusGlyph { StatusGlyph }
 import from ..shared.LogView { LogView }
 import from ..shared.Field { Segmented }
-import from ..shared.CodeBlock { CodeBlock }
+import from ..shared.RowBrowser { RowBrowser }
 
 glob GROUPS: list[dict] = [
     {"label": "SEED", "stages": ["seed_conversion"]},
@@ -27,9 +29,6 @@ glob GROUPS: list[dict] = [
     {"label": "HOLDOUTS", "stages": ["holdout", "graph_holdout"]},
     {"label": "AUDIT", "stages": ["dataset_stats", "verify_dataset"]}
 ];
-
-glob KIND_LABEL: dict = {"sft": "SFT", "dpo": "DPO", "holdout": "HOLD", "raw": "RAW", "rltask": "RL"};
-glob RL_SOURCES: list[str] = ["SFT", "GRPO", "conversion", "synthetic", "splits"];
 
 def:pub Data -> JsxElement {
     has stats: any = None,
@@ -45,22 +44,14 @@ def:pub Data -> JsxElement {
         addText: str = "",
         addResult: any = None,
         addBusy: bool = False,
-        dataView: str = "core",
-        rlSource: str = "SFT",
         doneCount: int = 0,
         runningStage: str = "",
         pollId: any = None;
 
-    # `p`/`off`/`view`/`src` are passed explicitly — reading the state right after
-    # setting it returns the stale value (React state writes are async).
-    async def _fetch(p: str, off: int, view: str, src: str) -> None {
-        limit = 25;
-        r: dict = {};
-        if view == "rl" {
-            r = await rl_dataset_rows(src, p, off, limit);
-        } else {
-            r = await dataset_rows(p, off, limit);
-        }
+    # `p`/`off` are passed explicitly — reading the state right after setting it
+    # returns the stale value (React state writes are async).
+    async def _fetch(p: str, off: int) -> None {
+        r = await dataset_rows(p, off, 25);
         rows = list(r["rows"]);
         total = int(r["total"]);
     }
@@ -69,35 +60,11 @@ def:pub Data -> JsxElement {
         path = p;
         offset = 0;
         expanded = -1;
-        await _fetch(p, 0, dataView, rlSource);
+        await _fetch(p, 0);
     }
 
-    async def _loadView(view: str, src: str) -> None {
-        fs: list = [];
-        if view == "rl" {
-            fs = await rl_dataset_files(src);
-        } else {
-            fs = await dataset_files();
-        }
-        files = fs;
-        expanded = -1;
-        offset = 0;
-        if len(list(fs)) > 0 {
-            path = str(fs[0].path);
-            await _fetch(str(fs[0].path), 0, view, src);
-        } else {
-            path = ""; rows = []; total = 0;
-        }
-    }
-
-    async def switchView(v: str) -> None {
-        dataView = v;
-        await _loadView(v, rlSource);
-    }
-
-    async def switchRlSource(s: str) -> None {
-        rlSource = s;
-        await _loadView("rl", s);
+    def toggleRow(idx: int) -> None {
+        expanded = -1 if expanded == idx else idx;
     }
 
     async def loadBuilders() -> None {
@@ -163,7 +130,7 @@ def:pub Data -> JsxElement {
             noff = max(0, offset - 25);
             offset = noff;
             expanded = -1;
-            await _fetch(path, noff, dataView, rlSource);
+            await _fetch(path, noff);
         }
     }
 
@@ -172,7 +139,7 @@ def:pub Data -> JsxElement {
             noff = offset + 25;
             offset = noff;
             expanded = -1;
-            await _fetch(path, noff, dataView, rlSource);
+            await _fetch(path, noff);
         }
     }
 
@@ -258,21 +225,6 @@ def:pub Data -> JsxElement {
         </div>;
     }
 
-    def _detail(row: any) -> JsxElement {
-        kind = str(row["kind"]);
-        return <div className="rounded-md border border-neutral-800 bg-[#0d0d0d] p-3 space-y-2">
-            {row["prompt"] and <div>
-                <div className="micro-label mb-1 text-neutral-600">PROMPT</div>
-                <pre className="whitespace-pre-wrap font-mono text-xs text-neutral-400 leading-relaxed">{row["prompt"]}</pre>
-            </div>}
-            {row["python"] and <CodeBlock label="" code={str(row["python"])} lang="python" />}
-            {(row["jac"] and kind != "dpo") and <CodeBlock label="" code={str(row["jac"])} lang="jac" />}
-            {(kind == "dpo" and row["chosen"]) and <CodeBlock label="CHOSEN.JAC" code={str(row["chosen"])} lang="jac" />}
-            {(kind == "dpo" and row["rejected"]) and <CodeBlock label="REJECTED.JAC" code={str(row["rejected"])} lang="jac" />}
-            {(kind == "raw" and row["raw"]) and <pre className="overflow-x-auto font-mono text-xs text-neutral-400 leading-relaxed whitespace-pre">{row["raw"]}</pre>}
-        </div>;
-    }
-
     def _addExamples() -> JsxElement {
         ph = ('one JSON object per line · sft: {"messages":[...]}' if addTarget == "sft"
             else 'one JSON object per line · dpo: {"prompt","chosen","rejected"}');
@@ -302,64 +254,6 @@ def:pub Data -> JsxElement {
         </div>;
     }
 
-    def _browser() -> JsxElement {
-        canPrev = offset > 0;
-        canNext = offset + len(rows) < total;
-        return <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-3 pt-4">
-            <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">DATASET.BROWSER</span>
-            <div className="mb-3 flex flex-wrap gap-1">
-                {(len(files) == 0) and <span className="stat-line">no files</span>}
-                {for f in files {
-                    <button
-                        key={str(f.path)}
-                        onClick={lambda e: MouseEvent { openFile(str(f.path)); }}
-                        className={"rounded border px-2 py-0.5 font-mono text-[10px] transition-colors " + (
-                            "border-neutral-500 bg-[#1a1a1a] text-neutral-100" if str(f.path) == path
-                            else "border-neutral-700 text-neutral-500 hover:text-neutral-300"
-                        )}
-                    >
-                        {f.label} {str(f.count)}
-                    </button>
-                }}
-            </div>
-            {path and <div>
-                <div className="overflow-x-auto">
-                    <div className="mb-1 grid grid-cols-[2rem_1fr_3rem_3rem_5rem_1fr] gap-2">
-                        <span className="micro-label">#</span>
-                        <span className="micro-label">NAME</span>
-                        <span className="micro-label">KIND</span>
-                        <span className="micro-label">DIFF</span>
-                        <span className="micro-label">SOURCE</span>
-                        <span className="micro-label">PREVIEW</span>
-                    </div>
-                    {(len(rows) == 0) and <div className="stat-line py-4 text-center">empty</div>}
-                    {for row in rows {
-                        <div key={str(row["idx"])}>
-                            <div
-                                onClick={lambda e: MouseEvent { expanded = -1 if expanded == int(row["idx"]) else int(row["idx"]); }}
-                                className="grid cursor-pointer grid-cols-[2rem_1fr_3rem_3rem_5rem_1fr] gap-2 rounded px-0.5 py-1 font-mono text-xs hover:bg-[#141414]"
-                            >
-                                <span className="text-neutral-600">{str(row["idx"])}</span>
-                                <span className="truncate text-neutral-300">{row["name"]}</span>
-                                <span className="text-neutral-500">{str(KIND_LABEL[str(row["kind"])]) if str(row["kind"]) in KIND_LABEL else str(row["kind"])}</span>
-                                <span className="text-neutral-500">{row["difficulty"]}</span>
-                                <span className="truncate text-neutral-500">{row["source"]}</span>
-                                <span className="truncate text-neutral-600">{row["preview"]}</span>
-                            </div>
-                            {(expanded == int(row["idx"])) and <div className="mb-1">{_detail({"row": row})}</div>}
-                        </div>
-                    }}
-                </div>
-                {(total > 0) and <div className="mt-3 flex items-center justify-center gap-3 stat-line">
-                    <button disabled={not canPrev} onClick={lambda e: MouseEvent { prevPage(); }} className="disabled:opacity-30 hover:text-neutral-200 transition-colors">← PREV</button>
-                    <span>{str(offset + 1)} to {str(offset + len(rows))} of {str(total)}</span>
-                    <button disabled={not canNext} onClick={lambda e: MouseEvent { nextPage(); }} className="disabled:opacity-30 hover:text-neutral-200 transition-colors">NEXT →</button>
-                </div>}
-            </div>}
-            {(not path) and <div className="stat-line py-6 text-center">select a file above</div>}
-        </div>;
-    }
-
     return <div className="flex h-full min-w-0 flex-1 flex-col">
         <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-2.5">
             <span className="micro-label">DATA.PIPELINE</span>
@@ -376,14 +270,13 @@ def:pub Data -> JsxElement {
                     </div>}
                 </div>
                 <div className="flex flex-col gap-4">
-                    <div className="flex flex-wrap items-center gap-2">
-                        <span className="micro-label text-neutral-600">DATASET</span>
-                        <Segmented options={["core", "rl"]} value={dataView} onSet={lambda v: str { switchView(v); }} />
-                        {(dataView == "rl") and <Segmented options={RL_SOURCES} value={rlSource} onSet={lambda v: str { switchRlSource(v); }} />}
-                    </div>
-                    {(dataView == "rl") and <div className="stat-line text-neutral-600">RL training data (read-only) — SFT gold · GRPO reward tasks · python→jac · synthetic · splits. See RL_FINDINGS.md.</div>}
-                    {_browser()}
-                    {(dataView == "core") and _addExamples()}
+                    <RowBrowser
+                        files={files} path={path} rows={rows} offset={offset}
+                        total={total} expanded={expanded}
+                        onOpen={openFile} onToggle={toggleRow}
+                        onPrev={prevPage} onNext={nextPage}
+                    />
+                    {_addExamples()}
                 </div>
             </div>
         </div>

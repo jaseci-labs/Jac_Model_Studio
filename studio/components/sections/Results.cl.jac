@@ -1,11 +1,14 @@
-"""RL section — LIVE SFT/GRPO ladder (top) + weekend archive (below).
+"""RESULTS section (workspace 02 RL/GRPO) — LIVE SFT/GRPO ladder + corrected
+results + weekend archive.
 
-The live block fetches get_rl_ladder() (rl.sv.jac, reads results/rl_ladder.jsonl as
-the ladder runs) and renders the holdout pass@1 curve over rungs + the per-cell
-table. The archive below is the static weekend GRPO/STaR result, kept for context.
+The live block fetches get_rl_ladder() (rl.sv.jac, reads 02-rl-grpo/results/
+rl_ladder.jsonl as the ladder runs) and renders the holdout pass@1 curve over
+rungs + the per-cell table; get_rl_corrected() drives the corrected charts. The
+archive below is the static weekend GRPO/STaR result, kept for context. The
+deployable best-of-k generate widget lives in the sibling Generate section.
 """
 
-sv import from ...rl { get_rl_ladder, get_rl_corrected, rl_generate }
+sv import from ...rl { get_rl_ladder, get_rl_corrected }
 
 import from "recharts" {
     ResponsiveContainer, LineChart, Line, BarChart, Bar,
@@ -129,7 +132,7 @@ def _archiveLine(props: dict) -> JsxElement {
     </div>;
 }
 
-def:pub Rl -> JsxElement {
+def:pub Results -> JsxElement {
     has cells: list = [],
         curve: list = [],
         keys: list = [],
@@ -142,19 +145,7 @@ def:pub Rl -> JsxElement {
         corrLadder: list = [],
         corrHold: list = [],
         corrJourney: list = [],
-        corrKscale: list = [],
-        genPrompt: str = "Write a Jac function `add(a: int, b: int) -> int` that returns their sum.",
-        genJac: str = "",
-        genNote: str = "",
-        genBusy: bool = False;
-
-    async def doGen() -> None {
-        genBusy = True; genJac = ""; genNote = "sampling 8 completions + compiler-verifying (~1-2 min, loads the model)…";
-        r = await rl_generate(genPrompt, 8);
-        genBusy = False;
-        genJac = str(r["jac"]);
-        genNote = ("✓ " + str(r["note"])) if r["verified"] else ("⚠ " + str(r["note"]));
-    }
+        corrKscale: list = [];
 
     async can with entry {
         d = await get_rl_ladder();
@@ -182,7 +173,7 @@ def:pub Rl -> JsxElement {
 
     return <div className="flex h-full min-w-0 flex-1 flex-col">
         <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-2.5">
-            <span className="micro-label">RL · SFT/GRPO LADDER (live) + weekend archive</span>
+            <span className="micro-label">RESULTS · SFT/GRPO LADDER (live) + corrected + weekend archive</span>
             <span className="micro-label text-neutral-600">{(str(len(cells)) + " cells") if has_live else "no ladder run yet"}</span>
         </div>
 
@@ -198,24 +189,6 @@ def:pub Rl -> JsxElement {
                         <Line type="monotone" dataKey="acc" name="holdout accuracy %" stroke="#9ec98f" strokeWidth={2} dot={{"r": 4, "fill": "#9ec98f"}} isAnimationActive={False} />
                     </LineChart>
                 </ResponsiveContainer>
-            </div>
-
-            <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-3 pt-4">
-                <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">GENERATE JAC · best-of-k + compiler verifier (~78%)</span>
-                <textarea
-                    className="w-full resize-y rounded-sm border border-neutral-800 bg-[#0a0a0a] p-2 font-mono text-xs text-neutral-200 outline-none focus:border-neutral-600"
-                    rows={3} value={genPrompt} onChange={lambda e: ChangeEvent { genPrompt = str(e.target.value); }}
-                    placeholder="Describe the Jac function to generate…" />
-                <div className="mt-2 flex items-center gap-3">
-                    <button
-                        className="rounded-sm border border-neutral-700 bg-neutral-900 px-3 py-1 font-mono text-xs text-neutral-100 hover:border-neutral-500 disabled:opacity-40"
-                        disabled={genBusy} onClick={lambda e: MouseEvent { doGen(); }}>
-                        {"generating…" if genBusy else "▷ generate (sample 8, keep the one that compiles+runs)"}
-                    </button>
-                    {(<span className="stat-line text-neutral-500">{genNote}</span>) if genNote else <span></span>}
-                </div>
-                {(<pre className="mt-3 overflow-x-auto rounded-sm border border-neutral-800 bg-[#0a0a0a] p-3 font-mono text-xs text-neutral-100">{genJac}</pre>) if genJac else <span></span>}
-                <div className="stat-line mt-2 text-neutral-600">the jac compiler is the verifier — returns the first of 8 samples that compiles+runs. On the holdout this reaches ~78% vs ~55% greedy. Loads the SFT model per call (~1–2 min).</div>
             </div>
 
             <div className="relative rounded-md border border-emerald-900/40 bg-[#0d0d0d] p-3 pt-4">
