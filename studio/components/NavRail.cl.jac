@@ -12,7 +12,7 @@ glob WS_DOT: dict = {"01": "var(--ws01)", "02": "var(--ws02)", "03": "var(--ws03
 glob SECTIONS: dict = {
     "01": ["chat", "data", "train", "evals"],
     "02": ["chat", "data", "results", "generate"],
-    "03": ["chat", "data", "plan"]
+    "03": ["chat", "data", "train", "plan"]
 };
 glob LABELS: dict = {
     "chat": "CHAT", "train": "TRAIN", "data": "DATA", "evals": "EVALS",

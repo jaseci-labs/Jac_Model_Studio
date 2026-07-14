@@ -20,6 +20,7 @@ import from .sections.RlData { RlData }
 import from .sections.Results { Results }
 import from .sections.Generate { Generate }
 import from .sections.CptData { CptData }
+import from .sections.CptTrain { CptTrain }
 import from .sections.Plan { Plan }
 
 glob WS_DEFAULT_MODEL: dict = {"01": "qwen-dpo", "02": "qwen3coder-rl", "03": "qwen-q4"};
@@ -104,6 +105,7 @@ def:pub AppShell -> JsxElement {
 
         <div className={slot("03", "chat")}><Chat workspace="03" defaultModel={str(WS_DEFAULT_MODEL["03"])} /></div>
         <div className={slot("03", "data")}><CptData /></div>
+        <div className={slot("03", "train")}><CptTrain active={workspace == "03" and str(sections["03"]) == "train"} /></div>
         <div className={slot("03", "plan")}><Plan /></div>
     </div>;
 }

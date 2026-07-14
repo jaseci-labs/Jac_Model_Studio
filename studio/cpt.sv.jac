@@ -1,14 +1,24 @@
-"""studio - CPT corpus browser (03-new attempt). Read-only.
+"""studio - CPT corpus browser + training control (03-new attempt).
 
 Surfaces the continual-pretrain dataset built by 03-new/cpt_build/build_cpt.py:
 manifest stats (pivoted server-side into chart-ready lists) + per-source raw/packed
 row previews. Like rl.sv.jac, CPT data lives in THIS repo (jac_ml_studio), not the
 studio's data_root (which can point at the DataGeneration checkout), so paths resolve
 against the repo root from __file__ — NOT models.data_root().
+
+Training control mirrors train.sv.jac/runs.sv.jac (jobs.sv.jac for detached-process
+lifecycle, metrics.sv.jac for log parsing) but scoped to 03-new's own results/adapters
+dirs instead of models.results_dir() -- CPT is LoRA continual pretrain on raw text via
+mlx_lm.lora directly (no run_probe.sh wrapper: no quantize/base-eval/fuse stages, CPT
+has no task-based holdout to eval against yet, see workflow.md's CF-guard open item).
 """
 
 import os;
 import json;
+import time;
+import shlex;
+import jobs;
+import metrics;
 import from pathlib { Path }
 import from data { FileRefView, DataRowView }
 
@@ -189,4 +199,157 @@ def:pub cpt_rows(path: str, offset: int, limit: int) -> dict {
         i += 1;
     }
     return {"rows": result, "total": total};
+}
+
+
+# ---------------------------------------------------------- training control
+
+glob CPT_CONFIG: str = "03-new/cpt_train/config.yaml";
+glob CPT_TOTAL_ITERS: int = 2586;  # 862 train windows, batch 1, 3 epochs -- see config.yaml
+
+def _cpt_results_dir(name: str) -> Path {
+    return Path(CPT_ROOT) / "03-new" / "results" / name;
+}
+
+def _cpt_adapter_dir(name: str) -> Path {
+    return Path(CPT_ROOT) / "03-new" / "adapters" / name;
+}
+
+def _cpt_job_file(name: str) -> Path {
+    return _cpt_results_dir(name) / ".job-cpt.json";
+}
+
+def _cpt_run_log(name: str) -> Path {
+    return _cpt_results_dir(name) / "run-cpt.log";
+}
+
+def _cpt_train_log(name: str) -> Path {
+    return _cpt_results_dir(name) / "train.log";
+}
+
+"""Latest saved checkpoint (sorted by the zero-padded step prefix mlx_lm names
+its files with, e.g. 0000100_adapters.safetensors) + the step it represents.
+Same convention as 01-sft-dpo/sft_dpo/run_probe.sh's resume logic."""
+def _cpt_resume_point(name: str) -> dict {
+    adir = _cpt_adapter_dir(name);
+    if not adir.exists() {
+        return {"done_steps": 0, "ckpt": ""};
+    }
+    ckpts = sorted(adir.glob("*_adapters.safetensors"));
+    if not ckpts {
+        return {"done_steps": 0, "ckpt": ""};
+    }
+    latest = ckpts[-1];
+    digits = "";
+    for ch in latest.name {
+        if ch.isdigit() { digits += ch; } else { break; }
+    }
+    steps = int(digits) if digits else 0;
+    return {"done_steps": steps, "ckpt": str(latest)};
+}
+
+def _cpt_build_status(name: str, message: str = "") -> dict {
+    jf = _cpt_job_file(name);
+    rl = _cpt_run_log(name);
+    tl = _cpt_train_log(name);
+    job = jobs.live_status(jf, rl);
+    parsed = metrics.parse_train_log(tl);
+    if job is None {
+        status = "finished" if tl.exists() else "idle";
+        return {
+            "name": name, "status": status, "pid": 0, "started": "",
+            "last_iter": parsed["last_iter"], "total_iters": CPT_TOTAL_ITERS,
+            "train": parsed["train"], "val": parsed["val"], "lr": parsed["lr"],
+            "tps": parsed["tps"], "log_tail": metrics.tail(rl, 40), "message": message
+        };
+    }
+    return {
+        "name": name, "status": str(job.get("status", "idle")),
+        "pid": int(str(job.get("pid") or 0)), "started": str(job.get("started", "")),
+        "last_iter": parsed["last_iter"], "total_iters": CPT_TOTAL_ITERS,
+        "train": parsed["train"], "val": parsed["val"], "lr": parsed["lr"],
+        "tps": parsed["tps"], "log_tail": metrics.tail(rl, 40), "message": message
+    };
+}
+
+"""Start (or resume) a CPT LoRA run via mlx_lm.lora, detached. Resume-aware: if
+03-new/adapters/<name> already has checkpoints, only the REMAINING iters run,
+picking up from the latest via --resume-adapter-file (same convention as
+run_probe.sh). Returns the status dict."""
+def:pub start_cpt_training(name: str = "cpt-v1") -> dict {
+    if not jobs.safe(name) {
+        raise ValueError("invalid name");
+    }
+    jf = _cpt_job_file(name);
+    rl = _cpt_run_log(name);
+    existing = jobs.live_status(jf, rl);
+    if existing is not None and str(existing.get("status")) == "running" {
+        return _cpt_build_status(name, "already running");
+    }
+
+    run_dir = _cpt_results_dir(name);
+    run_dir.mkdir(parents=True, exist_ok=True);
+    adapter_dir = _cpt_adapter_dir(name);
+    adapter_dir.parent.mkdir(parents=True, exist_ok=True);
+
+    resume = _cpt_resume_point(name);
+    done_steps = int(str(resume["done_steps"]));
+    remain = CPT_TOTAL_ITERS - done_steps;
+    if remain <= 0 {
+        return _cpt_build_status(name, f"already complete ({done_steps}/{CPT_TOTAL_ITERS})");
+    }
+
+    tl = _cpt_train_log(name);
+    if done_steps == 0 {
+        tl.write_text("");  # fresh start clears the learning curve
+    }
+
+    venv_bin = str(Path(CPT_ROOT) / ".venv" / "bin");
+    env_overrides = {"PATH": f"{venv_bin}:{os.environ.get('PATH', '')}"};
+
+    ckpt = str(resume["ckpt"]);
+    resume_flag = f" --resume-adapter-file {shlex.quote(ckpt)}" if ckpt else "";
+    inner = (
+        f"mlx_lm.lora --config {shlex.quote(CPT_CONFIG)} "
+        f"--adapter-path {shlex.quote(str(adapter_dir))} "
+        f"--iters {remain}{resume_flag} "
+        f"> {shlex.quote(str(tl))} 2>&1"
+    );
+
+    cmd = jobs.with_exit_marker(inner, rl);
+    rl.write_text("");  # erase a previous run's __EXIT__ marker
+
+    pid = jobs.spawn_detached(cmd, runlog=rl, env=env_overrides, cwd=Path(CPT_ROOT));
+
+    now = time.strftime("%Y-%m-%d %H:%M:%S");
+    jobs.write_job(jf, {
+        "name": name, "mode": "cpt", "pid": pid, "status": "running",
+        "started": now, "cmd": inner,
+        "resumed_from": done_steps, "iters_this_run": remain
+    });
+
+    msg = "";
+    if done_steps > 0 {
+        msg = f"training {remain} iters (resuming from {done_steps}/{CPT_TOTAL_ITERS})";
+    } else {
+        msg = f"training {remain} iters from scratch";
+    }
+    return _cpt_build_status(name, msg);
+}
+
+"""Stop a running CPT job (SIGTERM the process group). Returns status."""
+def:pub stop_cpt_training(name: str = "cpt-v1") -> dict {
+    if not jobs.safe(name) {
+        raise ValueError("invalid name");
+    }
+    jobs.stop(_cpt_job_file(name), _cpt_run_log(name));
+    return _cpt_build_status(name, "stop signal sent");
+}
+
+"""Poll live status + full loss/lr/tps curves for a CPT run."""
+def:pub get_cpt_status(name: str = "cpt-v1") -> dict {
+    if not jobs.safe(name) {
+        raise ValueError("invalid name");
+    }
+    return _cpt_build_status(name);
 }
