@@ -11,7 +11,7 @@ import from ..shared.StatusGlyph { StatusGlyph }
 glob PHASES: list[dict] = [
     {"id": "P0", "status": "idle", "title": "Base eval (checkpoint 0)", "note": "unmodified Qwen3-Coder-30B-A3B through both eval tracks — the floor every checkpoint is read against."},
     {"id": "P1", "status": "done", "title": "CPT data build", "note": "DONE — 3.84M tokens, 939 windows (790/149). 5 sources: docs, code, rehearsal, blogs, osp_paper. Decontam clean, manifest emitted."},
-    {"id": "P2", "status": "idle", "title": "CPT training", "note": "LoRA continual pretrain (next-token, raw text), Q4 on 48GB. CF monitor (general-coding eval) at every checkpoint."},
+    {"id": "P2", "status": "done", "title": "CPT training", "note": "DONE (2026-07-14) — 2586/2586 iters, 6.82h. Train loss -18.5%, val loss -24.4%, moving together (no overfit signal). Peak mem 30.4GB/48GB. Fused: models/qwen-cpt-v1-fused-q4. CF benchmark still unbuilt — no dedicated general-coding regression check this run, see analysis doc."},
     {"id": "C1", "status": "idle", "title": "Checkpoint 1 · +CPT eval", "note": "Semantic MCQ picks the CPT checkpoint + human-sample trust check (Hamming vs LLM grade)."},
     {"id": "P4", "status": "idle", "title": "SFT/DPO (redesigned data)", "note": "GATED — spec not yet written. Reuse 01-sft-dpo recipe; redesign DPO pairs toward semantic-vs-subtly-wrong OSP idiom."},
     {"id": "C2", "status": "idle", "title": "Checkpoint 2 · +CPT+SFT/DPO eval", "note": "Full track: semantic MCQ + online-judge (compiler/pass@k) + human trust check."},
@@ -26,7 +26,7 @@ glob CHECKLIST: list[dict] = [
     {"done": True, "t": "jaseci-labs org repo inventory enumerated (17 Jac repos)"},
     {"done": True, "t": "Phase 1 CPT dataset built, manifest emitted, decontam clean"},
     {"done": False, "t": "Phase 0 base eval recorded (both tracks)"},
-    {"done": False, "t": "Phase 2 CPT training run, CF monitor clean"},
+    {"done": True, "t": "Phase 2 CPT training run complete (CF monitor still unbuilt, see analysis doc)"},
     {"done": False, "t": "Checkpoint 1 MCQ + trust check recorded, CPT checkpoint accepted"},
     {"done": False, "t": "SFT/DPO redesign spec written (gates Phase 4)"},
     {"done": False, "t": "Phase 4 SFT/DPO run, Checkpoint 2 full eval recorded"},
