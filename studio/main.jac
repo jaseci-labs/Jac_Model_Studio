@@ -24,7 +24,7 @@ import from rl { get_rl_ladder, get_rl_corrected, rl_generate }
 # workspace's DATA + TRAIN sections.
 import from cpt {
     cpt_manifest, cpt_files, cpt_rows,
-    start_cpt_training, stop_cpt_training, get_cpt_status
+    start_cpt_training, stop_cpt_training, get_cpt_status, get_all_cpt_status
 }
 # Streaming chat endpoint — consumed by a raw fetch reader on the client (not an
 # `sv import` RPC stub), so register it explicitly at the top level.

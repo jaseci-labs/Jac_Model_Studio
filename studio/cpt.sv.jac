@@ -204,8 +204,16 @@ def:pub cpt_rows(path: str, offset: int, limit: int) -> dict {
 
 # ---------------------------------------------------------- training control
 
-glob CPT_CONFIG: str = "03-new/cpt_train/config.yaml";
-glob CPT_TOTAL_ITERS: int = 2586;  # 862 train windows, batch 1, 3 epochs -- see config.yaml
+glob CPT_CONFIGS: dict = {
+    "cpt-v1": "03-new/cpt_train/config.yaml",
+    "cpt-v2": "03-new/cpt_train/config_v2_6epoch.yaml",
+    "cpt-v3": "03-new/cpt_train/config_v3_rank32.yaml"
+};
+glob CPT_TOTAL_ITERS: dict = {
+    "cpt-v1": 2586,  # 3 epochs
+    "cpt-v2": 5172,  # 6 epochs
+    "cpt-v3": 2586   # 3 epochs, rank-32
+};
 
 def _cpt_results_dir(name: str) -> Path {
     return Path(CPT_ROOT) / "03-new" / "results" / name;
@@ -254,11 +262,13 @@ def _cpt_build_status(name: str, message: str = "") -> dict {
     tl = _cpt_train_log(name);
     job = jobs.live_status(jf, rl);
     parsed = metrics.parse_train_log(tl);
+    total_iters = CPT_TOTAL_ITERS.get(name, 2586);
+
     if job is None {
         status = "finished" if tl.exists() else "idle";
         return {
             "name": name, "status": status, "pid": 0, "started": "",
-            "last_iter": parsed["last_iter"], "total_iters": CPT_TOTAL_ITERS,
+            "last_iter": parsed["last_iter"], "total_iters": total_iters,
             "train": parsed["train"], "val": parsed["val"], "lr": parsed["lr"],
             "tps": parsed["tps"], "log_tail": metrics.tail(rl, 40), "message": message
         };
@@ -266,7 +276,7 @@ def _cpt_build_status(name: str, message: str = "") -> dict {
     return {
         "name": name, "status": str(job.get("status", "idle")),
         "pid": int(str(job.get("pid") or 0)), "started": str(job.get("started", "")),
-        "last_iter": parsed["last_iter"], "total_iters": CPT_TOTAL_ITERS,
+        "last_iter": parsed["last_iter"], "total_iters": total_iters,
         "train": parsed["train"], "val": parsed["val"], "lr": parsed["lr"],
         "tps": parsed["tps"], "log_tail": metrics.tail(rl, 40), "message": message
     };
@@ -276,10 +286,15 @@ def _cpt_build_status(name: str, message: str = "") -> dict {
 03-new/adapters/<name> already has checkpoints, only the REMAINING iters run,
 picking up from the latest via --resume-adapter-file (same convention as
 run_probe.sh). Returns the status dict."""
-def:pub start_cpt_training(name: str = "cpt-v1") -> dict {
+def:pub start_cpt_training(name: str = "cpt-v1", config: str = "") -> dict {
     if not jobs.safe(name) {
         raise ValueError("invalid name");
     }
+
+    config_file = CPT_CONFIGS.get(name, CPT_CONFIGS["cpt-v1"]);
+    if config { config_file = config; }
+    total_iters = CPT_TOTAL_ITERS.get(name, 2586);
+
     jf = _cpt_job_file(name);
     rl = _cpt_run_log(name);
     existing = jobs.live_status(jf, rl);
@@ -294,9 +309,9 @@ def:pub start_cpt_training(name: str = "cpt-v1") -> dict {
 
     resume = _cpt_resume_point(name);
     done_steps = int(str(resume["done_steps"]));
-    remain = CPT_TOTAL_ITERS - done_steps;
+    remain = total_iters - done_steps;
     if remain <= 0 {
-        return _cpt_build_status(name, f"already complete ({done_steps}/{CPT_TOTAL_ITERS})");
+        return _cpt_build_status(name, f"already complete ({done_steps}/{total_iters})");
     }
 
     tl = _cpt_train_log(name);
@@ -310,7 +325,7 @@ def:pub start_cpt_training(name: str = "cpt-v1") -> dict {
     ckpt = str(resume["ckpt"]);
     resume_flag = f" --resume-adapter-file {shlex.quote(ckpt)}" if ckpt else "";
     inner = (
-        f"mlx_lm.lora --config {shlex.quote(CPT_CONFIG)} "
+        f"mlx_lm.lora --config {shlex.quote(config_file)} "
         f"--adapter-path {shlex.quote(str(adapter_dir))} "
         f"--iters {remain}{resume_flag} "
         f"> {shlex.quote(str(tl))} 2>&1"
@@ -330,7 +345,7 @@ def:pub start_cpt_training(name: str = "cpt-v1") -> dict {
 
     msg = "";
     if done_steps > 0 {
-        msg = f"training {remain} iters (resuming from {done_steps}/{CPT_TOTAL_ITERS})";
+        msg = f"training {remain} iters (resuming from {done_steps}/{total_iters})";
     } else {
         msg = f"training {remain} iters from scratch";
     }
@@ -352,4 +367,13 @@ def:pub get_cpt_status(name: str = "cpt-v1") -> dict {
         raise ValueError("invalid name");
     }
     return _cpt_build_status(name);
+}
+
+"""Get status of all CPT runs for comparison view."""
+def:pub get_all_cpt_status() -> dict {
+    out: dict = {};
+    for name in ["cpt-v1", "cpt-v2", "cpt-v3"] {
+        out[name] = _cpt_build_status(name);
+    }
+    return out;
 }
