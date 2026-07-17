@@ -312,6 +312,10 @@ def:pub start_cpt_training(name: str = "cpt-v1", config: str = "") -> dict {
     if not jobs.safe(name) {
         raise ValueError("invalid name");
     }
+    if name not in CPT_CONFIGS and not config {
+        raise ValueError(f"no CPT_CONFIGS entry for '{name}' -- pass config= explicitly, "
+                          "or use start_cpt_leg() for the multi-leg CPT-v2 flow");
+    }
 
     config_file = CPT_CONFIGS.get(name, CPT_CONFIGS["cpt-v1"]);
     if config { config_file = config; }
