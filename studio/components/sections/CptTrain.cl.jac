@@ -102,6 +102,10 @@ def:pub CptTrain(active: bool) -> JsxElement {
     lastIter = int(str(status["last_iter"])) if status is not None else 0;
     totalIters = int(str(status["total_iters"])) if status is not None else 2586;
     pct = (lastIter * 100.0) / totalIters if totalIters > 0 else 0.0;
+    # leg/leg_ceiling are only nonzero for the CPT-v2 multi-leg flow
+    # (start_cpt_leg in cpt.sv.jac); 0 for the plain cpt-v1 single run.
+    leg = int(str(status["leg"])) if status is not None else 0;
+    legCeiling = int(str(status["leg_ceiling"])) if status is not None else 0;
 
     train: list = list(status["train"]) if status is not None else [];
     val: list = list(status["val"]) if status is not None else [];
@@ -137,6 +141,7 @@ def:pub CptTrain(active: bool) -> JsxElement {
                     </div>
                 </div>
                 {status is not None and status["message"] and <p className="stat-line mt-2 text-neutral-500">{str(status["message"])}</p>}
+                {leg > 0 and <p className="stat-line mt-1 text-neutral-500">LEG {str(leg)}/{str(legCeiling)}</p>}
                 {status is not None and str(status["started"]) and <p className="stat-line mt-1 text-neutral-600">STARTED {str(status["started"])}{(" · PID " + str(status["pid"])) if int(str(status["pid"])) > 0 else ""}</p>}
                 <div className="mt-3 flex gap-2">
                     <button onClick={lambda e: MouseEvent { doStart(); }} disabled={isRunning} className={btn + "text-neutral-100"}>▶ START / RESUME</button>

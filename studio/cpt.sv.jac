@@ -205,15 +205,17 @@ def:pub cpt_rows(path: str, offset: int, limit: int) -> dict {
 # ---------------------------------------------------------- training control
 
 glob CPT_CONFIGS: dict = {
-    "cpt-v1": "03-new/cpt_train/config.yaml",
-    "cpt-v2": "03-new/cpt_train/config_v2_6epoch.yaml",
-    "cpt-v3": "03-new/cpt_train/config_v3_rank32.yaml"
+    "cpt-v1": "03-new/cpt_train/config.yaml"
 };
 glob CPT_TOTAL_ITERS: dict = {
-    "cpt-v1": 2586,  # 3 epochs
-    "cpt-v2": 5172,  # 6 epochs
-    "cpt-v3": 2586   # 3 epochs, rank-32
+    "cpt-v1": 2586  # 3 epochs
 };
+
+# CPT-v2's multi-leg epoch loop (Tasks 8-10): per-leg configs live in
+# CPT_LEG_CONFIG_DIR as config_v2_leg{N}.yaml, and CPT_LEG_CEILING caps how
+# many legs (epochs) a run name is allowed to advance through.
+glob CPT_LEG_CONFIG_DIR: str = "03-new/cpt_train";
+glob CPT_LEG_CEILING: dict = {"cpt-v2": 12};
 
 def _cpt_results_dir(name: str) -> Path {
     return Path(CPT_ROOT) / "03-new" / "results" / name;
@@ -256,6 +258,23 @@ def _cpt_resume_point(name: str) -> dict {
     return {"done_steps": steps, "ckpt": str(latest)};
 }
 
+"""Like _cpt_resume_point but for the leg-based CPT-v2 flow: also resolves
+the matching optimizer-state file (run_cpt_leg.py writes both files with the
+same step prefix, see 03-new/docs/cpt-v2/design.md section 4.2/Task 8)."""
+def _cpt_leg_resume_point(name: str) -> dict {
+    base = _cpt_resume_point(name);
+    if not base["ckpt"] {
+        return {"done_steps": 0, "adapter_ckpt": "", "optimizer_ckpt": ""};
+    }
+    adapter_ckpt = Path(str(base["ckpt"]));
+    opt_ckpt = adapter_ckpt.parent / adapter_ckpt.name.replace("_adapters.safetensors", "_optimizer.safetensors");
+    return {
+        "done_steps": base["done_steps"],
+        "adapter_ckpt": str(adapter_ckpt),
+        "optimizer_ckpt": str(opt_ckpt) if opt_ckpt.exists() else ""
+    };
+}
+
 def _cpt_build_status(name: str, message: str = "") -> dict {
     jf = _cpt_job_file(name);
     rl = _cpt_run_log(name);
@@ -263,6 +282,7 @@ def _cpt_build_status(name: str, message: str = "") -> dict {
     job = jobs.live_status(jf, rl);
     parsed = metrics.parse_train_log(tl);
     total_iters = CPT_TOTAL_ITERS.get(name, 2586);
+    leg_ceiling = CPT_LEG_CEILING.get(name, 0);
 
     if job is None {
         status = "finished" if tl.exists() else "idle";
@@ -270,13 +290,15 @@ def _cpt_build_status(name: str, message: str = "") -> dict {
             "name": name, "status": status, "pid": 0, "started": "",
             "last_iter": parsed["last_iter"], "total_iters": total_iters,
             "train": parsed["train"], "val": parsed["val"], "lr": parsed["lr"],
-            "tps": parsed["tps"], "log_tail": metrics.tail(rl, 40), "message": message
+            "tps": parsed["tps"], "log_tail": metrics.tail(rl, 40), "message": message,
+            "leg": 0, "leg_ceiling": leg_ceiling
         };
     }
     return {
         "name": name, "status": str(job.get("status", "idle")),
         "pid": int(str(job.get("pid") or 0)), "started": str(job.get("started", "")),
         "last_iter": parsed["last_iter"], "total_iters": total_iters,
+        "leg": int(str(job.get("leg") or 0)), "leg_ceiling": leg_ceiling,
         "train": parsed["train"], "val": parsed["val"], "lr": parsed["lr"],
         "tps": parsed["tps"], "log_tail": metrics.tail(rl, 40), "message": message
     };
@@ -350,6 +372,83 @@ def:pub start_cpt_training(name: str = "cpt-v1", config: str = "") -> dict {
         msg = f"training {remain} iters from scratch";
     }
     return _cpt_build_status(name, msg);
+}
+
+"""Run ONE CPT-v2 leg (one epoch) via run_cpt_leg.py (Task 8), which persists
+optimizer state across legs -- unlike start_cpt_training's raw mlx_lm.lora
+invocation, which only resumes weights (see design.md section 4.2). Detached
+job semantics mirror start_cpt_training exactly (jobs.spawn_detached +
+jobs.with_exit_marker), just a different inner command."""
+def:pub start_cpt_leg(name: str = "cpt-v2", leg: int = 1) -> dict {
+    if not jobs.safe(name) {
+        raise ValueError("invalid name");
+    }
+    ceiling = CPT_LEG_CEILING.get(name, 12);
+    if leg < 1 or leg > ceiling {
+        raise ValueError(f"leg must be 1..{ceiling}");
+    }
+
+    jf = _cpt_job_file(name);
+    rl = _cpt_run_log(name);
+    existing = jobs.live_status(jf, rl);
+    if existing is not None and str(existing.get("status")) == "running" {
+        return _cpt_build_status(name, "already running");
+    }
+
+    resume = _cpt_leg_resume_point(name);
+    done_steps = int(str(resume["done_steps"]));
+
+    manifest_path = Path(CPT_ROOT) / "03-new" / "dataset" / "cpt-v2" / "manifest.json";
+    windows = 0;
+    try {
+        m = json.loads(manifest_path.read_text());
+        windows = int(m["packed"]["train"]);
+    } except Exception {
+        raise ValueError("cpt-v2 manifest.json not found -- build the corpus first (Task 6)");
+    }
+    expected_done = windows * (leg - 1);
+    if done_steps != expected_done {
+        raise ValueError(f"resume point ({done_steps} steps) doesn't match leg {leg}'s "
+                          f"expected start ({expected_done}) -- legs must run in order");
+    }
+
+    config_file = str(Path(CPT_LEG_CONFIG_DIR) / f"config_v2_leg{leg}.yaml");
+    adapter_dir = _cpt_adapter_dir(name);
+    run_dir = _cpt_results_dir(name);
+    run_dir.mkdir(parents=True, exist_ok=True);
+    adapter_dir.parent.mkdir(parents=True, exist_ok=True);
+
+    tl = _cpt_train_log(name);
+    if leg == 1 { tl.write_text(""); }
+
+    venv_bin = str(Path(CPT_ROOT) / ".venv" / "bin");
+    env_overrides = {"PATH": f"{venv_bin}:{os.environ.get('PATH', '')}"};
+
+    resume_flags = "";
+    if resume["adapter_ckpt"] {
+        resume_flags += f" --resume-adapter-file {shlex.quote(str(resume['adapter_ckpt']))}";
+    }
+    if resume["optimizer_ckpt"] {
+        resume_flags += f" --resume-optimizer-file {shlex.quote(str(resume['optimizer_ckpt']))}";
+    }
+
+    inner = (
+        f"{venv_bin}/python3 03-new/cpt_train/run_cpt_leg.py "
+        f"--config {shlex.quote(config_file)} "
+        f"--adapter-path {shlex.quote(str(adapter_dir))} "
+        f"--iters {windows} --done-steps {done_steps}{resume_flags} "
+        f">> {shlex.quote(str(tl))} 2>&1"
+    );
+    cmd = jobs.with_exit_marker(inner, rl);
+    rl.write_text("");
+
+    pid = jobs.spawn_detached(cmd, runlog=rl, env=env_overrides, cwd=Path(CPT_ROOT));
+    now = time.strftime("%Y-%m-%d %H:%M:%S");
+    jobs.write_job(jf, {
+        "name": name, "mode": "cpt-leg", "pid": pid, "status": "running",
+        "started": now, "cmd": inner, "leg": leg, "resumed_from": done_steps
+    });
+    return _cpt_build_status(name, f"leg {leg}/{ceiling} running ({windows} iters, resuming from {done_steps})");
 }
 
 """Stop a running CPT job (SIGTERM the process group). Returns status."""
