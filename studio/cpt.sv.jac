@@ -472,10 +472,17 @@ def:pub get_cpt_status(name: str = "cpt-v1") -> dict {
     return _cpt_build_status(name);
 }
 
-"""Get status of all CPT runs for comparison view."""
+"""Get status of all CPT runs for comparison view. cpt-v3 was removed from
+this design (see Task 12); its stub entry was dropped from CPT_CONFIGS/
+CPT_TOTAL_ITERS earlier and is no longer iterated here either. cpt-v2's
+total_iters below is a placeholder (CPT_TOTAL_ITERS has no cpt-v2 entry, so
+_cpt_build_status falls back to the cpt-v1-shaped default of 2586) -- CPT-v2's
+real total is leg-based (windows_per_epoch x ceiling_epochs) and only knowable
+once 03-new/dataset/cpt-v2/manifest.json exists; treat cpt-v2's total_iters
+in this comparison view as not yet meaningful until that's wired up."""
 def:pub get_all_cpt_status() -> dict {
     out: dict = {};
-    for name in ["cpt-v1", "cpt-v2", "cpt-v3"] {
+    for name in ["cpt-v1", "cpt-v2"] {
         out[name] = _cpt_build_status(name);
     }
     return out;
