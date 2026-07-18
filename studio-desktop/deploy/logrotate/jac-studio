@@ -1,0 +1,36 @@
+# logrotate rules for Jac ML Studio.
+#
+# Install:
+#   sudo cp deploy/logrotate/jac-studio /etc/logrotate.d/jac-studio
+#   sudo chown root:root /etc/logrotate.d/jac-studio && sudo chmod 644 /etc/logrotate.d/jac-studio
+#   sudo logrotate --debug /etc/logrotate.d/jac-studio   # dry-run to verify paths
+#
+# Paths below assume JAC_STUDIO_DATA_ROOT=/opt/jac_ml_studio. If you set a
+# different data root, edit the two glob prefixes to match. The server appends
+# to audit.jsonl with a fresh open() per record (audit.sv.jac), so a plain
+# rename-and-recreate rotation loses no lines — no restart or signal needed.
+
+# Append-only audit trail (audit.sv.jac writes <data_root>/audit/audit.jsonl).
+/opt/jac_ml_studio/audit/audit.jsonl {
+    weekly
+    rotate 26
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 jac jac
+    dateext
+}
+
+# Detached training / eval / builder run logs (jobs engine writes per-user run
+# dirs under <data_root>/results/users/<uid>/<run>/*.log). Rotated by size so a
+# runaway job cannot fill the disk; copytruncate keeps any still-open writer
+# attached to the same inode.
+/opt/jac_ml_studio/results/users/*/*/*.log {
+    size 50M
+    rotate 5
+    compress
+    missingok
+    notifempty
+    copytruncate
+}

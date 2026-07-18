@@ -1,0 +1,18 @@
+[Unit]
+Description=Jac ML Studio graph backup (oneshot, triggered by backup.timer)
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=jac
+Group=jac
+WorkingDirectory=/opt/jac_ml_studio/studio-desktop
+# Where tarballs land (backup_graph.sh keeps the last 14). Point at off-host
+# storage (mounted volume / rclone target) for real disaster recovery.
+Environment=JAC_BACKUP_DIR=/opt/jac_ml_studio/backups
+ExecStart=/opt/jac_ml_studio/studio-desktop/scripts/backup_graph.sh
+
+# Install:
+#   sudo cp deploy/studio-backup.service deploy/studio-backup.timer /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now studio-backup.timer
+#   sudo systemctl start studio-backup.service   # take one now to verify
