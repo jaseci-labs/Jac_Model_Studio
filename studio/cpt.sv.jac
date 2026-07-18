@@ -275,13 +275,32 @@ def _cpt_leg_resume_point(name: str) -> dict {
     };
 }
 
+"""Leg-based runs (names in CPT_LEG_CEILING) derive total_iters from the live
+manifest (windows_per_epoch x ceiling_epochs) so status stays correct across
+corpus rebuilds; fixed-length runs use the CPT_TOTAL_ITERS table. 0 = corpus
+not built yet."""
+def _cpt_total_iters(name: str) -> int {
+    if name in CPT_LEG_CEILING {
+        manifest_path = Path(CPT_ROOT) / "03-new" / "dataset" / name / "manifest.json";
+        try {
+            m = json.loads(manifest_path.read_text());
+            windows = int(str(m["packed"]["train"]));
+            ceiling = int(str(CPT_LEG_CEILING[name]));
+            return windows * ceiling;
+        } except Exception {
+            return 0;
+        }
+    }
+    return int(str(CPT_TOTAL_ITERS.get(name, 2586)));
+}
+
 def _cpt_build_status(name: str, message: str = "") -> dict {
     jf = _cpt_job_file(name);
     rl = _cpt_run_log(name);
     tl = _cpt_train_log(name);
     job = jobs.live_status(jf, rl);
     parsed = metrics.parse_train_log(tl);
-    total_iters = CPT_TOTAL_ITERS.get(name, 2586);
+    total_iters = _cpt_total_iters(name);
     leg_ceiling = CPT_LEG_CEILING.get(name, 0);
 
     if job is None {
@@ -475,11 +494,8 @@ def:pub get_cpt_status(name: str = "cpt-v1") -> dict {
 """Get status of all CPT runs for comparison view. cpt-v3 was removed from
 this design (see Task 12); its stub entry was dropped from CPT_CONFIGS/
 CPT_TOTAL_ITERS earlier and is no longer iterated here either. cpt-v2's
-total_iters below is a placeholder (CPT_TOTAL_ITERS has no cpt-v2 entry, so
-_cpt_build_status falls back to the cpt-v1-shaped default of 2586) -- CPT-v2's
-real total is leg-based (windows_per_epoch x ceiling_epochs) and only knowable
-once 03-new/dataset/cpt-v2/manifest.json exists; treat cpt-v2's total_iters
-in this comparison view as not yet meaningful until that's wired up."""
+total_iters comes from _cpt_total_iters (manifest windows x leg ceiling),
+0 if the corpus manifest doesn't exist yet."""
 def:pub get_all_cpt_status() -> dict {
     out: dict = {};
     for name in ["cpt-v1", "cpt-v2"] {
