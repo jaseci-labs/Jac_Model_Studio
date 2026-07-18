@@ -260,7 +260,7 @@ def _cpt_resume_point(name: str) -> dict {
 
 """Like _cpt_resume_point but for the leg-based CPT-v2 flow: also resolves
 the matching optimizer-state file (run_cpt_leg.py writes both files with the
-same step prefix, see 03-new/docs/cpt-v2/design.md section 4.2/Task 8)."""
+same step prefix, see 03-new/docs/cpt-2/design.md section 4.2/Task 8)."""
 def _cpt_leg_resume_point(name: str) -> dict {
     base = _cpt_resume_point(name);
     if not base["ckpt"] {

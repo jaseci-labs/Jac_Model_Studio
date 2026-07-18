@@ -1,6 +1,6 @@
 """PLAN section (workspace 03 CPT) — the CPT→SFT/DPO→GRPO roadmap.
 
-Static render of 03-new/docs/workflow.md: the 9 phases with a status glyph each
+Static render of 03-new/docs/cpt-1/workflow.md: the 9 phases with a status glyph each
 (P1 done — corpus built; everything downstream idle/gated) + the 12-item
 checklist. Status is hardcoded to on-disk reality; workflow.md is the source of
 truth. No sv imports.
@@ -39,7 +39,7 @@ def:pub Plan -> JsxElement {
     return <div className="flex h-full min-w-0 flex-1 flex-col">
         <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-2.5">
             <span className="micro-label">PLAN · CPT → SFT/DPO → GRPO</span>
-            <span className="micro-label text-neutral-600">03-new/docs/workflow.md</span>
+            <span className="micro-label text-neutral-600">03-new/docs/cpt-1/workflow.md</span>
         </div>
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
             <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-3 pt-4">
@@ -69,7 +69,7 @@ def:pub Plan -> JsxElement {
                         </div>
                     }}
                 </div>
-                <div className="stat-line mt-3 text-neutral-600">status hardcoded to on-disk reality · source of truth: 03-new/docs/workflow.md</div>
+                <div className="stat-line mt-3 text-neutral-600">status hardcoded to on-disk reality · source of truth: 03-new/docs/cpt-1/workflow.md</div>
             </div>
         </div>
     </div>;
