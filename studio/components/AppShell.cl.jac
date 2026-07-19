@@ -78,7 +78,7 @@ def:pub AppShell -> JsxElement {
         } except Exception { }
         try {
             lo: any = win.localStorage.getItem("jacml.layout");
-            if lo == "rail" or lo == "icons" or lo == "cockpit" or lo == "topbar" {
+            if lo == "rail" or lo == "icons" or lo == "cockpit" or lo == "topbar" or lo == "deck" or lo == "dock" {
                 layout = str(lo);
             }
         } except Exception { }
@@ -132,14 +132,14 @@ def:pub AppShell -> JsxElement {
     if online == -1 {
         return <div className="flex h-screen items-center justify-center bg-background"><EmptyState label="CONNECTING" pulse={True} /></div>;
     }
-    return <div className={"flex h-screen overflow-hidden " + ("flex-col" if layout == "topbar" else "")} data-ws={workspace} data-layout={layout}>
+    return <div className={"flex h-screen overflow-hidden " + ("flex-col" if layout == "topbar" or layout == "deck" else "")} data-ws={workspace} data-layout={layout}>
         <NavRail
             workspace={workspace} section={sections[workspace]}
             onWorkspace={goWorkspace} onSection={go}
             layout={layout} onLayout={applyLayout}
             loadedInfo={loadedInfo} ramGb={ramGb}
         />
-        <div className="flex min-h-0 min-w-0 flex-1">
+        <div className={"flex min-h-0 min-w-0 flex-1 " + ("pb-16" if layout == "dock" else "")}>
             <div className={slot("01", "chat")}><Chat workspace="01" defaultModel={str(WS_DEFAULT_MODEL["01"])} /></div>
             <div className={slot("01", "data")}><Data active={workspace == "01" and str(sections["01"]) == "data"} /></div>
             <div className={slot("01", "train")}><Train active={workspace == "01" and str(sections["01"]) == "train"} /></div>

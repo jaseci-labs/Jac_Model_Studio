@@ -2,12 +2,14 @@
 by AppShell (structure changes need a re-render up there, unlike themes which
 are pure CSS); persists to localStorage("jacml.layout")."""
 
-glob LAYOUTS: list[str] = ["rail", "icons", "cockpit", "topbar"];
+glob LAYOUTS: list[str] = ["rail", "icons", "cockpit", "topbar", "deck", "dock"];
 glob BLURB: dict = {
     "rail": "compact sidebar",
     "icons": "icons only · max content",
     "cockpit": "wide sidebar · live status",
-    "topbar": "nav on top · full width"
+    "topbar": "nav on top · full width",
+    "deck": "two-tier header · tabs",
+    "dock": "floating bottom dock"
 };
 
 def:pub LayoutSwitcher(
