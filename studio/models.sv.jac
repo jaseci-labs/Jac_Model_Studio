@@ -60,7 +60,9 @@ def model_available(m: dict) -> bool {
 }
 
 def results_dir() -> Path {
-    return data_root() / "results";
+    # run_probe.sh / run_dpo.sh cd to the repo root and write under
+    # 01-sft-dpo/results/, so the studio must read the same tree.
+    return data_root() / "01-sft-dpo" / "results";
 }
 
 def jac_bin() -> Path {

@@ -105,11 +105,13 @@ def:pub start_training(name: str, mode: str, model_id: str = "", opts: dict = {}
     current_path = os.environ.get("PATH", "");
     env_overrides["PATH"] = f"{venv_bin}:{current_path}";
 
+    # The run scripts live in 01-sft-dpo/sft_dpo/ (post-flatten layout); they
+    # re-cd themselves to the repo root, so cwd=data_root stays correct.
     inner = "";
     if mode == "sft" {
-        inner = f"./run_probe.sh {shlex.quote(model_id)} {shlex.quote(name)}";
+        inner = f"./01-sft-dpo/sft_dpo/run_probe.sh {shlex.quote(model_id)} {shlex.quote(name)}";
     } else {
-        inner = f"./run_dpo.sh {shlex.quote(name)}";
+        inner = f"./01-sft-dpo/sft_dpo/run_dpo.sh {shlex.quote(name)}";
     }
 
     cmd = jobs.with_exit_marker(inner, rl);

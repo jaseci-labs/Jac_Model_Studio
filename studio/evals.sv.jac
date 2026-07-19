@@ -110,7 +110,7 @@ def _start(run: EvalRun, limit: int, sim_threshold: float) -> int {
     env: dict = {
         "JAC_EVAL_MODE": "mlx",
         "JAC_EVAL_MODEL": run.model,
-        "JAC_HOLDOUT": str(models.HOLDOUTS[run.holdout]),
+        "JAC_HOLDOUT": str(models.data_root() / str(models.HOLDOUTS[run.holdout])),
         "PATH": f"{venv_bin}:{current_path}"
     };
     if run.adapter {
@@ -130,7 +130,7 @@ def _start(run: EvalRun, limit: int, sim_threshold: float) -> int {
         script = "idiom_eval.jac";
     }
 
-    inner = f"{shlex.quote(str(models.jac_bin()))} run srccurrent/jacgen/{script}";
+    inner = f"{shlex.quote(str(models.jac_bin()))} run 01-sft-dpo/sft_dpo/jacgen/{script}";
     cmd = jobs.with_exit_marker(inner, run_log);
     pid = jobs.spawn_detached(cmd, run_log, env, models.data_root());
     jobs.write_job(ed / "job.json", {"pid": pid, "status": "running"});
