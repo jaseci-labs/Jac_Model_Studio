@@ -12,14 +12,17 @@ import from .LayoutSwitcher { LayoutSwitcher }
 glob WS_ORDER: list[str] = ["01", "02", "03"];
 glob WS_NAME: dict = {"01": "SFT/DPO", "02": "RL/GRPO", "03": "CPT"};
 glob WS_DOT: dict = {"01": "var(--ws01)", "02": "var(--ws02)", "03": "var(--ws03)"};
+# Uniform: every workspace exposes the same five sections. What each page shows
+# is workspace-specific (01 results = eval runs; 02 train = the deployed
+# best-of-k generator, GRPO trained offline; 03 results = CPT run compare).
 glob SECTIONS: dict = {
-    "01": ["chat", "data", "train", "evals"],
-    "02": ["chat", "data", "results", "generate"],
-    "03": ["chat", "data", "train", "plan"]
+    "01": ["chat", "data", "train", "results", "plan"],
+    "02": ["chat", "data", "train", "results", "plan"],
+    "03": ["chat", "data", "train", "results", "plan"]
 };
 glob LABELS: dict = {
-    "chat": "CHAT", "train": "TRAIN", "data": "DATA", "evals": "EVALS",
-    "results": "RESULTS", "generate": "GENERATE", "plan": "PLAN"
+    "chat": "CHAT", "data": "DATA", "train": "TRAIN",
+    "results": "RESULTS", "plan": "PLAN"
 };
 
 # props-component convention: called as {_glyph({"s": ...})} from JSX, so the
