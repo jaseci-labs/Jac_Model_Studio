@@ -69,15 +69,23 @@ def jac_bin() -> Path {
     return data_root() / ".venv" / "bin" / "jac";
 }
 
+glob _size_cache: dict = {};
+
 """On-disk size of a model dir in GB (2 dp). round(x,2) is broken in the checker,
-so the cents are computed with int division instead."""
+so the cents are computed with int division instead. Memoized per path — model
+dirs are static multi-GB trees and every list_models call was rglob-stat'ing
+thousands of files (sluggish Chat/Evals mounts); restart refreshes the cache."""
 def dir_size_gb(p: Path) -> float {
     if not p.is_dir() { return 0.0; }
+    key = str(p);
+    if key in _size_cache { return float(str(_size_cache[key])); }
     total = 0;
     for f in p.rglob("*") {
         if f.is_file() { total += f.stat().st_size; }
     }
-    return int(total / 10_000_000) / 100.0;
+    gb = int(total / 10_000_000) / 100.0;
+    _size_cache[key] = gb;
+    return gb;
 }
 
 def total_ram_gb() -> int {

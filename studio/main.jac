@@ -28,7 +28,7 @@ import from cpt {
 }
 # Streaming chat endpoint — consumed by a raw fetch reader on the client (not an
 # `sv import` RPC stub), so register it explicitly at the top level.
-import from chat { chat_stream }
+import from chat { chat_stream, stop_generation }
 
 # Client-side UI
 cl {

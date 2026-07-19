@@ -33,3 +33,11 @@ def:pub chat_stream(
         yield frame;
     }
 }
+
+"""Cancel the in-flight generation (*gen_id* from the stream's load frame, or the
+current one when omitted). Lock-free: the streaming generator holds the model
+lock, and this flag is how STOP actually frees the GPU — client-side reader
+cancellation alone left the model decoding to max_tokens."""
+def:pub stop_generation(gen_id: str = "") -> dict {
+    return {"stopped": inference.request_cancel(gen_id)};
+}

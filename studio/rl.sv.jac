@@ -108,10 +108,18 @@ def:pub get_rl_ladder() -> dict {
 def:pub get_rl_corrected() -> dict {
     # The corrected results (fixed eval+reward) — assembled by 02-rl-grpo/rl/make_summary.py.
     p = os.path.join(RL_REPO, "02-rl-grpo", "resultspub", "rl", "corrected_summary.json");
+    # Fallback/error shapes must carry every key the client dereferences
+    # (Results.cl.jac lists journey/kscale unguarded).
+    empty: dict = {"ladder": [], "holdouts": [], "journey": [], "kscale": [], "headline": {}, "note": ""};
     if not os.path.exists(p) {
-        return {"ladder": [], "holdouts": [], "headline": {}, "note": ""};
+        return empty;
     }
-    return json.loads(Path(p).read_text());
+    try {
+        loaded = dict(json.loads(Path(p).read_text()));
+        return {**empty, **loaded};
+    } except Exception {
+        return {**empty, "note": "corrected_summary.json unreadable"};
+    }
 }
 
 def:pub rl_generate(prompt: str, k: int = 8) -> dict {

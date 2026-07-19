@@ -139,8 +139,8 @@ def _build_row(idx: int, rec: any) -> DataRowView {
     } elif "chosen" in rec {
         kind = "dpo";
         prompt = _strip_fences(str(rec.get("prompt", "")));
-        chosen = _fence(str(rec["chosen"]), "jac") or str(rec["chosen"]).strip();
-        rejected = _fence(str(rec["rejected"]), "jac") or str(rec["rejected"]).strip();
+        chosen = _fence(str(rec.get("chosen", "")), "jac") or str(rec.get("chosen", "")).strip();
+        rejected = _fence(str(rec.get("rejected", "")), "jac") or str(rec.get("rejected", "")).strip();
         py = _fence(str(rec.get("prompt", "")), "python");
         nm = _funcname(chosen) or _funcname(py);
     } elif "python" in rec {

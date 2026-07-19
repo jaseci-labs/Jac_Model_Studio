@@ -18,12 +18,26 @@ import gc;
 import time;
 import threading;
 import resource;
+import from uuid { uuid4 }
 
 glob _model: any = None;
 glob _tokenizer: any = None;
 glob _current_id: str = "";
 glob _load_seconds: float = 0.0;
 glob _lock: any = threading.Lock();
+# Generation cancel channel: stream_chat records its generation id in
+# _active_gen; stop_generation (chat.sv.jac) sets _cancel_gen; the token loop
+# breaks when they match. Lock-free on purpose — the whole point is to reach a
+# generator that is holding _lock.
+glob _active_gen: str = "";
+glob _cancel_gen: str = "";
+
+def request_cancel(gen_id: str = "") -> str {
+    global _cancel_gen;
+    target = gen_id if gen_id else _active_gen;
+    _cancel_gen = target;
+    return target;
+}
 
 def _now() -> float { return time.monotonic(); }
 
@@ -80,7 +94,7 @@ def loaded_info() -> dict {
         return {"id": "", "resident_gb": 0.0};
     }
     ru: any = resource.getrusage(resource.RUSAGE_SELF);
-    rss = float(str(ru.ru_maxrss));
+    rss = float(str(ru.ru_maxrss));  # bytes on macOS; would be KB on Linux
     return {"id": _current_id, "resident_gb": int(rss / 10_000_000.0) / 100.0};
 }
 
@@ -99,8 +113,10 @@ def stream_chat(
     messages: list[dict], model_id: str, path: str,
     temperature: float, top_p: float, max_tokens: int
 ) -> any {
-    global _model, _tokenizer, _current_id, _load_seconds;
+    global _model, _tokenizer, _current_id, _load_seconds, _active_gen, _cancel_gen;
     _lock.acquire();
+    gid = str(uuid4().hex)[:8];
+    _active_gen = gid;
     try {
         import from mlx_lm { load, stream_generate }
         import from mlx_lm.sample_utils { make_sampler }
@@ -115,7 +131,7 @@ def stream_chat(
             _current_id = model_id;
             _load_seconds = load_s;
         }
-        yield {"kind": "load", "load_s": load_s, "model_id": model_id};
+        yield {"kind": "load", "load_s": load_s, "model_id": model_id, "gen_id": gid};
         sampler = make_sampler(temp=temperature, top_p=top_p);
         ptoks = _build_prompt(messages);
         gt0 = _now();
@@ -128,6 +144,7 @@ def stream_chat(
         ntok: any = 0;
         ntps: any = 0.0;
         for resp in gen {
+            if _cancel_gen == gid { break; }
             # Extract native attrs into locals before yielding (checker crash).
             txt: str = str(resp.text);
             ntok = resp.generation_tokens;
@@ -142,6 +159,8 @@ def stream_chat(
     } except Exception as e {
         yield {"kind": "error", "text": str(e)};
     } finally {
+        if _cancel_gen == gid { _cancel_gen = ""; }
+        if _active_gen == gid { _active_gen = ""; }
         _lock.release();
     }
 }
