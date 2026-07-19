@@ -1,10 +1,15 @@
-@import "tailwindcss";
-@import "tw-animate-css";
 /* Geist + Geist Mono — the defining schematic typeface. The old Next app loaded
    these via next/font/google; we have no Next here, so pull them from Google
    Fonts directly. ponytail: @import over an npm font dep — one line, no build
-   config; swap to @fontsource if offline builds ever matter. */
+   config; swap to @fontsource if offline builds ever matter.
+   NOTE: this remote @import must stay FIRST. Vite/PostCSS inlines the local
+   package imports below (tailwindcss, tw-animate-css) into thousands of lines
+   of CSS but leaves remote url() imports in place — so if this isn't first,
+   the inlined CSS pushes it down and breaks "@import must precede all other
+   statements". */
 @import url('https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&display=swap');
+@import "tailwindcss";
+@import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
