@@ -212,7 +212,7 @@ def:pub Results -> JsxElement {
     return <div className="flex h-full min-w-0 flex-1 flex-col">
         <SectionHeader
             title={<span className="micro-label">RESULTS · SFT/GRPO LADDER (live) + corrected + weekend archive</span>}
-            right={<span className="micro-label text-muted-foreground/70">{(str(len(cells)) + " cells") if has_live else "no ladder run yet"}</span>}
+            right={<span className="micro-label text-muted-foreground/70">{("ladder · " + str(len(cells)) + " cells") if has_live else "no ladder run yet"}</span>}
         />
 
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">

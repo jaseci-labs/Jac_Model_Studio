@@ -402,7 +402,7 @@ def:pub Train(active: bool) -> JsxElement {
         jobMsg: str = str(job["message"] or "") if job is not None else "";
         return <div className="flex items-start gap-4 p-4 pt-5">
             <div className="relative flex min-w-0 flex-1 flex-col gap-3 rounded-md border border-border bg-card p-4 pt-5">
-                <span className="micro-label absolute -top-2 left-3 bg-background px-2">LAUNCH.CONFIG</span>
+                <span className="micro-label absolute -top-2 left-3 bg-background px-2">LAUNCH CONFIG</span>
 
                 {formMode == "sft" and <Field label="BASE MODEL (HF ID)">
                     <TextInput value={formModelId} onSet={lambda v: str { updateForm("modelId", v); }} placeholder="org/model" mono={True} />
@@ -433,7 +433,7 @@ def:pub Train(active: bool) -> JsxElement {
             </div>
 
             <div className="relative flex min-w-0 flex-1 flex-col gap-3 rounded-md border border-border bg-card p-4 pt-5">
-                <span className="micro-label absolute -top-2 left-3 bg-background px-2">RUN.STATUS</span>
+                <span className="micro-label absolute -top-2 left-3 bg-background px-2">RUN STATUS</span>
 
                 {pinnedLine != "" and <p key="pinned-run" className="stat-line text-muted-foreground/70">{pinnedLine}</p>}
 
@@ -591,7 +591,6 @@ def:pub Train(active: bool) -> JsxElement {
     return <div className="flex h-full min-w-0 flex-1 flex-col">
         <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
             <SubTabs tabs={TABS} active={tab.upper()} onTab={onTab} />
-            <span className="micro-label text-muted-foreground/70">TRAIN.CTL</span>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto">

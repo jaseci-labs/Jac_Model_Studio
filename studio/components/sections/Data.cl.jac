@@ -155,7 +155,6 @@ def:pub Data(active: bool = False) -> JsxElement {
             <div className="mb-3 flex flex-col gap-1.5">
                 <div className="flex items-center justify-between">
                     <span className="stat-line text-muted-foreground">{str(doneCount)}/{str(nstages)} DONE</span>
-                    {runningStage and <span className="micro-label pulse text-foreground/80">⦿ {runningStage}</span>}
                 </div>
                 <div className="h-1 w-full rounded-full bg-border">
                     <div className="h-1 rounded-full bg-primary transition-all" style={{"width": str(pct) + "%"}}></div>
@@ -201,7 +200,7 @@ def:pub Data(active: bool = False) -> JsxElement {
         ph = ('one JSON object per line · sft: {"messages":[...]}' if addTarget == "sft"
             else 'one JSON object per line · dpo: {"prompt","chosen","rejected"}');
         return <div className="relative rounded-md border border-border bg-card p-3 pt-4">
-            <span className="micro-label absolute -top-2 left-3 bg-background px-2">ADD.EXAMPLES</span>
+            <span className="micro-label absolute -top-2 left-3 bg-background px-2">ADD EXAMPLES</span>
             <div className="flex flex-col gap-3">
                 <Segmented options={["sft", "dpo"]} value={addTarget} onSet={lambda v: str { addTarget = v; }} />
                 <textarea
@@ -229,8 +228,8 @@ def:pub Data(active: bool = False) -> JsxElement {
 
     return <div className="flex h-full min-w-0 flex-1 flex-col">
         <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
-            <span className="micro-label">DATA.PIPELINE</span>
-            <span className="micro-label text-muted-foreground/70">DATASET.CTL</span>
+            <span className="micro-label">DATA · SFT/DPO DATASET</span>
+            {runningStage and <span key="running" className="micro-label pulse text-foreground/80">⦿ {runningStage}</span>}
         </div>
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
             {_tiles()}

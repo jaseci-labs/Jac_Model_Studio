@@ -40,7 +40,6 @@ def:pub RlData -> JsxElement {
     return <div className="flex h-full min-w-0 flex-1 flex-col">
         <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
             <span className="micro-label">DATA · RL TRAINING SETS (read-only)</span>
-            <span className="micro-label text-muted-foreground/70">02-rl-grpo/dataset</span>
         </div>
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
             <div className="flex flex-wrap items-center gap-2">
@@ -54,6 +53,7 @@ def:pub RlData -> JsxElement {
                 onOpen={pager["openFile"]} onToggle={pager["toggleRow"]}
                 onPrev={pager["prevPage"]} onNext={pager["nextPage"]}
             />
+            <div className="stat-line text-muted-foreground/70">source: 02-rl-grpo/dataset</div>
         </div>
     </div>;
 }

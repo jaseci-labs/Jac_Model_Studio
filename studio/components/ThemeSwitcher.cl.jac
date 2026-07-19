@@ -7,7 +7,7 @@ glob THEMES: list[str] = [
     "terminal", "shadcn-light", "shadcn-dark", "linear", "paper", "gruvbox", "high-contrast"
 ];
 
-def:pub ThemeSwitcher() -> JsxElement {
+def:pub ThemeSwitcher(up: bool = True) -> JsxElement {
     has open: bool = False,
         theme: str = "terminal";
 
@@ -35,7 +35,7 @@ def:pub ThemeSwitcher() -> JsxElement {
     }
 
     return <div className="relative">
-        {open and <div className="absolute bottom-8 left-0 z-50 flex w-36 flex-col gap-1 rounded-md border border-border bg-popover p-2">
+        {open and <div className={"absolute left-0 z-50 flex w-36 flex-col gap-1 rounded-md border border-border bg-popover p-2 " + ("bottom-8" if up else "top-8")}>
             {for t in THEMES {
                 <button
                     key={t}

@@ -188,7 +188,7 @@ def:pub Evals(active: bool = False) -> JsxElement {
             if m.available { avail.append(m); }
         }
         return <div className="relative rounded-md border border-border bg-card p-4 pt-5">
-            <span className="micro-label absolute -top-2 left-3 bg-background px-2">EVAL.LAUNCH</span>
+            <span className="micro-label absolute -top-2 left-3 bg-background px-2">LAUNCH</span>
             <div className="flex flex-col gap-4">
                 <Field label="KIND">
                     <div className="flex flex-col gap-1">
@@ -267,7 +267,7 @@ def:pub Evals(active: bool = False) -> JsxElement {
     def _runView -> JsxElement {
         run: any = current;
         return <div className="relative rounded-md border border-border bg-card p-4 pt-5">
-            <span className="micro-label absolute -top-2 left-3 bg-background px-2">EVAL.RUN</span>
+            <span className="micro-label absolute -top-2 left-3 bg-background px-2">ACTIVE RUN</span>
             {if not run {
                 <span key="none" className="micro-label text-muted-foreground/70">NO ACTIVE EVAL</span>
                 skip;
@@ -299,7 +299,7 @@ def:pub Evals(active: bool = False) -> JsxElement {
 
     def _history -> JsxElement {
         return <div className="relative rounded-md border border-border bg-card p-4 pt-5">
-            <span className="micro-label absolute -top-2 left-3 bg-background px-2">EVAL.HISTORY</span>
+            <span className="micro-label absolute -top-2 left-3 bg-background px-2">HISTORY</span>
             {if len(history) == 0 {
                 <span className="micro-label text-muted-foreground/70">no evals yet</span>
                 skip;
@@ -447,7 +447,6 @@ def:pub Evals(active: bool = False) -> JsxElement {
     return <div className="flex h-full min-w-0 flex-1 flex-col">
         <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
             <span className="micro-label">EVALS</span>
-            <span className="micro-label text-muted-foreground/70">EVAL.CTL</span>
         </div>
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
             <div className="grid gap-4" style={{"gridTemplateColumns": "360px 1fr"}}>

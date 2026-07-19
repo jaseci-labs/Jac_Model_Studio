@@ -80,7 +80,7 @@ def:pub Sidebar(
     }
 
     return <aside className="flex w-56 shrink-0 flex-col border-r border-border bg-card p-3">
-        <div className="micro-label mb-3">JAC.STUDIO · fig.1</div>
+        <div className="micro-label mb-3">CHATS</div>
         <Button
             variant="outline"
             onClick={lambda e: MouseEvent { if not busy { onNew(); } }}
