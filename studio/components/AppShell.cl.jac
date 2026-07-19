@@ -55,6 +55,15 @@ def:pub AppShell -> JsxElement {
                 workspace = str(saved);
             }
         } except Exception { }
+        # Re-apply the stored theme before the first real paint — the
+        # loading/offline screens render before NavRail (and its ThemeSwitcher)
+        # mounts. One-frame FOUC on the default theme is accepted.
+        try {
+            th: any = win.localStorage.getItem("jacml.theme");
+            if th and th != "terminal" {
+                doc.documentElement.setAttribute("data-theme", str(th));
+            }
+        } except Exception { }
         await probe();
         probeId = setInterval(lambda -> None { probe(); }, 3000);
     }

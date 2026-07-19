@@ -6,6 +6,8 @@ everywhere — accent (dot + active left-bar) is the only per-workspace color, d
 by --ws-accent (stamped by data-ws on the shell root).
 """
 
+import from .ThemeSwitcher { ThemeSwitcher }
+
 glob WS_ORDER: list[str] = ["01", "02", "03"];
 glob WS_NAME: dict = {"01": "SFT/DPO", "02": "RL/GRPO", "03": "CPT"};
 glob WS_DOT: dict = {"01": "var(--ws01)", "02": "var(--ws02)", "03": "var(--ws03)"};
@@ -106,6 +108,7 @@ def:pub NavRail(
             }}
         </div>
         <div className="flex-1" />
+        <div className="mb-2"><ThemeSwitcher /></div>
         <span className="micro-label px-2">v3</span>
     </nav>;
 }
