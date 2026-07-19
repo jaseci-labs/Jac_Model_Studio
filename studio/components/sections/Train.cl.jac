@@ -589,7 +589,7 @@ def:pub Train(active: bool) -> JsxElement {
     }
 
     return <div className="flex h-full min-w-0 flex-1 flex-col">
-        <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
+        <div className="section-header flex items-center justify-between border-b border-border px-4 py-2.5">
             <SubTabs tabs={TABS} active={tab.upper()} onTab={onTab} />
         </div>
 

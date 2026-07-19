@@ -31,7 +31,7 @@ def:pub AppShell -> JsxElement {
     has workspace: str = "03",
         sections: dict = {"01": "chat", "02": "chat", "03": "chat"},
         online: int = -1,  # -1 unknown, 0 offline, 1 online
-        layout: str = "rail",
+        layout: str = "split",
         ramGb: float = 0.0,
         loadedInfo: any = None,
         probeId: any = None;
@@ -78,7 +78,7 @@ def:pub AppShell -> JsxElement {
         } except Exception { }
         try {
             lo: any = win.localStorage.getItem("jacml.layout");
-            if lo == "rail" or lo == "icons" or lo == "cockpit" or lo == "topbar" or lo == "deck" or lo == "dock" {
+            if lo == "split" or lo == "rail" or lo == "icons" or lo == "cockpit" or lo == "topbar" or lo == "deck" or lo == "dock" {
                 layout = str(lo);
             }
         } except Exception { }
@@ -132,14 +132,26 @@ def:pub AppShell -> JsxElement {
     if online == -1 {
         return <div className="flex h-screen items-center justify-center bg-background"><EmptyState label="CONNECTING" pulse={True} /></div>;
     }
-    return <div className={"flex h-screen overflow-hidden " + ("flex-col" if layout == "topbar" or layout == "deck" else "")} data-ws={workspace} data-layout={layout}>
-        <NavRail
+    return <div className={"flex h-screen overflow-hidden " + ("flex-col" if layout == "topbar" or layout == "deck" or layout == "split" else "")} data-ws={workspace} data-layout={layout}>
+        {layout == "split" and <NavRail
+            workspace={workspace} section={sections[workspace]}
+            onWorkspace={goWorkspace} onSection={go}
+            layout={layout} onLayout={applyLayout}
+            loadedInfo={loadedInfo} ramGb={ramGb} part="top"
+        />}
+        {layout != "split" and <NavRail
             workspace={workspace} section={sections[workspace]}
             onWorkspace={goWorkspace} onSection={go}
             layout={layout} onLayout={applyLayout}
             loadedInfo={loadedInfo} ramGb={ramGb}
-        />
+        />}
         <div className={"flex min-h-0 min-w-0 flex-1 " + ("pb-16" if layout == "dock" else "")}>
+            {layout == "split" and <NavRail
+                workspace={workspace} section={sections[workspace]}
+                onWorkspace={goWorkspace} onSection={go}
+                layout={layout} onLayout={applyLayout}
+                loadedInfo={loadedInfo} ramGb={ramGb} part="side"
+            />}
             <div className={slot("01", "chat")}><Chat workspace="01" defaultModel={str(WS_DEFAULT_MODEL["01"])} /></div>
             <div className={slot("01", "data")}><Data active={workspace == "01" and str(sections["01"]) == "data"} /></div>
             <div className={slot("01", "train")}><Train active={workspace == "01" and str(sections["01"]) == "train"} /></div>

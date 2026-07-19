@@ -4,7 +4,8 @@ needs to reach any other component; AppShell re-applies the stored theme at
 boot (before NavRail mounts) to cover the loading/offline screens."""
 
 glob THEMES: list[str] = [
-    "terminal", "shadcn-light", "shadcn-dark", "linear", "paper", "gruvbox", "high-contrast"
+    "terminal", "shadcn-light", "shadcn-dark", "linear", "paper",
+    "gruvbox", "high-contrast", "nord", "dracula", "solarized-light", "rose-pine"
 ];
 
 def:pub ThemeSwitcher(up: bool = True) -> JsxElement {

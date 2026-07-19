@@ -133,16 +133,44 @@ def StatusBlock(info: any = None, ramGb: any = None) -> JsxElement {
 def:pub NavRail(
     workspace: str, section: str,
     onWorkspace: Callable[([str], None)], onSection: Callable[([str], None)],
-    layout: str = "rail",
+    layout: str = "split",
     onLayout: Callable[([str], None)] = None,
     loadedInfo: any = None,
-    ramGb: float = 0.0
+    ramGb: float = 0.0,
+    part: str = ""
 ) -> JsxElement {
     slim = layout == "icons";
 
+    # split · the signature layout: workspaces CENTERED in a slim top bar
+    # (brand left, switchers right), sections in a left rail. AppShell renders
+    # NavRail twice for it: part="top" and part="side".
+    if layout == "split" and part == "top" {
+        return <nav className="grid h-12 w-full shrink-0 grid-cols-[1fr_auto_1fr] items-center border-b border-border bg-card px-4">
+            <span className="micro-label justify-self-start">JAC MODEL STUDIO</span>
+            <div className="flex items-center gap-1 justify-self-center rounded-lg border border-border bg-background p-1">
+                {for w in WS_ORDER {
+                    <WsBtn key={w} w={w} workspace={workspace} onWorkspace={onWorkspace} slim={False} horizontal={True} />
+                }}
+            </div>
+            <div className="flex items-center gap-2 justify-self-end">
+                {onLayout and <LayoutSwitcher layout={layout} onLayout={onLayout} up={False} />}
+                <ThemeSwitcher up={False} />
+            </div>
+        </nav>;
+    }
+    if layout == "split" and part == "side" {
+        return <nav className="flex w-44 shrink-0 flex-col gap-1 border-r border-border bg-card px-2 py-4">
+            <span className="micro-label mb-2 px-2 text-muted-foreground/70">{str(WS_NAME[workspace])}</span>
+            {for s in list(SECTIONS[workspace]) {
+                <SecBtn key={s} s={s} section={section} onSection={onSection} slim={False} horizontal={False} />
+            }}
+            <div className="flex-1" />
+        </nav>;
+    }
+
     if layout == "topbar" {
         return <nav className="flex h-12 w-full shrink-0 items-center gap-1 border-b border-border bg-card px-3">
-            <span className="micro-label mr-3">JAC·ML STUDIO</span>
+            <span className="micro-label mr-3">JAC MODEL STUDIO</span>
             {for w in WS_ORDER {
                 <WsBtn key={w} w={w} workspace={workspace} onWorkspace={onWorkspace} slim={False} horizontal={True} />
             }}
@@ -161,7 +189,7 @@ def:pub NavRail(
         # active workspace's sections as underline tabs.
         return <nav className="flex w-full shrink-0 flex-col border-b border-border bg-card">
             <div className="flex h-11 items-center gap-1 border-b border-border/50 px-3">
-                <span className="micro-label mr-3">JAC·ML STUDIO</span>
+                <span className="micro-label mr-3">JAC MODEL STUDIO</span>
                 {for w in WS_ORDER {
                     <WsBtn key={w} w={w} workspace={workspace} onWorkspace={onWorkspace} slim={False} horizontal={True} />
                 }}
@@ -208,7 +236,7 @@ def:pub NavRail(
     if layout == "cockpit" { width = "w-64"; }
 
     return <nav className={"flex shrink-0 flex-col border-r border-border bg-card px-2 py-3 " + width}>
-        <span className={"micro-label mb-4 " + ("px-0 text-center" if slim else "px-2")}>{"J·ML" if slim else "JAC·ML STUDIO"}</span>
+        <span className={"micro-label mb-4 " + ("px-0 text-center" if slim else "px-2")}>{"JMS" if slim else "JAC MODEL STUDIO"}</span>
         <div className="flex flex-col gap-1">
             {for w in WS_ORDER {
                 <WsBtn key={w} w={w} workspace={workspace} onWorkspace={onWorkspace} slim={slim} horizontal={False} />

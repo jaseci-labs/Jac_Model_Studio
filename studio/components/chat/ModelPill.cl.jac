@@ -35,7 +35,7 @@ def:pub ModelPill(
     has pickerOpen: bool = False,
         cmpOpen: bool = False;
 
-    return <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
+    return <div className="section-header flex items-center justify-between border-b border-border px-4 py-2.5">
         <div className="flex items-center gap-2">
             <div className="relative">
                 <button

@@ -13,6 +13,7 @@ import from persistence {
 import from data { FileRefView, DataRowView, dataset_stats, dataset_files, dataset_rows, add_examples, rl_dataset_files, rl_dataset_rows }
 import from builders { BuilderView, list_builders, run_builder }
 import from prompts { list_prompts }
+import from gallery { list_galleries, gallery_images }
 import from evals { EvalView, create_eval, list_evals, get_eval, stop_eval, delete_eval }
 # Training control + read-only run metrics — consumed by the TRAIN section's
 # `sv import` RPC stubs, so register them at the top level.

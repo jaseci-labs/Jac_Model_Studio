@@ -19,6 +19,7 @@ import from "recharts" {
 }
 import from ..shared.Panel { Panel }
 import from ..shared.SectionHeader { SectionHeader }
+import from ..shared.Gallery { Gallery }
 import from ...lib.chartkit {
     tick, tipContentStyle, tipLabelStyle, tipItemStyle, tipCursor,
     gridStroke, axisStroke
@@ -400,6 +401,7 @@ def:pub Results -> JsxElement {
                     }}
                 </div>
             </Panel>
+            <Gallery prefix="02-rl-grpo" />
         </div>
     </div>;
 }

@@ -78,7 +78,7 @@ def:pub Plan(workspace: str = "03") -> JsxElement {
     phases: list = list(WS_PHASES[workspace]);
     checklist: list = list(WS_CHECKLIST[workspace]);
     return <div className="flex h-full min-w-0 flex-1 flex-col">
-        <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
+        <div className="section-header flex items-center justify-between border-b border-border px-4 py-2.5">
             <span className="micro-label">{str(TITLES[workspace])}</span>
         </div>
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">

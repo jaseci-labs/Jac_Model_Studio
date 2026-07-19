@@ -17,6 +17,7 @@ import from ..shared.LogView { LogView }
 import from ..shared.StatTile { StatTile }
 import from ..shared.Button { Button }
 import from ..shared.Chip { Chip }
+import from ..shared.Gallery { Gallery }
 
 def _stripModels(m: str) -> str {
     if m.startswith("models/") { return m[7:]; }
@@ -445,8 +446,8 @@ def:pub Evals(active: bool = False) -> JsxElement {
     }
 
     return <div className="flex h-full min-w-0 flex-1 flex-col">
-        <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
-            <span className="micro-label">EVALS</span>
+        <div className="section-header flex items-center justify-between border-b border-border px-4 py-2.5">
+            <span className="micro-label">RESULTS · EVAL RUNS</span>
         </div>
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
             <div className="grid gap-4" style={{"gridTemplateColumns": "360px 1fr"}}>
@@ -457,6 +458,7 @@ def:pub Evals(active: bool = False) -> JsxElement {
                 {_history()}
                 {_compare()}
             </div>
+            <Gallery prefix="01-sft-dpo" />
         </div>
     </div>;
 }

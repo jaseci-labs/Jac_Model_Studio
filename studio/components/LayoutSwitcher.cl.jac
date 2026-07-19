@@ -2,8 +2,9 @@
 by AppShell (structure changes need a re-render up there, unlike themes which
 are pure CSS); persists to localStorage("jacml.layout")."""
 
-glob LAYOUTS: list[str] = ["rail", "icons", "cockpit", "topbar", "deck", "dock"];
+glob LAYOUTS: list[str] = ["split", "rail", "icons", "cockpit", "topbar", "deck", "dock"];
 glob BLURB: dict = {
+    "split": "workspaces on top · sections aside",
     "rail": "compact sidebar",
     "icons": "icons only · max content",
     "cockpit": "wide sidebar · live status",

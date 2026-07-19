@@ -1,4 +1,4 @@
-# Jac ML Studio
+# Jac Model Studio
 
 One-stop local ML workbench for the Jac fine-tuning project: chat with the
 trained models, launch + monitor training, run the data pipeline, and run

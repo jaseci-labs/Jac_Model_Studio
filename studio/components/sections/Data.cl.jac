@@ -227,7 +227,7 @@ def:pub Data(active: bool = False) -> JsxElement {
     }
 
     return <div className="flex h-full min-w-0 flex-1 flex-col">
-        <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
+        <div className="section-header flex items-center justify-between border-b border-border px-4 py-2.5">
             <span className="micro-label">DATA · SFT/DPO DATASET</span>
             {runningStage and <span key="running" className="micro-label pulse text-foreground/80">⦿ {runningStage}</span>}
         </div>

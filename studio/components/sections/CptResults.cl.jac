@@ -9,6 +9,7 @@ import from ..shared.StatusGlyph { StatusGlyph }
 import from ..shared.MonoChart { MonoChart }
 import from ..shared.EmptyState { EmptyState }
 import from ..shared.SectionHeader { SectionHeader }
+import from ..shared.Gallery { Gallery }
 
 glob RUNS: list[str] = ["cpt-v1", "cpt-v2"];
 
@@ -70,6 +71,7 @@ def:pub CptResults(active: bool = False) -> JsxElement {
                 </div>
                 skip;
             }}
+            <Gallery prefix="03-new" />
             <div className="stat-line text-muted-foreground/70">checkpoint verdicts + analysis live in PLAN and 03-new/docs · curves are the same train.log TRAIN reads</div>
         </div>
     </div>;
