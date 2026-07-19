@@ -81,16 +81,16 @@ def:pub RlData -> JsxElement {
     }
 
     return <div className="flex h-full min-w-0 flex-1 flex-col">
-        <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-2.5">
+        <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
             <span className="micro-label">DATA · RL TRAINING SETS (read-only)</span>
-            <span className="micro-label text-neutral-600">02-rl-grpo/dataset</span>
+            <span className="micro-label text-muted-foreground/70">02-rl-grpo/dataset</span>
         </div>
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
             <div className="flex flex-wrap items-center gap-2">
-                <span className="micro-label text-neutral-600">SOURCE</span>
+                <span className="micro-label text-muted-foreground/70">SOURCE</span>
                 <Segmented options={RL_SOURCES} value={rlSource} onSet={lambda v: str { switchSource(v); }} />
             </div>
-            <div className="stat-line text-neutral-600">RL training data (read-only) — SFT gold · GRPO reward tasks · python→jac · synthetic · splits. See RL_FINDINGS.md.</div>
+            <div className="stat-line text-muted-foreground/70">RL training data (read-only) — SFT gold · GRPO reward tasks · python→jac · synthetic · splits. See RL_FINDINGS.md.</div>
             <RowBrowser
                 files={files} path={path} rows={rows} offset={offset}
                 total={total} expanded={expanded}

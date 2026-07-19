@@ -10,8 +10,16 @@ sv import from ...cpt { cpt_manifest, cpt_files, cpt_rows }
 import from ..shared.StatTile { StatTile }
 import from ..shared.RowBrowser { RowBrowser }
 
-# Grayscale ramp for the composition bar (light→dark, ordered like SRC_ORDER).
-glob SHADES: list[str] = ["#ededed", "#b8b8b8", "#888888", "#5a5a5a", "#3a3a3a"];
+# Foreground-opacity ramp for the composition bar (strong→faint, ordered like
+# SRC_ORDER) — tracks --foreground so the 5 steps stay distinguishable in both
+# light and dark themes.
+glob SHADES: list[str] = [
+    "color-mix(in srgb, var(--foreground) 90%, transparent)",
+    "color-mix(in srgb, var(--foreground) 70%, transparent)",
+    "color-mix(in srgb, var(--foreground) 50%, transparent)",
+    "color-mix(in srgb, var(--foreground) 35%, transparent)",
+    "color-mix(in srgb, var(--foreground) 20%, transparent)"
+];
 
 def _k(n: int) -> str {
     # compact token count: 1970952 -> "1.97M", 64451 -> "64.5K"
@@ -111,8 +119,8 @@ def:pub CptData -> JsxElement {
             return <span></span>;
         }
         srcs: list = list(man["sources"]);
-        return <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-3 pt-4">
-            <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">TOKEN.COMPOSITION</span>
+        return <div className="relative rounded-md border border-border bg-card p-3 pt-4">
+            <span className="micro-label absolute -top-2 left-3 bg-background px-2">TOKEN.COMPOSITION</span>
             <div className="flex h-4 w-full overflow-hidden rounded-sm">
                 {for s in srcs {
                     <div
@@ -124,7 +132,7 @@ def:pub CptData -> JsxElement {
             </div>
             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
                 {for s in srcs {
-                    <span key={str(s["name"])} className="stat-line flex items-center gap-1.5 text-neutral-500">
+                    <span key={str(s["name"])} className="stat-line flex items-center gap-1.5 text-muted-foreground">
                         <span style={{"display": "inline-block", "width": 8, "height": 8, "background": str(s["shade"])}}></span>
                         {str(s["name"])} {str(int(s["pct"]) / 10.0)}%
                     </span>
@@ -141,12 +149,12 @@ def:pub CptData -> JsxElement {
         decon: list = list(man["decontam"]);
         dropped = 0;
         for d in decon { dropped += int(d["dropped"]); }
-        return <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-3 pt-4">
-            <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">CODE.GATE · jac check -p per repo</span>
+        return <div className="relative rounded-md border border-border bg-card p-3 pt-4">
+            <span className="micro-label absolute -top-2 left-3 bg-background px-2">CODE.GATE · jac check -p per repo</span>
             <div className="overflow-x-auto">
                 <table className="w-full font-mono text-xs">
                     <thead>
-                        <tr className="text-neutral-500">
+                        <tr className="text-muted-foreground">
                             <th className="py-1 text-left">repo</th>
                             <th className="text-right">files</th>
                             <th className="text-right">passed</th>
@@ -155,26 +163,26 @@ def:pub CptData -> JsxElement {
                     </thead>
                     <tbody>
                         {for g in gate {
-                            <tr key={str(g["repo"])} className="border-t border-neutral-900 text-neutral-300">
+                            <tr key={str(g["repo"])} className="border-t border-border/50 text-foreground/80">
                                 <td className="py-1">{g["repo"]}</td>
-                                <td className="text-right text-neutral-500">{str(g["files"])}</td>
-                                <td className="text-right text-neutral-100">{str(g["passed"])}</td>
-                                <td className="text-right text-neutral-500">{str(g["pct"])}%</td>
+                                <td className="text-right text-muted-foreground">{str(g["files"])}</td>
+                                <td className="text-right text-foreground">{str(g["passed"])}</td>
+                                <td className="text-right text-muted-foreground">{str(g["pct"])}%</td>
                             </tr>
                         }}
                     </tbody>
                 </table>
             </div>
-            <div className="stat-line mt-2 text-neutral-600">
+            <div className="stat-line mt-2 text-muted-foreground/70">
                 decontam dropped {str(dropped)} (14-gram containment ≥0.5 vs RL holdouts) · packed {str(man["packed"]["train"])}/{str(man["packed"]["valid"])} · seq {str(man["seq_len"])} · split {str(man["split"])} · EOS {str(man["eos_token"])} · {str(man["n_repos"])} repos
             </div>
         </div>;
     }
 
     return <div className="flex h-full min-w-0 flex-1 flex-col">
-        <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-2.5">
+        <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
             <span className="micro-label">DATA · CPT CORPUS (read-only)</span>
-            <span className="micro-label text-neutral-600">03-new/dataset/cpt</span>
+            <span className="micro-label text-muted-foreground/70">03-new/dataset/cpt</span>
         </div>
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
             {_tiles()}

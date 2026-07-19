@@ -37,39 +37,39 @@ glob CHECKLIST: list[dict] = [
 
 def:pub Plan -> JsxElement {
     return <div className="flex h-full min-w-0 flex-1 flex-col">
-        <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-2.5">
+        <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
             <span className="micro-label">PLAN · CPT → SFT/DPO → GRPO</span>
-            <span className="micro-label text-neutral-600">03-new/docs/cpt-1/workflow.md</span>
+            <span className="micro-label text-muted-foreground/70">03-new/docs/cpt-1/workflow.md</span>
         </div>
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
-            <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-3 pt-4">
-                <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">PHASES</span>
+            <div className="relative rounded-md border border-border bg-card p-3 pt-4">
+                <span className="micro-label absolute -top-2 left-3 bg-background px-2">PHASES</span>
                 <div className="relative flex flex-col gap-0.5 pl-3">
-                    <div className="absolute bottom-1 left-0 top-1 w-px bg-neutral-800"></div>
+                    <div className="absolute bottom-1 left-0 top-1 w-px bg-border"></div>
                     {for p in PHASES {
                         <div key={str(p["id"])} className="flex items-start gap-3 rounded px-2 py-1.5">
                             <span className="mt-0.5 shrink-0"><StatusGlyph status={str(p["status"])} showLabel={False} /></span>
-                            <span className="shrink-0 font-mono text-xs text-neutral-600" style={{"width": 26}}>{str(p["id"])}</span>
+                            <span className="shrink-0 font-mono text-xs text-muted-foreground/70" style={{"width": 26}}>{str(p["id"])}</span>
                             <div className="flex flex-col gap-0.5">
-                                <span className="font-mono text-xs text-neutral-200">{str(p["title"])}</span>
-                                <span className="stat-line text-neutral-500">{str(p["note"])}</span>
+                                <span className="font-mono text-xs text-foreground">{str(p["title"])}</span>
+                                <span className="stat-line text-muted-foreground">{str(p["note"])}</span>
                             </div>
                         </div>
                     }}
                 </div>
             </div>
 
-            <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-3 pt-4">
-                <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">CHECKLIST</span>
+            <div className="relative rounded-md border border-border bg-card p-3 pt-4">
+                <span className="micro-label absolute -top-2 left-3 bg-background px-2">CHECKLIST</span>
                 <div className="flex flex-col gap-1">
                     {for c in CHECKLIST {
                         <div key={str(c["t"])} className="flex items-center gap-2 font-mono text-xs">
-                            <span className={"shrink-0 " + ("text-neutral-100" if c["done"] else "text-neutral-600")}>{"✓" if c["done"] else "○"}</span>
-                            <span className={"text-neutral-300" if c["done"] else "text-neutral-500"}>{str(c["t"])}</span>
+                            <span className={"shrink-0 " + ("text-foreground" if c["done"] else "text-muted-foreground/70")}>{"✓" if c["done"] else "○"}</span>
+                            <span className={"text-foreground/80" if c["done"] else "text-muted-foreground"}>{str(c["t"])}</span>
                         </div>
                     }}
                 </div>
-                <div className="stat-line mt-3 text-neutral-600">status hardcoded to on-disk reality · source of truth: 03-new/docs/cpt-1/workflow.md</div>
+                <div className="stat-line mt-3 text-muted-foreground/70">status hardcoded to on-disk reality · source of truth: 03-new/docs/cpt-1/workflow.md</div>
             </div>
         </div>
     </div>;

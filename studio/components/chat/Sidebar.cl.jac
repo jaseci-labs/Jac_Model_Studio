@@ -4,6 +4,8 @@ Chats are grouped by day (most-recent first) under TODAY / ISO-date micro-labels
 each row reveals a DEL action on hover. The footer MEM gauge shows resident vs
 total RAM as `{used} / {ram} GB` plus an 8-cell ▮/░ bar."""
 
+import from ..shared.Button { Button }
+
 def _repeat(ch: str, n: int) -> str {
     s = "";
     i = 0;
@@ -28,16 +30,20 @@ def _groups(chats: list) -> list[dict] {
     return out;
 }
 
-def _mem_gauge(used: float, total: float) -> JsxElement {
+# JsxElement defs compile to props-object components — params must be optional
+# and call sites pass one dict (the _cell/_cmpRow idiom in Train/Evals).
+def _mem_gauge(used: any = None, total: any = None) -> JsxElement {
+    u = float(str(used or 0.0));
+    t = float(str(total or 0.0));
     filled = 0;
-    if total > 0.0 {
-        filled = int(round(used / total * 8.0));
+    if t > 0.0 {
+        filled = int(round(u / t * 8.0));
     }
     if filled > 8 { filled = 8; }
     if filled < 0 { filled = 0; }
-    return <div className="dashed-rule pt-3 font-mono text-[10px] text-neutral-500">
-        MEM {f"{used:.1f}"} / {str(int(total))} GB{" "}
-        <span className="text-neutral-300">{_repeat("▮", filled)}</span>{_repeat("░", 8 - filled)}
+    return <div className="dashed-rule pt-3 font-mono text-[10px] text-muted-foreground">
+        MEM {f"{u:.1f}"} / {str(int(t))} GB{" "}
+        <span className="text-foreground/80">{_repeat("▮", filled)}</span>{_repeat("░", 8 - filled)}
     </div>;
 }
 
@@ -52,18 +58,19 @@ def:pub Sidebar(
     onOpen: Callable[([str], None)],
     onDelete: Callable[([str], None)]
 ) -> JsxElement {
-    return <aside className="flex w-56 shrink-0 flex-col border-r border-neutral-800 bg-[#0d0d0d] p-3">
+    return <aside className="flex w-56 shrink-0 flex-col border-r border-border bg-card p-3">
         <div className="micro-label mb-3">JAC.STUDIO · fig.1</div>
-        <button
+        <Button
+            variant="outline"
             onClick={lambda e: MouseEvent { if not busy { onNew(); } }}
             disabled={busy}
-            className="mb-3 rounded-md border border-dashed border-neutral-600 py-1.5 text-xs text-neutral-300 hover:border-neutral-400 disabled:opacity-40"
+            className="mb-3"
         >
             + new chat
-        </button>
+        </Button>
         <div className="flex-1 overflow-y-auto">
             {if len(chats) == 0 {
-                <p className="px-2 font-mono text-[10px] text-neutral-600">no chats yet</p>
+                <p key="empty" className="px-2 font-mono text-[10px] text-muted-foreground/70">no chats yet</p>
                 skip;
             }}
             {for grp in _groups(chats) {
@@ -75,15 +82,16 @@ def:pub Sidebar(
                                 key={str(c.id)}
                                 onClick={lambda e: MouseEvent { if not busy { onOpen(str(c.id)); } }}
                                 className={"group flex cursor-pointer items-center justify-between rounded-md px-2 py-1.5 text-xs " + (
-                                    "bg-[#1a1a1a] text-neutral-100" if str(c.id) == activeId
-                                    else "text-neutral-400 hover:bg-[#141414]"
+                                    "bg-accent text-foreground" if str(c.id) == activeId
+                                    else "text-muted-foreground hover:bg-muted"
                                 ) + (" opacity-50" if busy else "")}
                             >
                                 <span className="truncate" title={str(c.title)}>{c.title if c.title else "untitled"}</span>
-                                <button
+                                <Button
+                                    variant="ghost"
                                     onClick={lambda e: MouseEvent { e.stopPropagation(); if not busy { onDelete(str(c.id)); } }}
-                                    className="hidden font-mono text-[9px] text-neutral-600 hover:text-neutral-300 group-hover:block"
-                                >DEL</button>
+                                    className="hidden px-1 py-0 group-hover:block"
+                                >DEL</Button>
                             </div>
                         }}
                     </div>

@@ -27,7 +27,7 @@ def _glyph(s: str) -> JsxElement {
     }
     if s == "train" {
         return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.25">
-            <path d="M2 13h12" stroke="#444" />
+            <path d="M2 13h12" stroke="var(--input)" />
             <path d="M2 3c3 0 3 7 6 7 2 0 3-2 6-2" />
         </svg>;
     }
@@ -60,7 +60,7 @@ def _glyph(s: str) -> JsxElement {
     }
     # results (also the old rl fallback): sparkline + point
     return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.25">
-        <path d="M2 13h12" stroke="#444" />
+        <path d="M2 13h12" stroke="var(--input)" />
         <path d="M2 11l3-3 3 2 5-6" strokeLinejoin="miter" />
         <circle cx="13" cy="4" r="1.2" fill="currentColor" stroke="none" />
     </svg>;
@@ -70,7 +70,7 @@ def:pub NavRail(
     workspace: str, section: str,
     onWorkspace: Callable[([str], None)], onSection: Callable[([str], None)]
 ) -> JsxElement {
-    return <nav className="flex w-40 shrink-0 flex-col border-r border-neutral-800 bg-[#0d0d0d] px-2 py-3">
+    return <nav className="flex w-40 shrink-0 flex-col border-r border-border bg-card px-2 py-3">
         <span className="micro-label mb-4 px-2">JAC·ML STUDIO</span>
         <div className="flex flex-col gap-1">
             {for w in WS_ORDER {
@@ -78,8 +78,8 @@ def:pub NavRail(
                     key={w}
                     onClick={lambda e: MouseEvent { onWorkspace(w); }}
                     className={"relative flex h-9 items-center gap-2.5 rounded-md px-3 transition-colors " + (
-                        "bg-[#161616] text-neutral-100" if w == workspace
-                        else "text-neutral-500 hover:bg-[#121212] hover:text-neutral-300"
+                        "bg-muted text-foreground" if w == workspace
+                        else "text-muted-foreground hover:bg-popover hover:text-foreground/80"
                     )}
                 >
                     {w == workspace and <span className="absolute left-0 top-2 bottom-2 w-[2px]" style={{"background": "var(--ws-accent)"}} />}
@@ -95,8 +95,8 @@ def:pub NavRail(
                     key={s}
                     onClick={lambda e: MouseEvent { onSection(s); }}
                     className={"relative flex h-9 items-center gap-3 rounded-md px-3 transition-colors " + (
-                        "bg-[#161616] text-neutral-100" if s == section
-                        else "text-neutral-600 hover:bg-[#121212] hover:text-neutral-300"
+                        "bg-muted text-foreground" if s == section
+                        else "text-muted-foreground/70 hover:bg-popover hover:text-foreground/80"
                     )}
                 >
                     {s == section and <span className="absolute left-0 top-2 bottom-2 w-[2px]" style={{"background": "var(--ws-accent)"}} />}

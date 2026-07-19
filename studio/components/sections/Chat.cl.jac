@@ -193,7 +193,11 @@ def:pub Chat(workspace: str, defaultModel: str) -> JsxElement {
             );
             reader: any = resp.body.getReader();
             activeReader = reader;
-            dec: any = new(TextDecoder);
+            # `new(TextDecoder)` trips the checker (E1053: unresolvable JS global as a
+            # class); Reflect.construct(TextDecoder, []) is the same `new TextDecoder()`.
+            refl: any = Reflect;
+            tdCls: any = TextDecoder;
+            dec: any = refl.construct(tdCls, []);
             nl = String.fromCharCode(10);
             sep = nl + nl;
             buf = "";

@@ -14,9 +14,10 @@ import from ..shared.StatusGlyph { StatusGlyph }
 import from ..shared.StatTile { StatTile }
 import from ..shared.LogView { LogView }
 import from ..shared.MonoChart { MonoChart }
+import from ..shared.Button { Button }
 
 glob RUN_NAME: str = "cpt-v1";
-glob CC: dict = {"loss": "#d8a657", "lr": "#7aa2f7", "tps": "#6fc3b2"};
+glob CC: dict = {"loss": "var(--chart-2)", "lr": "var(--chart-1)", "tps": "var(--chart-5)"};
 
 def _fix(v: any, n: int) -> str {
     return str(v.toFixed(n));
@@ -88,16 +89,15 @@ def:pub CptTrain(active: bool) -> JsxElement {
 
     def _feedChip() -> JsxElement {
         if feed == "live" {
-            return <span className="font-mono text-[10px] tracking-widest text-neutral-100">⦿ LIVE</span>;
+            return <span className="font-mono text-[10px] tracking-widest text-foreground">⦿ LIVE</span>;
         }
         if feed == "stalled" {
-            return <span className="font-mono text-[10px] tracking-widest text-neutral-400">⦿ STALLED {str(stalledFor)}s</span>;
+            return <span className="font-mono text-[10px] tracking-widest text-muted-foreground">⦿ STALLED {str(stalledFor)}s</span>;
         }
-        return <span className="font-mono text-[10px] tracking-widest text-neutral-600">○ NO FEED</span>;
+        return <span className="font-mono text-[10px] tracking-widest text-muted-foreground/70">○ NO FEED</span>;
     }
 
     isRunning = status is not None and str(status["status"]) == "running";
-    btn = "rounded-lg border border-neutral-600 px-3 py-1 font-mono text-[10px] transition-colors hover:border-neutral-400 disabled:opacity-30 ";
 
     lastIter = int(str(status["last_iter"])) if status is not None else 0;
     totalIters = int(str(status["total_iters"])) if status is not None else 2586;
@@ -116,11 +116,11 @@ def:pub CptTrain(active: bool) -> JsxElement {
     lastTps: any = tps[len(tps) - 1] if len(tps) > 0 else None;
 
     return <div className="flex h-full min-w-0 flex-1 flex-col">
-        <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-2.5">
+        <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
             <span className="micro-label">TRAIN · CPT LoRA (cpt-v1)</span>
             <div className="flex items-center gap-3">
                 {_feedChip()}
-                <span className="micro-label text-neutral-600">TRAIN.CTL</span>
+                <span className="micro-label text-muted-foreground/70">TRAIN.CTL</span>
             </div>
         </div>
 
@@ -132,23 +132,23 @@ def:pub CptTrain(active: bool) -> JsxElement {
                 <StatTile label="TOK/S" value={_fix(lastTps["y"], 0) if lastTps is not None else "·"} sub="" dim={False} />
             </div>
 
-            <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-3 pt-4">
-                <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">RUN.CTL</span>
+            <div className="relative rounded-md border border-border bg-card p-3 pt-4">
+                <span className="micro-label absolute -top-2 left-3 bg-background px-2">RUN.CTL</span>
                 <div className="flex items-center gap-3">
                     <StatusGlyph status={str(status["status"]) if status is not None else "idle"} showLabel={True} />
-                    <div className="h-1 flex-1 rounded-full bg-neutral-800">
-                        <div className="h-1 rounded-full bg-neutral-300 transition-all" style={{"width": _fix(pct, 1) + "%"}}></div>
+                    <div className="h-1 flex-1 rounded-full bg-accent">
+                        <div className="h-1 rounded-full bg-primary transition-all" style={{"width": _fix(pct, 1) + "%"}}></div>
                     </div>
                 </div>
-                {status is not None and status["message"] and <p className="stat-line mt-2 text-neutral-500">{str(status["message"])}</p>}
-                {leg > 0 and <p className="stat-line mt-1 text-neutral-500">LEG {str(leg)}/{str(legCeiling)}</p>}
-                {status is not None and str(status["started"]) and <p className="stat-line mt-1 text-neutral-600">STARTED {str(status["started"])}{(" · PID " + str(status["pid"])) if int(str(status["pid"])) > 0 else ""}</p>}
+                {status is not None and status["message"] and <p className="stat-line mt-2 text-muted-foreground">{str(status["message"])}</p>}
+                {leg > 0 and <p className="stat-line mt-1 text-muted-foreground">LEG {str(leg)}/{str(legCeiling)}</p>}
+                {status is not None and str(status["started"]) and <p className="stat-line mt-1 text-muted-foreground/70">STARTED {str(status["started"])}{(" · PID " + str(status["pid"])) if int(str(status["pid"])) > 0 else ""}</p>}
                 <div className="mt-3 flex gap-2">
-                    <button onClick={lambda e: MouseEvent { doStart(); }} disabled={isRunning} className={btn + "text-neutral-100"}>▶ START / RESUME</button>
-                    <button onClick={lambda e: MouseEvent { doStop(); }} disabled={not isRunning} className={btn + "text-neutral-400"}>■ STOP</button>
+                    <Button variant="solid" onClick={lambda e: MouseEvent { doStart(); }} disabled={isRunning}>▶ START / RESUME</Button>
+                    <Button variant="outline" onClick={lambda e: MouseEvent { doStop(); }} disabled={not isRunning}>■ STOP</Button>
                 </div>
-                {error and <p className="stat-line mt-1 text-neutral-400">{error}</p>}
-                <p className="stat-line mt-2 text-neutral-600">3 epochs over 862 windows (2586 iters) · resumes from the last checkpoint if stopped and restarted</p>
+                {error and <p className="stat-line mt-1 text-muted-foreground">{error}</p>}
+                <p className="stat-line mt-2 text-muted-foreground/70">3 epochs over 862 windows (2586 iters) · resumes from the last checkpoint if stopped and restarted</p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -157,7 +157,7 @@ def:pub CptTrain(active: bool) -> JsxElement {
                 <MonoChart title="TOKENS/SEC" data={tps} secondary={[]} live={feed == "live"} accent={str(CC["tps"])} expY={False} />
             </div>
 
-            <LogView text={status is not None and status["log_tail"] and str(status["log_tail"]) or ""} maxH="16rem" />
+            <LogView text={str(status["log_tail"]) if status is not None and status["log_tail"] else ""} maxH="16rem" />
         </div>
     </div>;
 }

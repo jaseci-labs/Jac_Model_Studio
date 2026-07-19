@@ -7,10 +7,24 @@ were copy-pasted across MonoChart, MultiLineChart, Train, and Results.
 
 glob MONO: str = "var(--font-mono)";
 
+# Module-internal: globs don't survive the JS module boundary — consumers use
+# chartColors()/chartColor(i)/gridStroke()/axisStroke().
 glob CHART_COLORS: list[str] = [
     "var(--chart-1)", "var(--chart-2)", "var(--chart-3)",
     "var(--chart-4)", "var(--chart-5)", "var(--chart-6)"
 ];
+
+def:pub chartColors() -> list[str] {
+    return CHART_COLORS;
+}
+
+def:pub gridStroke() -> str {
+    return "var(--border)";
+}
+
+def:pub axisStroke() -> str {
+    return "var(--input)";
+}
 
 """Axis tick style."""
 def:pub tick() -> dict {
@@ -36,9 +50,6 @@ def:pub tipItemStyle() -> dict {
 def:pub tipCursor() -> dict {
     return {"stroke": "var(--input)", "strokeDasharray": "3 3"};
 }
-
-glob GRID_STROKE: str = "var(--border)";
-glob AXIS_STROKE: str = "var(--input)";
 
 """Nth chart color (wraps)."""
 def:pub chartColor(i: int) -> str {

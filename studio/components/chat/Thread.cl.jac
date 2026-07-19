@@ -9,70 +9,70 @@ Prose segments (headers/bold/lists/tables/links -- anything outside a fenced
 ```code``` block) render through react-markdown + remark-gfm instead of a flat
 whitespace-pre-wrap <p>, so a model's markdown formatting actually shows up
 instead of raw ** and | characters. Component overrides below map each
-markdown element to the app's existing monochrome Tailwind tokens (same
-neutral-800/900 borders and text-neutral-200/500 scale as CodeBlock uses)
-rather than pulling in the Tailwind Typography plugin, which would fight this
-app's deliberately custom look.
+markdown element to the app's semantic design tokens (same border / foreground /
+muted-foreground scale as CodeBlock uses) rather than pulling in the Tailwind
+Typography plugin, which would fight this app's deliberately custom look.
 """
 
 cl import from "react-markdown" { default as Markdown }
 cl import from "remark-gfm" { default as remarkGfm }
+import from ..shared.CodeBlock { CodeBlock }
 
 def _mdH1(props: any) -> JsxElement {
-    return <h2 className="mb-2 mt-3 text-base font-semibold text-neutral-100 first:mt-0">{props.children}</h2>;
+    return <h2 className="mb-2 mt-3 text-base font-semibold text-foreground first:mt-0">{props.children}</h2>;
 }
 def _mdH2(props: any) -> JsxElement {
-    return <h3 className="mb-2 mt-3 text-sm font-semibold text-neutral-100 first:mt-0">{props.children}</h3>;
+    return <h3 className="mb-2 mt-3 text-sm font-semibold text-foreground first:mt-0">{props.children}</h3>;
 }
 def _mdH3(props: any) -> JsxElement {
-    return <h4 className="mb-1.5 mt-2.5 text-sm font-semibold text-neutral-200 first:mt-0">{props.children}</h4>;
+    return <h4 className="mb-1.5 mt-2.5 text-sm font-semibold text-foreground first:mt-0">{props.children}</h4>;
 }
 def _mdP(props: any) -> JsxElement {
-    return <p className="mb-2 text-sm leading-relaxed text-neutral-200 last:mb-0">{props.children}</p>;
+    return <p className="mb-2 text-sm leading-relaxed text-foreground last:mb-0">{props.children}</p>;
 }
 def _mdUl(props: any) -> JsxElement {
-    return <ul className="mb-2 ml-4 list-disc space-y-1 text-sm leading-relaxed text-neutral-200">{props.children}</ul>;
+    return <ul className="mb-2 ml-4 list-disc space-y-1 text-sm leading-relaxed text-foreground">{props.children}</ul>;
 }
 def _mdOl(props: any) -> JsxElement {
-    return <ol className="mb-2 ml-4 list-decimal space-y-1 text-sm leading-relaxed text-neutral-200">{props.children}</ol>;
+    return <ol className="mb-2 ml-4 list-decimal space-y-1 text-sm leading-relaxed text-foreground">{props.children}</ol>;
 }
 def _mdLi(props: any) -> JsxElement {
     return <li className="pl-1">{props.children}</li>;
 }
 def _mdStrong(props: any) -> JsxElement {
-    return <strong className="font-semibold text-neutral-50">{props.children}</strong>;
+    return <strong className="font-semibold text-foreground">{props.children}</strong>;
 }
 def _mdEm(props: any) -> JsxElement {
-    return <em className="italic text-neutral-200">{props.children}</em>;
+    return <em className="italic text-foreground">{props.children}</em>;
 }
 def _mdCode(props: any) -> JsxElement {
-    return <code className="rounded bg-[#121212] px-1 py-0.5 font-mono text-xs text-neutral-200">{props.children}</code>;
+    return <code className="rounded bg-popover px-1 py-0.5 font-mono text-xs text-foreground">{props.children}</code>;
 }
 def _mdA(props: any) -> JsxElement {
     return <a
         href={props.href}
         target="_blank"
         rel="noreferrer"
-        className="text-neutral-200 underline decoration-neutral-600 underline-offset-2 hover:text-neutral-50"
+        className="text-foreground underline decoration-ring underline-offset-2 hover:text-foreground"
     >{props.children}</a>;
 }
 def _mdBlockquote(props: any) -> JsxElement {
-    return <blockquote className="mb-2 border-l-2 border-neutral-700 pl-3 text-sm italic text-neutral-400">{props.children}</blockquote>;
+    return <blockquote className="mb-2 border-l-2 border-input pl-3 text-sm italic text-muted-foreground">{props.children}</blockquote>;
 }
 def _mdHr(props: any) -> JsxElement {
-    return <hr className="my-3 border-neutral-800" />;
+    return <hr className="my-3 border-border" />;
 }
 def _mdTable(props: any) -> JsxElement {
     return <div className="mb-2 overflow-x-auto"><table className="w-full border-collapse text-sm">{props.children}</table></div>;
 }
 def _mdThead(props: any) -> JsxElement {
-    return <thead className="border-b border-neutral-700">{props.children}</thead>;
+    return <thead className="border-b border-input">{props.children}</thead>;
 }
 def _mdTh(props: any) -> JsxElement {
-    return <th className="px-2 py-1 text-left font-mono text-[10px] uppercase tracking-wide text-neutral-500">{props.children}</th>;
+    return <th className="px-2 py-1 text-left font-mono text-[10px] uppercase tracking-wide text-muted-foreground">{props.children}</th>;
 }
 def _mdTd(props: any) -> JsxElement {
-    return <td className="border-t border-neutral-800 px-2 py-1 text-neutral-200">{props.children}</td>;
+    return <td className="border-t border-border px-2 py-1 text-foreground">{props.children}</td>;
 }
 
 glob MD_COMPONENTS: dict = {
@@ -82,11 +82,6 @@ glob MD_COMPONENTS: dict = {
     "blockquote": _mdBlockquote, "hr": _mdHr,
     "table": _mdTable, "thead": _mdThead, "th": _mdTh, "td": _mdTd,
 };
-
-def _copy(text: str) -> None {
-    nav: any = navigator;
-    nav.clipboard.writeText(text);
-}
 
 # Split assistant content into prose + fenced code segments.
 def _codeParts(content: str) -> list[dict] {
@@ -140,31 +135,12 @@ def _rows(messages: list) -> list[dict] {
     return out;
 }
 
-def:pub CodeBlock(lang: str, code: str) -> JsxElement {
-    has copied: bool = False;
-
-    return <div className="relative mt-3 mb-1 rounded-lg border border-neutral-800 bg-[#121212]">
-        <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">
-            OUTPUT.{(lang.upper() if lang else "TXT")}
-        </span>
-        <button
-            onClick={lambda e: MouseEvent {
-                _copy(code);
-                copied = True;
-                setTimeout(lambda -> None { copied = False; }, 1200);
-            }}
-            className="absolute right-2 top-2 font-mono text-[9px] text-neutral-500 hover:text-neutral-200"
-        >{"COPIED" if copied else "COPY"}</button>
-        <pre className="overflow-x-auto p-3 pt-4 font-mono text-xs leading-relaxed text-neutral-200">{code}</pre>
-    </div>;
-}
-
 def:pub Bubble(msg: dict, label: str, paired: bool, userText: str, onSave: any) -> JsxElement {
     has saved: bool = False;
 
     if msg["role"] == "user" {
         return <div className="my-2 flex justify-end">
-            <div className="max-w-[80%] whitespace-pre-wrap rounded-xl bg-neutral-200 px-4 py-2 text-sm text-neutral-900">{str(msg["content"])}</div>
+            <div className="max-w-[80%] whitespace-pre-wrap rounded-xl bg-primary px-4 py-2 text-sm text-primary-foreground">{str(msg["content"])}</div>
         </div>;
     }
     content = str(msg["content"]);
@@ -175,17 +151,17 @@ def:pub Bubble(msg: dict, label: str, paired: bool, userText: str, onSave: any) 
         {for (pi, part) in enumerate(_codeParts(content)) {
             <div key={str(pi)}>
                 {if part["kind"] == "code" {
-                    <CodeBlock lang={str(part["lang"])} code={str(part["text"])} />
+                    <CodeBlock key="code" label="" code={str(part["text"])} lang={str(part["lang"])} />
                     skip;
                 }}
                 {if part["kind"] == "text" {
-                    <Markdown remarkPlugins={[remarkGfm]} components={MD_COMPONENTS}>{str(part["text"])}</Markdown>
+                    <Markdown key="text" remarkPlugins={[remarkGfm]} components={MD_COMPONENTS}>{str(part["text"])}</Markdown>
                     skip;
                 }}
             </div>
         }}
-        {(streaming and content) and <span className="animate-pulse font-mono text-neutral-400">▍</span>}
-        {msg["error"] and <div className="stat-line mt-1 border border-dashed border-neutral-600 p-2">ERROR: {str(msg["error"])}</div>}
+        {(streaming and content) and <span className="animate-pulse font-mono text-muted-foreground">▍</span>}
+        {msg["error"] and <div className="stat-line mt-1 border border-dashed border-ring p-2">ERROR: {str(msg["error"])}</div>}
         {msg["stats"] and <div className="stat-line mt-1.5">└─ {str(msg["stats"]["tps"])} tok/s · {str(msg["stats"]["tokens"])} tok · Δ{str(msg["stats"]["gen_s"])}s · load {str(msg["stats"]["load_s"])}s</div>}
         {(onSave is not None and not streaming and content and userText) and <button
             onClick={lambda e: MouseEvent {
@@ -193,7 +169,7 @@ def:pub Bubble(msg: dict, label: str, paired: bool, userText: str, onSave: any) 
                 saved = True;
                 setTimeout(lambda -> None { saved = False; }, 1400);
             }}
-            className="micro-label mt-1.5 rounded border border-neutral-700 px-1.5 py-0.5 text-neutral-500 transition-colors hover:border-neutral-500 hover:text-neutral-200"
+            className="micro-label mt-1.5 rounded border border-input px-1.5 py-0.5 text-muted-foreground transition-colors hover:border-ring hover:text-foreground"
         >{"SAVED ✓ → sft.jsonl" if saved else "+ SAVE EXAMPLE"}</button>}
     </div>;
 }
@@ -211,7 +187,7 @@ def:pub Thread(messages: list, labels: dict, onSave: any) -> JsxElement {
 
     return <div className="flex-1 overflow-y-auto px-6 py-4">
         {if len(messages) == 0 {
-            <div className="flex h-full items-center justify-center">
+            <div key="empty" className="flex h-full items-center justify-center">
                 <p className="micro-label">SELECT A PROMPT OR TYPE BELOW</p>
             </div>
             skip;
@@ -219,18 +195,18 @@ def:pub Thread(messages: list, labels: dict, onSave: any) -> JsxElement {
         {for (ri, row) in enumerate(_rows(messages)) {
             <div key={str(ri)}>
                 {if row["kind"] == "pair" {
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="rounded-lg border border-dashed border-neutral-800 p-3">
+                    <div key="pair" className="grid grid-cols-2 gap-4">
+                        <div className="rounded-lg border border-dashed border-border p-3">
                             <Bubble msg={row["a"]} label={lbl(str(row["a"]["modelId"]))} paired={True} userText={str(row["user"])} onSave={onSave} />
                         </div>
-                        <div className="rounded-lg border border-dashed border-neutral-800 p-3">
+                        <div className="rounded-lg border border-dashed border-border p-3">
                             <Bubble msg={row["b"]} label={lbl(str(row["b"]["modelId"]))} paired={True} userText={str(row["user"])} onSave={onSave} />
                         </div>
                     </div>
                     skip;
                 }}
                 {if row["kind"] == "single" {
-                    <Bubble msg={row["a"]} label={lbl(str(row["a"]["modelId"]))} paired={False} userText={str(row["user"])} onSave={onSave} />
+                    <Bubble key="single" msg={row["a"]} label={lbl(str(row["a"]["modelId"]))} paired={False} userText={str(row["user"])} onSave={onSave} />
                     skip;
                 }}
             </div>

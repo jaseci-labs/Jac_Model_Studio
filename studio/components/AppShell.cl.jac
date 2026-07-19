@@ -12,6 +12,7 @@ default model.
 sv import from ..models { system_ram }
 import from .NavRail { NavRail }
 import from .Offline { Offline }
+import from .shared.EmptyState { EmptyState }
 import from .sections.Chat { Chat }
 import from .sections.Train { Train }
 import from .sections.Data { Data }
@@ -28,7 +29,8 @@ glob WS_DEFAULT_MODEL: dict = {"01": "qwen-dpo", "02": "qwen3coder-rl", "03": "q
 def:pub AppShell -> JsxElement {
     has workspace: str = "03",
         sections: dict = {"01": "chat", "02": "chat", "03": "chat"},
-        online: int = -1;  # -1 unknown, 0 offline, 1 online
+        online: int = -1,  # -1 unknown, 0 offline, 1 online
+        probeId: any = None;
 
     async def probe -> None {
         try {
@@ -39,28 +41,33 @@ def:pub AppShell -> JsxElement {
         }
     }
 
-    # Enable the `dark` variant + font antialiasing (the old app set these on
-    # <html>/<body> in layout.tsx; we have no static HTML shell to edit). Restore
-    # the last workspace from localStorage (first-ever visit stays on 03). Then
-    # probe the backend on mount and re-probe every 3s.
+    # Enable font antialiasing (the old app set this on <body> in layout.tsx; we
+    # have no static HTML shell to edit). Restore the last workspace from
+    # localStorage (first-ever visit stays on 03). Then probe the backend on
+    # mount and re-probe every 3s.
     async can with entry {
         doc: any = document;
-        doc.documentElement.classList.add("dark");
         doc.body.classList.add("antialiased");
+        win: any = window;
         try {
-            saved: any = window.localStorage.getItem("jacml.workspace");
+            saved: any = win.localStorage.getItem("jacml.workspace");
             if saved == "01" or saved == "02" or saved == "03" {
                 workspace = str(saved);
             }
         } except Exception { }
         await probe();
-        setInterval(lambda -> None { probe(); }, 3000);
+        probeId = setInterval(lambda -> None { probe(); }, 3000);
+    }
+
+    can with exit {
+        if probeId { clearInterval(float(str(probeId))); }
     }
 
     def goWorkspace(w: str) -> None {
         workspace = w;
+        win: any = window;
         try {
-            window.localStorage.setItem("jacml.workspace", w);
+            win.localStorage.setItem("jacml.workspace", w);
         } except Exception { }
     }
 
@@ -85,10 +92,10 @@ def:pub AppShell -> JsxElement {
     }
 
     if online == 0 {
-        return <Offline />;
+        return <Offline onRetry={lambda -> None { probe(); }} />;
     }
     if online == -1 {
-        return <div className="h-screen bg-[#0a0a0a]" />;
+        return <div className="flex h-screen items-center justify-center bg-background"><EmptyState label="CONNECTING" pulse={True} /></div>;
     }
     return <div className="flex h-screen overflow-hidden" data-ws={workspace}>
         <NavRail workspace={workspace} section={sections[workspace]} onWorkspace={goWorkspace} onSection={go} />
