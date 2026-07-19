@@ -12,7 +12,6 @@ go through `str(...)`; EXCLUDED_RUN_DIRS is a list[str] membership test.
 """
 
 import os;
-import time;
 import shlex;
 import jobs;
 import metrics;
@@ -50,6 +49,7 @@ def _build_status(name: str, mode: str, message: str = "") -> dict {
             "mode": mode,
             "status": status,
             "pid": 0,
+            "run_id": "",
             "started": "",
             "last_iter": metrics.last_iter(tl),
             "log_tail": metrics.tail(rl, 40),
@@ -61,6 +61,7 @@ def _build_status(name: str, mode: str, message: str = "") -> dict {
         "mode": mode,
         "status": str(job.get("status", "idle")),
         "pid": int(str(job.get("pid") or 0)),
+        "run_id": str(job.get("run_id", "")),
         "started": str(job.get("started", "")),
         "last_iter": metrics.last_iter(_train_log(name, mode)),
         "log_tail": metrics.tail(rl, 40),
@@ -114,33 +115,23 @@ def:pub start_training(name: str, mode: str, model_id: str = "", opts: dict = {}
         inner = f"./01-sft-dpo/sft_dpo/run_dpo.sh {shlex.quote(name)}";
     }
 
-    cmd = jobs.with_exit_marker(inner, rl);
-    # Truncate the runlog so a previous run's __EXIT__ marker is erased; otherwise
-    # live_status would instantly mark the new run as done.
-    rl.write_text("");
-
-    pid = jobs.spawn_detached(cmd, runlog=rl, env=env_overrides, cwd=models.data_root());
-
-    now = time.strftime("%Y-%m-%d %H:%M:%S");
-    jobs.write_job(jf, {
-        "name": name,
-        "mode": mode,
-        "pid": pid,
-        "status": "running",
-        "started": now,
-        "cmd": inner
-    });
+    jobs.launch(jf, rl, inner, env_overrides, models.data_root(), {"name": name, "mode": mode});
 
     return _build_status(name, mode, msg);
 }
 
-"""Stop a running training job (SIGTERM the process group). Returns JobStatus."""
-def:pub stop_training(name: str, mode: str) -> dict {
+"""Stop a running training job (SIGTERM the process group). When *run_id* is
+given, only that exact run is stopped — a newer run under the same (name, mode)
+is left alone and the message says so. Returns JobStatus."""
+def:pub stop_training(name: str, mode: str, run_id: str = "") -> dict {
     if not jobs.safe(name) { raise ValueError("invalid name"); }
     if mode != "sft" and mode != "dpo" { raise ValueError("mode must be sft|dpo"); }
     jf = _job_file(name, mode);
     rl = _run_log(name, mode);
-    jobs.stop(jf, rl);
+    res = jobs.stop(jf, rl, run_id=run_id);
+    if res is not None and str(res.get("status", "")) == "superseded" {
+        return _build_status(name, mode, f"run {run_id} superseded; not stopped");
+    }
     return _build_status(name, mode, "stop signal sent");
 }
 
