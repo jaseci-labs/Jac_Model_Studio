@@ -4,7 +4,7 @@
 set -e
 cd "$(dirname "$0")"
 
-export JAC_STUDIO_DATA_ROOT="${JAC_STUDIO_DATA_ROOT:-/Volumes/ExtremePro/JaseciLabs/jac_ml_studio}"
+export JAC_STUDIO_DATA_ROOT="${JAC_STUDIO_DATA_ROOT:-/Volumes/ExtremePro/JaseciLabs/jac_model_studio}"
 
 # jac 0.30+ places client_runtime_core.js in compiled/, but older .jac/client
 # artifacts import ./jaclang/runtimelib/client_runtime_core.js. Symlink the legacy

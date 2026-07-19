@@ -9,7 +9,7 @@ import os;
 import inference;
 import from pathlib { Path }
 
-glob DEFAULT_ROOT: str = "/Volumes/ExtremePro/JaseciLabs/jac_ml_studio";
+glob DEFAULT_ROOT: str = "/Volumes/ExtremePro/JaseciLabs/jac_model_studio";
 
 glob MODELS: list[dict] = [
     {"id": "qwen-dpo", "label": "Qwen · DPO", "path": "models/qwen-jac-dpo-fused-q8"},
