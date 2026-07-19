@@ -15,7 +15,6 @@ has no task-based holdout to eval against yet, see workflow.md's CF-guard open i
 
 import os;
 import json;
-import time;
 import shlex;
 import jobs;
 import metrics;
@@ -237,24 +236,32 @@ def _cpt_train_log(name: str) -> Path {
     return _cpt_results_dir(name) / "train.log";
 }
 
-"""Latest saved checkpoint (sorted by the zero-padded step prefix mlx_lm names
-its files with, e.g. 0000100_adapters.safetensors) + the step it represents.
-Same convention as 01-sft-dpo/sft_dpo/run_probe.sh's resume logic."""
+"""Latest saved checkpoint + the CUMULATIVE step it represents. mlx_lm restarts
+its checkpoint numbering at 1 on every invocation (verified in
+mlx_lm/tuner/trainer.py), so the zero-padded prefix alone under-counts after a
+resume: cumulative = the job file's resumed_from (steps done before the current
+invocation launched) + the prefix of the newest file BY MTIME (digit-max picks
+stale big-numbered files from an earlier, longer invocation). Runs resumed
+manually outside the studio have no job record and fall back to prefix-only."""
 def _cpt_resume_point(name: str) -> dict {
     adir = _cpt_adapter_dir(name);
     if not adir.exists() {
         return {"done_steps": 0, "ckpt": ""};
     }
-    ckpts = sorted(adir.glob("*_adapters.safetensors"));
+    ckpts = list(adir.glob("*_adapters.safetensors"));
     if not ckpts {
         return {"done_steps": 0, "ckpt": ""};
     }
-    latest = ckpts[-1];
+    latest = sorted(ckpts, key=lambda p: Path -> float { return p.stat().st_mtime; })[-1];
     digits = "";
     for ch in latest.name {
         if ch.isdigit() { digits += ch; } else { break; }
     }
     steps = int(digits) if digits else 0;
+    job = jobs.read_job(_cpt_job_file(name));
+    if job is not None {
+        steps += int(str(job.get("resumed_from") or 0));
+    }
     return {"done_steps": steps, "ckpt": str(latest)};
 }
 
@@ -306,7 +313,7 @@ def _cpt_build_status(name: str, message: str = "") -> dict {
     if job is None {
         status = "finished" if tl.exists() else "idle";
         return {
-            "name": name, "status": status, "pid": 0, "started": "",
+            "name": name, "status": status, "pid": 0, "run_id": "", "started": "",
             "last_iter": parsed["last_iter"], "total_iters": total_iters,
             "train": parsed["train"], "val": parsed["val"], "lr": parsed["lr"],
             "tps": parsed["tps"], "log_tail": metrics.tail(rl, 40), "message": message,
@@ -315,7 +322,8 @@ def _cpt_build_status(name: str, message: str = "") -> dict {
     }
     return {
         "name": name, "status": str(job.get("status", "idle")),
-        "pid": int(str(job.get("pid") or 0)), "started": str(job.get("started", "")),
+        "pid": int(str(job.get("pid") or 0)), "run_id": str(job.get("run_id", "")),
+        "started": str(job.get("started", "")),
         "last_iter": parsed["last_iter"], "total_iters": total_iters,
         "leg": int(str(job.get("leg") or 0)), "leg_ceiling": leg_ceiling,
         "train": parsed["train"], "val": parsed["val"], "lr": parsed["lr"],
@@ -369,22 +377,18 @@ def:pub start_cpt_training(name: str = "cpt-v1", config: str = "") -> dict {
 
     ckpt = str(resume["ckpt"]);
     resume_flag = f" --resume-adapter-file {shlex.quote(ckpt)}" if ckpt else "";
+    # >> not >: a resumed run must append to the existing learning curve (the
+    # explicit truncate above already handles the fresh-start case) — matches
+    # the leg flow's rule.
     inner = (
         f"mlx_lm.lora --config {shlex.quote(config_file)} "
         f"--adapter-path {shlex.quote(str(adapter_dir))} "
         f"--iters {remain}{resume_flag} "
-        f"> {shlex.quote(str(tl))} 2>&1"
+        f">> {shlex.quote(str(tl))} 2>&1"
     );
 
-    cmd = jobs.with_exit_marker(inner, rl);
-    rl.write_text("");  # erase a previous run's __EXIT__ marker
-
-    pid = jobs.spawn_detached(cmd, runlog=rl, env=env_overrides, cwd=Path(CPT_ROOT));
-
-    now = time.strftime("%Y-%m-%d %H:%M:%S");
-    jobs.write_job(jf, {
-        "name": name, "mode": "cpt", "pid": pid, "status": "running",
-        "started": now, "cmd": inner,
+    jobs.launch(jf, rl, inner, env_overrides, Path(CPT_ROOT), {
+        "name": name, "mode": "cpt",
         "resumed_from": done_steps, "iters_this_run": remain
     });
 
@@ -421,13 +425,13 @@ def:pub start_cpt_leg(name: str = "cpt-v2", leg: int = 1) -> dict {
     resume = _cpt_leg_resume_point(name);
     done_steps = int(str(resume["done_steps"]));
 
-    manifest_path = Path(CPT_ROOT) / "03-new" / "dataset" / "cpt-v2" / "manifest.json";
+    manifest_path = Path(CPT_ROOT) / "03-new" / "dataset" / name / "manifest.json";
     windows = 0;
     try {
         m = json.loads(manifest_path.read_text());
         windows = int(m["packed"]["train"]);
     } except Exception {
-        raise ValueError("cpt-v2 manifest.json not found -- build the corpus first (Task 6)");
+        raise ValueError(f"{name} manifest.json not found -- build the corpus first (Task 6)");
     }
     expected_done = windows * (leg - 1);
     if done_steps != expected_done {
@@ -462,24 +466,22 @@ def:pub start_cpt_leg(name: str = "cpt-v2", leg: int = 1) -> dict {
         f"--iters {windows} --done-steps {done_steps}{resume_flags} "
         f">> {shlex.quote(str(tl))} 2>&1"
     );
-    cmd = jobs.with_exit_marker(inner, rl);
-    rl.write_text("");
-
-    pid = jobs.spawn_detached(cmd, runlog=rl, env=env_overrides, cwd=Path(CPT_ROOT));
-    now = time.strftime("%Y-%m-%d %H:%M:%S");
-    jobs.write_job(jf, {
-        "name": name, "mode": "cpt-leg", "pid": pid, "status": "running",
-        "started": now, "cmd": inner, "leg": leg, "resumed_from": done_steps
+    jobs.launch(jf, rl, inner, env_overrides, Path(CPT_ROOT), {
+        "name": name, "mode": "cpt-leg", "leg": leg, "resumed_from": done_steps
     });
     return _cpt_build_status(name, f"leg {leg}/{ceiling} running ({windows} iters, resuming from {done_steps})");
 }
 
-"""Stop a running CPT job (SIGTERM the process group). Returns status."""
-def:pub stop_cpt_training(name: str = "cpt-v1") -> dict {
+"""Stop a running CPT job (SIGTERM the process group). When *run_id* is given,
+only that exact run is stopped (a newer run is reported superseded). Returns status."""
+def:pub stop_cpt_training(name: str = "cpt-v1", run_id: str = "") -> dict {
     if not jobs.safe(name) {
         raise ValueError("invalid name");
     }
-    jobs.stop(_cpt_job_file(name), _cpt_run_log(name));
+    res = jobs.stop(_cpt_job_file(name), _cpt_run_log(name), run_id=run_id);
+    if res is not None and str(res.get("status", "")) == "superseded" {
+        return _cpt_build_status(name, f"run {run_id} superseded; not stopped");
+    }
     return _cpt_build_status(name, "stop signal sent");
 }
 
