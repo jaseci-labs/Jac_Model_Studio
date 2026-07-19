@@ -102,9 +102,6 @@ def _start(run: EvalRun, limit: int, sim_threshold: float) -> int {
     run_log = ed / "run.log";
     metrics_out = ed / "metrics.jsonl";
 
-    # Truncate the runlog so stale __EXIT__ markers from prior attempts are gone.
-    run_log.write_text("");
-
     venv_bin = str(models.data_root() / ".venv" / "bin");
     current_path = os.environ.get("PATH", "");
     env: dict = {
@@ -131,10 +128,8 @@ def _start(run: EvalRun, limit: int, sim_threshold: float) -> int {
     }
 
     inner = f"{shlex.quote(str(models.jac_bin()))} run 01-sft-dpo/sft_dpo/jacgen/{script}";
-    cmd = jobs.with_exit_marker(inner, run_log);
-    pid = jobs.spawn_detached(cmd, run_log, env, models.data_root());
-    jobs.write_job(ed / "job.json", {"pid": pid, "status": "running"});
-    return pid;
+    job = jobs.launch(ed / "job.json", run_log, inner, env, models.data_root(), {"eid": run.eid});
+    return int(str(job.get("pid") or 0));
 }
 
 """Refresh a running run's status (live_status-style): resolve the job.json/run.log
@@ -144,7 +139,13 @@ def _refresh(run: EvalRun) -> None {
     if run.status != "running" { return; }
     ed = eval_dir(run.eid);
     job = jobs.live_status(ed / "job.json", ed / "run.log");
-    if job is None { return; }
+    if job is None {
+        # Artifacts dir gone (legacy DataGeneration-era eval or manual cleanup):
+        # resolve the node instead of leaving it "running" forever.
+        run.status = "stopped";
+        run.finished = _now();
+        return;
+    }
     st = str(job.get("status", "running"));
     if st == "running" { return; }
     if st == "done" {
