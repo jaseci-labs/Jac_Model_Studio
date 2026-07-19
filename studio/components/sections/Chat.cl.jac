@@ -1,4 +1,5 @@
-"""CHAT section — 3-pane: history sidebar | thread + composer | sampling rail.
+"""CHAT section — 3-pane: history sidebar | thread + composer | prompt rail.
+Sampling params are server defaults (temp 0.2, top_p 0.9, max_tokens 1024).
 
 Ports ui/components/chat-section.tsx + use-studio.ts. Chats persist to the OSP
 graph (persistence.sv.jac). Completion streams from /function/chat_stream (raw
@@ -12,10 +13,11 @@ sv import from ...models {
     list_models, system_ram, loaded_model, warm_model, ModelView
 }
 sv import from ...prompts { list_prompts }
+sv import from ...chat { stop_generation }
 sv import from ...data { add_examples }
 sv import from ...persistence {
-    create_chat, list_chats, delete_chat, get_messages, add_message, today_utc,
-    ChatView, MsgView
+    create_chat, list_chats, rename_chat, delete_chat, get_messages, add_message,
+    today_utc, ChatView, MsgView
 }
 import from ..chat.Sidebar { Sidebar }
 import from ..chat.Rail { Rail }
@@ -43,9 +45,7 @@ def:pub Chat(workspace: str, defaultModel: str) -> JsxElement {
         streaming: bool = False,
         stopRequested: bool = False,
         activeReader: any = None,
-        temperature: float = 0.2,
-        topP: float = 0.9,
-        maxTokens: int = 1024,
+        activeGenId: str = "",
         ramGb: float = 0.0,
         residentGb: float = 0.0,
         loadedId: str = "",
@@ -118,6 +118,12 @@ def:pub Chat(workspace: str, defaultModel: str) -> JsxElement {
         messages = ms;
     }
 
+    async def renameChat(id: str, title: str) -> None {
+        await rename_chat(id, title);
+        cs = await list_chats(workspace=workspace);
+        chats = cs;
+    }
+
     async def removeChat(id: str) -> None {
         await delete_chat(id);
         cs = await list_chats(workspace=workspace);
@@ -185,15 +191,16 @@ def:pub Chat(workspace: str, defaultModel: str) -> JsxElement {
                 {
                     "method": "POST",
                     "headers": {"Content-Type": "application/json"},
-                    "body": JSON.stringify({
-                        "messages": hist, "model_id": legModel,
-                        "temperature": temperature, "top_p": topP, "max_tokens": maxTokens
-                    })
+                    "body": JSON.stringify({"messages": hist, "model_id": legModel})
                 }
             );
             reader: any = resp.body.getReader();
             activeReader = reader;
-            dec: any = new(TextDecoder);
+            # `new(TextDecoder)` trips the checker (E1053: unresolvable JS global as a
+            # class); Reflect.construct(TextDecoder, []) is the same `new TextDecoder()`.
+            refl: any = Reflect;
+            tdCls: any = TextDecoder;
+            dec: any = refl.construct(tdCls, []);
             nl = String.fromCharCode(10);
             sep = nl + nl;
             buf = "";
@@ -230,7 +237,9 @@ def:pub Chat(workspace: str, defaultModel: str) -> JsxElement {
                     } elif data {
                         try {
                             msg: any = JSON.parse(data);
-                            if msg.kind == "token" {
+                            if msg.kind == "load" {
+                                activeGenId = str(msg.gen_id or "");
+                            } elif msg.kind == "token" {
                                 acc = str(msg.text);
                                 work[ai] = {
                                     "role": "assistant", "content": acc, "stats": None,
@@ -286,13 +295,22 @@ def:pub Chat(workspace: str, defaultModel: str) -> JsxElement {
         }
     }
 
-    # Cancel the in-flight stream (if any) so the composer frees up immediately.
+    # Cancel the in-flight stream so the composer frees up immediately, AND tell
+    # the server to stop decoding (stop_generation flips a lock-free flag the
+    # token loop checks — covers the case where a proxy keeps the upstream pipe
+    # alive after reader.cancel(), which otherwise decodes to max_tokens).
     async def stop -> None {
         stopRequested = True;
         r: any = activeReader;
         if r {
             try {
                 await r.cancel();
+            } except Exception { }
+        }
+        gid = activeGenId;
+        if gid {
+            try {
+                await stop_generation(gen_id=gid);
             } except Exception { }
         }
     }
@@ -376,6 +394,7 @@ def:pub Chat(workspace: str, defaultModel: str) -> JsxElement {
             chats={chats} activeId={chatId} ramGb={ramGb} residentGb={residentGb}
             todayIso={todayIso} busy={streaming}
             onNew={newChat} onOpen={openChat} onDelete={removeChat}
+            onRename={renameChat}
         />
         <main className="flex min-w-0 flex-1 flex-col">
             <ModelPill
@@ -396,12 +415,9 @@ def:pub Chat(workspace: str, defaultModel: str) -> JsxElement {
         </main>
         <Rail
             prompts={prompts}
-            temperature={temperature} topP={topP} maxTokens={maxTokens} lastStats={lastStats}
+            lastStats={lastStats}
             collapsed={railCollapsed}
             onPick={lambda p: str { draft = p; }}
-            onTemp={lambda v: float { temperature = v; }}
-            onTopP={lambda v: float { topP = v; }}
-            onMaxTokens={lambda v: float { maxTokens = int(v); }}
             onToggle={lambda { railCollapsed = not railCollapsed; }}
         />
     </div>;

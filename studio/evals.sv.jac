@@ -102,15 +102,12 @@ def _start(run: EvalRun, limit: int, sim_threshold: float) -> int {
     run_log = ed / "run.log";
     metrics_out = ed / "metrics.jsonl";
 
-    # Truncate the runlog so stale __EXIT__ markers from prior attempts are gone.
-    run_log.write_text("");
-
     venv_bin = str(models.data_root() / ".venv" / "bin");
     current_path = os.environ.get("PATH", "");
     env: dict = {
         "JAC_EVAL_MODE": "mlx",
         "JAC_EVAL_MODEL": run.model,
-        "JAC_HOLDOUT": str(models.HOLDOUTS[run.holdout]),
+        "JAC_HOLDOUT": str(models.data_root() / str(models.HOLDOUTS[run.holdout])),
         "PATH": f"{venv_bin}:{current_path}"
     };
     if run.adapter {
@@ -130,11 +127,9 @@ def _start(run: EvalRun, limit: int, sim_threshold: float) -> int {
         script = "idiom_eval.jac";
     }
 
-    inner = f"{shlex.quote(str(models.jac_bin()))} run srccurrent/jacgen/{script}";
-    cmd = jobs.with_exit_marker(inner, run_log);
-    pid = jobs.spawn_detached(cmd, run_log, env, models.data_root());
-    jobs.write_job(ed / "job.json", {"pid": pid, "status": "running"});
-    return pid;
+    inner = f"{shlex.quote(str(models.jac_bin()))} run 01-sft-dpo/sft_dpo/jacgen/{script}";
+    job = jobs.launch(ed / "job.json", run_log, inner, env, models.data_root(), {"eid": run.eid});
+    return int(str(job.get("pid") or 0));
 }
 
 """Refresh a running run's status (live_status-style): resolve the job.json/run.log
@@ -144,7 +139,13 @@ def _refresh(run: EvalRun) -> None {
     if run.status != "running" { return; }
     ed = eval_dir(run.eid);
     job = jobs.live_status(ed / "job.json", ed / "run.log");
-    if job is None { return; }
+    if job is None {
+        # Artifacts dir gone (legacy DataGeneration-era eval or manual cleanup):
+        # resolve the node instead of leaving it "running" forever.
+        run.status = "stopped";
+        run.finished = _now();
+        return;
+    }
     st = str(job.get("status", "running"));
     if st == "running" { return; }
     if st == "done" {
@@ -201,6 +202,10 @@ def:pub create_eval(
     if sim_threshold > 0.0 { params["sim_threshold"] = sim_threshold; }
 
     eid = uuid4().hex[:12];
+    ed = eval_dir(eid);
+    grab = jobs.heavy_acquire(f"eval:{eid}", ed / "job.json", ed / "run.log");
+    if not grab["ok"] { return None; }
+
     run = (root ++> EvalRun(
         eid=eid, kind=kind, model=model_rel, adapter=adapter_rel,
         holdout=holdout, params_json=json.dumps(params), status="running",

@@ -17,6 +17,7 @@ a rung-indexed curve (one line per model·cond, gen pass@1), and the line keys.
 import os;
 import json;
 import subprocess;
+import jobs;
 import from pathlib { Path }
 
 # rl.sv.jac lives at studio/ root = <repo>/jac_ml_studio/studio ; results/ is at <repo>.
@@ -107,10 +108,18 @@ def:pub get_rl_ladder() -> dict {
 def:pub get_rl_corrected() -> dict {
     # The corrected results (fixed eval+reward) — assembled by 02-rl-grpo/rl/make_summary.py.
     p = os.path.join(RL_REPO, "02-rl-grpo", "resultspub", "rl", "corrected_summary.json");
+    # Fallback/error shapes must carry every key the client dereferences
+    # (Results.cl.jac lists journey/kscale unguarded).
+    empty: dict = {"ladder": [], "holdouts": [], "journey": [], "kscale": [], "headline": {}, "note": ""};
     if not os.path.exists(p) {
-        return {"ladder": [], "holdouts": [], "headline": {}, "note": ""};
+        return empty;
     }
-    return json.loads(Path(p).read_text());
+    try {
+        loaded = dict(json.loads(Path(p).read_text()));
+        return {**empty, **loaded};
+    } except Exception {
+        return {**empty, "note": "corrected_summary.json unreadable"};
+    }
 }
 
 def:pub rl_generate(prompt: str, k: int = 8) -> dict {
@@ -119,6 +128,10 @@ def:pub rl_generate(prompt: str, k: int = 8) -> dict {
     # is the deployable artifact from RL_FINDINGS.md (~78% vs 55% greedy).
     if not os.path.exists(GEN_MODEL) {
         return {"ok": False, "verified": False, "jac": "", "note": "SFT model missing: " + GEN_MODEL};
+    }
+    grab = jobs.heavy_acquire("rl_generate");
+    if not grab["ok"] {
+        return {"ok": False, "verified": False, "jac": "", "note": f"busy: {grab['busy_with']} is running"};
     }
     env = dict(os.environ);
     env["JAC_GEN_MODEL"] = GEN_MODEL;
@@ -136,5 +149,7 @@ def:pub rl_generate(prompt: str, k: int = 8) -> dict {
         return {"ok": True, "verified": verified, "jac": jac, "note": note, "k": k};
     } except Exception as e {
         return {"ok": False, "verified": False, "jac": "", "note": str(e)};
+    } finally {
+        jobs.heavy_release("rl_generate");
     }
 }

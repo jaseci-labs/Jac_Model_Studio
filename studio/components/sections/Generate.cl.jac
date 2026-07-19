@@ -6,44 +6,74 @@ holdout this reaches ~78% vs ~55% greedy. Loads a 30B model per call (~1–2 min
 """
 
 sv import from ...rl { rl_generate }
+import from ..shared.Button { Button }
 
 def:pub Generate -> JsxElement {
     has genPrompt: str = "Write a Jac function `add(a: int, b: int) -> int` that returns their sum.",
         genJac: str = "",
         genNote: str = "",
-        genBusy: bool = False;
+        genBusy: bool = False,
+        startedAt: float = 0.0,
+        elapsed: int = 0,
+        tickId: any = None;
 
+    # rl_generate is a blocking RPC with no cancel endpoint — all we can do
+    # honestly is count elapsed seconds while it holds the connection.
     async def doGen() -> None {
-        genBusy = True; genJac = ""; genNote = "sampling 8 completions + compiler-verifying (~1-2 min, loads the model)…";
-        r = await rl_generate(genPrompt, 8);
+        if genBusy { return; }
+        win: any = window;
+        t0: float = float(str(win.Date.now()));
+        startedAt = t0;
+        elapsed = 0;
+        genBusy = True; genJac = ""; genNote = "";
+        # capture t0/win locally: the interval lambda must not read stale state
+        iv: any = setInterval(lambda -> None {
+            elapsed = int((float(str(win.Date.now())) - t0) / 1000);
+        }, 1000);
+        tickId = iv;
+        try {
+            r = await rl_generate(genPrompt, 8);
+            if ("ok" in r) and (not bool(r["ok"])) {
+                # backend busy-rejection: {"ok": False, "note": "busy: ..."}
+                genNote = "⚠ " + str(r["note"]);
+            } else {
+                genJac = str(r["jac"] or "");
+                genNote = ("✓ " + str(r["note"])) if bool(r["verified"]) else ("⚠ " + str(r["note"]));
+            }
+        } except Exception {
+            genNote = "⚠ generate failed — server unreachable or errored";
+        }
         genBusy = False;
-        genJac = str(r["jac"]);
-        genNote = ("✓ " + str(r["note"])) if r["verified"] else ("⚠ " + str(r["note"]));
+        clearInterval(float(str(iv)));
+        tickId = None;
+    }
+
+    can with exit {
+        if tickId { clearInterval(float(str(tickId))); }
     }
 
     return <div className="flex h-full min-w-0 flex-1 flex-col">
-        <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-2.5">
+        <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
             <span className="micro-label">GENERATE · best-of-k + compiler verifier (~78%)</span>
-            <span className="micro-label text-neutral-600">{"sampling…" if genBusy else "SFT · deploy"}</span>
+            <span className="micro-label text-muted-foreground/70">{"sampling…" if genBusy else ""}</span>
         </div>
 
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
-            <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-3 pt-4">
-                <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">GENERATE JAC · best-of-k + compiler verifier (~78%)</span>
+            <div className="relative rounded-md border border-border bg-card p-3 pt-4">
+                <span className="micro-label absolute -top-2 left-3 bg-background px-2">PROMPT</span>
                 <textarea
-                    className="w-full resize-y rounded-sm border border-neutral-800 bg-[#0a0a0a] p-2 font-mono text-xs text-neutral-200 outline-none focus:border-neutral-600"
+                    className="w-full resize-y rounded-sm border border-input bg-background p-2 font-mono text-xs text-foreground outline-none placeholder:text-muted-foreground/70 focus:border-ring"
                     rows={4} value={genPrompt} onChange={lambda e: ChangeEvent { genPrompt = str(e.target.value); }}
                     placeholder="Describe the Jac function to generate…" />
                 <div className="mt-2 flex items-center gap-3">
-                    <button
-                        className="rounded-sm border border-neutral-700 bg-neutral-900 px-3 py-1 font-mono text-xs text-neutral-100 hover:border-neutral-500 disabled:opacity-40"
-                        disabled={genBusy} onClick={lambda e: MouseEvent { doGen(); }}>
+                    <Button variant="solid" disabled={genBusy} onClick={lambda e: MouseEvent { doGen(); }}>
                         {"generating…" if genBusy else "▷ generate (sample 8, keep the one that compiles+runs)"}
-                    </button>
-                    {(<span className="stat-line text-neutral-500">{genNote}</span>) if genNote else <span></span>}
+                    </Button>
+                    {genBusy and <span key="gen-elapsed" className="stat-line text-muted-foreground">{f"GENERATING · {elapsed}s · loads 30B model, 1-2 min typical"}</span>}
+                    {(not genBusy and genNote != "") and <span key="gen-note" className="stat-line text-muted-foreground">{genNote}</span>}
                 </div>
-                {(<pre className="mt-3 overflow-x-auto rounded-sm border border-neutral-800 bg-[#0a0a0a] p-3 font-mono text-xs text-neutral-100">{genJac}</pre>) if genJac else <span></span>}
-                <div className="stat-line mt-2 text-neutral-600">the jac compiler is the verifier — returns the first of 8 samples that compiles+runs. On the holdout this reaches ~78% vs ~55% greedy. Loads the SFT model per call (~1–2 min).</div>
+                {(<pre className="mt-3 overflow-x-auto rounded-sm border border-border bg-background p-3 font-mono text-xs text-foreground">{genJac}</pre>) if genJac else <span></span>}
+                <div className="stat-line mt-2 text-muted-foreground/70">the jac compiler is the verifier — returns the first of 8 samples that compiles+runs. On the holdout this reaches ~78% vs ~55% greedy. Loads the SFT model per call (~1–2 min).</div>
             </div>
         </div>
     </div>;

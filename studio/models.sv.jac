@@ -18,7 +18,8 @@ glob MODELS: list[dict] = [
     {"id": "gemma-sft", "label": "Gemma · SFT", "path": "models/gemma-jac-fused-q8"},
     {"id": "qwen3coder-rl", "label": "Qwen3-Coder · RL", "path": "models/jac-qwen3coder-r20-rft-q4"},
     {"id": "qwen-q4", "label": "Qwen · BASE", "path": "models/qwen-q4"},
-    {"id": "qwen-cpt-v1", "label": "Qwen · CPT-v1", "path": "models/qwen-cpt-v1-fused-q4"}
+    {"id": "qwen-cpt-v1", "label": "Qwen · CPT-v1", "path": "models/qwen-cpt-v1-fused-q4"},
+    {"id": "qwen-cpt-v2", "label": "Qwen · CPT-v2", "path": "models/qwen-cpt-v2-fused-q4"}
 ];
 
 # Eval holdout sets (rel to data root) + run dirs that are NOT training runs.
@@ -59,22 +60,32 @@ def model_available(m: dict) -> bool {
 }
 
 def results_dir() -> Path {
-    return data_root() / "results";
+    # run_probe.sh / run_dpo.sh cd to the repo root and write under
+    # 01-sft-dpo/results/, so the studio must read the same tree.
+    return data_root() / "01-sft-dpo" / "results";
 }
 
 def jac_bin() -> Path {
     return data_root() / ".venv" / "bin" / "jac";
 }
 
+glob _size_cache: dict = {};
+
 """On-disk size of a model dir in GB (2 dp). round(x,2) is broken in the checker,
-so the cents are computed with int division instead."""
+so the cents are computed with int division instead. Memoized per path — model
+dirs are static multi-GB trees and every list_models call was rglob-stat'ing
+thousands of files (sluggish Chat/Evals mounts); restart refreshes the cache."""
 def dir_size_gb(p: Path) -> float {
     if not p.is_dir() { return 0.0; }
+    key = str(p);
+    if key in _size_cache { return float(str(_size_cache[key])); }
     total = 0;
     for f in p.rglob("*") {
         if f.is_file() { total += f.stat().st_size; }
     }
-    return int(total / 10_000_000) / 100.0;
+    gb = int(total / 10_000_000) / 100.0;
+    _size_cache[key] = gb;
+    return gb;
 }
 
 def total_ram_gb() -> int {

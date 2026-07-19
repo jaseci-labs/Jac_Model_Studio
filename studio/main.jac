@@ -11,7 +11,7 @@ import from persistence {
     create_chat, list_chats, rename_chat, delete_chat, get_messages, add_message, today_utc
 }
 import from data { FileRefView, DataRowView, dataset_stats, dataset_files, dataset_rows, add_examples, rl_dataset_files, rl_dataset_rows }
-import from builders { BuilderView, list_builders, run_builder, get_builder }
+import from builders { BuilderView, list_builders, run_builder }
 import from prompts { list_prompts }
 import from evals { EvalView, create_eval, list_evals, get_eval, stop_eval, delete_eval }
 # Training control + read-only run metrics — consumed by the TRAIN section's
@@ -24,11 +24,11 @@ import from rl { get_rl_ladder, get_rl_corrected, rl_generate }
 # workspace's DATA + TRAIN sections.
 import from cpt {
     cpt_manifest, cpt_files, cpt_rows,
-    start_cpt_training, stop_cpt_training, get_cpt_status, get_all_cpt_status
+    start_cpt_training, start_cpt_leg, stop_cpt_training, get_cpt_status, get_all_cpt_status
 }
 # Streaming chat endpoint — consumed by a raw fetch reader on the client (not an
 # `sv import` RPC stub), so register it explicitly at the top level.
-import from chat { chat_stream }
+import from chat { chat_stream, stop_generation }
 
 # Client-side UI
 cl {

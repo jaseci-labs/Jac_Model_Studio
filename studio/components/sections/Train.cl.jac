@@ -7,9 +7,7 @@ HISTORY: runs (pick model+stage → RunDetail) | compare (table + overlay charts
 Backed by train.sv.jac (start/stop/status/sessions) + runs.sv.jac (get_run/compare).
 Polling uses manual `useEffect` + setInterval so the interval is re-established when
 its deps change (avoids stale-closure reads); cross-tick stall tracking lives in an
-effect-local dict (mutated by reference, never via React state). The ⟳ UPDATE APP
-button is a client-only placeholder — no system-update endpoint exists yet, so it
-runs the confirm→reload state machine without a backend call (NOTE).
+effect-local dict (mutated by reference, never via React state).
 """
 
 import from react { useEffect }
@@ -22,12 +20,17 @@ import from ..shared.LogView { LogView }
 import from ..shared.StatTile { StatTile }
 import from ..shared.MonoChart { MonoChart }
 import from ..shared.MultiLineChart { MultiLineChart }
+import from ..shared.Button { Button }
+import from ..shared.Chip { Chip }
 
 glob TABS: list[str] = ["LAUNCH", "MONITOR", "HISTORY"];
 glob SFT_OPT_KEYS: list[str] = ["EVAL_EVERY", "SUBSET", "DRY_ITERS", "SKIP_DRY"];
 glob DPO_OPT_KEYS: list[str] = ["DPO_ITERS", "DPO_LR", "DPO_BETA", "SUBSET"];
-glob CC: dict = {"loss": "#d8a657", "lr": "#7aa2f7", "tps": "#6fc3b2", "acc": "#9ec98f"};
-glob COLORS: list[str] = ["#7aa2f7", "#d8a657", "#9ec98f", "#b89ce8", "#6fc3b2", "#e08a8a"];
+glob CC: dict = {"loss": "var(--chart-2)", "lr": "var(--chart-1)", "tps": "var(--chart-5)", "acc": "var(--chart-3)"};
+glob COLORS: list[str] = [
+    "var(--chart-1)", "var(--chart-2)", "var(--chart-3)",
+    "var(--chart-4)", "var(--chart-5)", "var(--chart-6)"
+];
 glob MODE_DESC: dict = {
     "sft": "supervised finetune · teaches the model to write Jac",
     "dpo": "preference tuning · pushes outputs toward idiomatic Jac"
@@ -119,23 +122,26 @@ def _hMetrics(h: any) -> dict {
     };
 }
 
-def _cmpRow(label: str, cells: list, nums: list, best: str) -> JsxElement {
+# All-optional params: called with a props dict (compiler quirk), which the
+# checker otherwise flags E1050 "missing required parameters".
+def _cmpRow(label: any = "", cells: list = [], nums: list = [], best: str = "max") -> JsxElement {
     valid: list = [n for n in nums if n is not None];
     leader: any = None;
     if len(valid) > 1 {
         leader = max(valid) if best == "max" else min(valid);
     }
-    return <tr key={label} className="border-t border-neutral-800/60">
-        <td className="py-1.5 pr-4 text-neutral-500">{label}</td>
+    return <tr key={label} className="border-t border-border/60">
+        <td className="py-1.5 pr-4 text-muted-foreground">{label}</td>
         {for (i, c) in enumerate(cells) {
             <td key={str(i)} className={"py-1.5 px-4 text-right " + (
-                "text-neutral-100 font-semibold" if (leader is not None and nums[i] is not None and nums[i] == leader) else "text-neutral-400"
+                "text-foreground font-semibold" if (leader is not None and nums[i] is not None and nums[i] == leader) else "text-muted-foreground"
             )}>{c}</td>
         }}
     </tr>;
 }
 
-def _compareTable(headline: list) -> JsxElement {
+# `headline: any` — receives a props dict at the call site (same quirk as _cmpRow).
+def _compareTable(headline: any = None) -> JsxElement {
     hm: list = [_hMetrics(h) for h in headline];
     names: list = [str(h["name"]) for h in headline];
     accCells: list = [f"{m['fp']}%" for m in hm];
@@ -152,8 +158,8 @@ def _compareTable(headline: list) -> JsxElement {
     gsimCells: list = [m["gsim"] if m["ghas"] else "·" for m in hm];
     nullNums: list = [None for m in hm];
 
-    return <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-3 pt-5 overflow-x-auto">
-        <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">COMPARISON</span>
+    return <div className="relative rounded-md border border-border bg-card p-3 pt-5 overflow-x-auto">
+        <span className="micro-label absolute -top-2 left-3 bg-background px-2">COMPARISON</span>
         <table className="w-full border-collapse font-mono text-xs">
             <thead>
                 <tr>
@@ -191,6 +197,7 @@ def:pub Train(active: bool) -> JsxElement {
         "DPO_ITERS": "200", "DPO_LR": "1e-6", "DPO_BETA": "0.1"
     };
     has job: any = None;
+    has launchedRun: dict = {};
     has error: str = "";
     has selName: str = "";
     has selMode: str = "";
@@ -203,8 +210,6 @@ def:pub Train(active: bool) -> JsxElement {
     has histName: str = "";
     has histMode: str = "sft";
     has historyMetrics: any = None;
-    has updateState: str = "idle";
-    has timer: any = None;
 
     # ---- async fetchers (set state only; logic params passed explicitly) ----
     async def _pollSessions() -> None {
@@ -281,16 +286,19 @@ def:pub Train(active: bool) -> JsxElement {
         }
     }, [sessions]);
 
+    # Poll the LAUNCHED run when a launch handle exists (editing the form must
+    # not repoint the status panel); fall back to form fields pre-launch.
     useEffect(lambda {
         iv: any = None;
-        if active and tab == "launch" and formName != "" {
-            nm = formName;
-            md = formMode;
+        pinned: bool = "name" in launchedRun;
+        nm: str = str(launchedRun["name"]) if pinned else formName;
+        md: str = str(launchedRun["mode"]) if pinned else formMode;
+        if active and tab == "launch" and nm != "" {
             _pollStatus(nm, md);
             iv = setInterval(lambda { _pollStatus(nm, md); }, 2500);
         }
         return lambda { if iv is not None { clearInterval(float(str(iv))); } };
-    }, [active, tab, formName, formMode]);
+    }, [active, tab, formName, formMode, launchedRun]);
 
     useEffect(lambda {
         iv: any = None;
@@ -348,52 +356,53 @@ def:pub Train(active: bool) -> JsxElement {
             if k in opts { filtered[k] = str(opts[k]); }
         }
         mid = formModelId if formMode == "sft" else "";
+        nm = formName;
+        md = formMode;
         try {
-            j = await start_training(name=formName, mode=formMode, model_id=mid, opts=filtered);
+            j = await start_training(name=nm, mode=md, model_id=mid, opts=filtered);
             job = j;
             error = "";
+            rid: str = str(j["run_id"]) if "run_id" in j else "";
+            if rid != "" {
+                # launch handle — status panel + stop now target THIS run,
+                # regardless of later form edits.
+                launchedRun = {"name": nm, "mode": md, "run_id": rid};
+            }
         } except Exception {
             error = "start failed";
         }
     }
     async def doStop() -> None {
         try {
-            j = await stop_training(name=formName, mode=formMode);
-            job = j;
+            if "run_id" in launchedRun {
+                j = await stop_training(
+                    name=str(launchedRun["name"]),
+                    mode=str(launchedRun["mode"]),
+                    run_id=str(launchedRun["run_id"])
+                );
+                job = j;
+            } else {
+                j = await stop_training(name=formName, mode=formMode);
+                job = j;
+            }
         } except Exception {
             error = "stop failed";
         }
     }
-    def _reload() -> None {
-        w: any = window;
-        w.location.reload();
-    }
-    def handleUpdate() -> None {
-        if updateState == "idle" {
-            updateState = "confirm";
-            timer = setTimeout(lambda { updateState = "idle"; }, 4000);
-        } elif updateState == "confirm" {
-            if timer is not None { clearTimeout(float(str(timer))); }
-            updateState = "updating";
-            # NOTE: no /system/update backend endpoint exists — placeholder reload only.
-            setTimeout(lambda { _reload(); }, 20000);
-        }
-    }
-
-    def _updateLabel() -> str {
-        if updateState == "confirm" { return "CONFIRM RESTART?"; }
-        if updateState == "updating" { return "UPDATING…"; }
-        return "⟳ UPDATE APP";
-    }
-
     # ---- LAUNCH tab ----
     def _launch() -> JsxElement {
         isRunning = job is not None and str(job["status"]) == "running";
         optKeys = SFT_OPT_KEYS if formMode == "sft" else DPO_OPT_KEYS;
-        btn = "rounded-lg border border-neutral-600 px-3 py-1 font-mono text-[10px] transition-colors hover:border-neutral-400 disabled:opacity-30 ";
+        pinnedLine: str = (
+            f"showing run {launchedRun['run_id']} · {launchedRun['name']}/{launchedRun['mode']}"
+            if "run_id" in launchedRun else ""
+        );
+        # backend messages ("busy: <holder> is running", "run X superseded; not
+        # stopped") arrive on the status/stop dict — must reach the UI.
+        jobMsg: str = str(job["message"] or "") if job is not None else "";
         return <div className="flex items-start gap-4 p-4 pt-5">
-            <div className="relative flex min-w-0 flex-1 flex-col gap-3 rounded-md border border-neutral-800 bg-[#0d0d0d] p-4 pt-5">
-                <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">LAUNCH.CONFIG</span>
+            <div className="relative flex min-w-0 flex-1 flex-col gap-3 rounded-md border border-border bg-card p-4 pt-5">
+                <span className="micro-label absolute -top-2 left-3 bg-background px-2">LAUNCH CONFIG</span>
 
                 {formMode == "sft" and <Field label="BASE MODEL (HF ID)">
                     <TextInput value={formModelId} onSet={lambda v: str { updateForm("modelId", v); }} placeholder="org/model" mono={True} />
@@ -413,27 +422,31 @@ def:pub Train(active: bool) -> JsxElement {
                     </Field>
                 }}
 
-                <p className="stat-line mt-1 text-neutral-500">heavy workload · one training at a time, runs detached</p>
+                <p className="stat-line mt-1 text-muted-foreground">heavy workload · one training at a time, runs detached</p>
 
                 <div className="mt-2 flex gap-2">
-                    <button onClick={lambda e: MouseEvent { doStart(); }} disabled={isRunning} className={btn + "text-neutral-100"}>▶ START {formMode.upper()}</button>
-                    <button onClick={lambda e: MouseEvent { doStop(); }} disabled={not isRunning} className={btn + "text-neutral-400"}>■ STOP</button>
+                    <Button variant="solid" onClick={lambda e: MouseEvent { doStart(); }} disabled={isRunning}>▶ START {formMode.upper()}</Button>
+                    <Button variant="outline" onClick={lambda e: MouseEvent { doStop(); }} disabled={not isRunning}>■ STOP</Button>
                 </div>
 
-                {error and <p className="stat-line mt-1 text-neutral-400">{error}</p>}
+                {error and <p className="stat-line mt-1 text-muted-foreground">{error}</p>}
             </div>
 
-            <div className="relative flex min-w-0 flex-1 flex-col gap-3 rounded-md border border-neutral-800 bg-[#0d0d0d] p-4 pt-5">
-                <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">RUN.STATUS</span>
+            <div className="relative flex min-w-0 flex-1 flex-col gap-3 rounded-md border border-border bg-card p-4 pt-5">
+                <span className="micro-label absolute -top-2 left-3 bg-background px-2">RUN STATUS</span>
+
+                {pinnedLine != "" and <p key="pinned-run" className="stat-line text-muted-foreground/70">{pinnedLine}</p>}
 
                 <div className="flex flex-wrap items-center gap-3">
                     <StatusGlyph status={str(job["status"]) if job is not None else "idle"} showLabel={True} />
                 </div>
 
+                {jobMsg != "" and <p key="job-msg" className="stat-line text-warning">{jobMsg}</p>}
+
                 {job is not None and <div className="flex flex-col gap-1">
-                    {int(str(job["pid"])) > 0 and <span className="font-mono text-[11px] text-neutral-500">PID {str(job["pid"])}</span>}
-                    {str(job["started"]) and <span className="font-mono text-[11px] text-neutral-500">STARTED {str(job["started"])}</span>}
-                    {int(str(job["last_iter"])) > 0 and <span className="font-mono text-[11px] text-neutral-500">LAST ITER {str(job["last_iter"])}</span>}
+                    {int(str(job["pid"])) > 0 and <span className="font-mono text-[11px] text-muted-foreground">PID {str(job["pid"])}</span>}
+                    {str(job["started"]) and <span className="font-mono text-[11px] text-muted-foreground">STARTED {str(job["started"])}</span>}
+                    {int(str(job["last_iter"])) > 0 and <span className="font-mono text-[11px] text-muted-foreground">LAST ITER {str(job["last_iter"])}</span>}
                 </div>}
 
                 <LogView text={str(job["log_tail"]) if job is not None else ""} maxH="24rem" />
@@ -442,22 +455,12 @@ def:pub Train(active: bool) -> JsxElement {
     }
 
     # ---- MONITOR tab ----
-    def _feedChip() -> JsxElement {
-        if feed == "live" {
-            return <span className="font-mono text-[10px] tracking-widest text-neutral-100">⦿ LIVE</span>;
-        }
-        if feed == "stalled" {
-            return <span className="font-mono text-[10px] tracking-widest text-neutral-400">⦿ STALLED {str(stalledFor)}s</span>;
-        }
-        return <span className="font-mono text-[10px] tracking-widest text-neutral-600">○ NO FEED</span>;
-    }
-
     def _monitor() -> JsxElement {
         running: list = [s for s in sessions if str(s["status"]) == "running"];
         if len(running) == 0 {
             return <div className="flex h-full flex-1 flex-col items-center justify-center gap-1 p-4">
                 <span className="micro-label">NO LIVE RUNS</span>
-                <span className="stat-line text-neutral-600">launch from the LAUNCH tab · finished runs live in HISTORY</span>
+                <span className="stat-line text-muted-foreground/70">launch from the LAUNCH tab · finished runs live in HISTORY</span>
             </div>;
         }
         found = metrics is not None and bool(metrics["found"]);
@@ -465,19 +468,21 @@ def:pub Train(active: bool) -> JsxElement {
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex flex-wrap items-center gap-1">
                     {for s in running {
-                        <button
+                        <Chip
                             key={str(s["name"]) + "|" + str(s["mode"])}
                             onClick={lambda e: MouseEvent { pickSession(str(s["name"]), str(s["mode"])); }}
-                            className={"rounded-md border px-3 py-1 font-mono text-[10px] tracking-widest transition-colors " + (
-                                "border-neutral-500 bg-[#1a1a1a] text-neutral-100" if (selName == str(s["name"]) and selMode == str(s["mode"]))
-                                else "border-neutral-700 text-neutral-500 hover:text-neutral-300"
-                            )}
+                            selected={selName == str(s["name"]) and selMode == str(s["mode"])}
+                            className="font-mono text-[10px] tracking-widest"
                         >
                             {str(s["label"]) if "label" in s else (str(s["name"]) + "·" + str(s["mode"]))}
-                        </button>
+                        </Chip>
                     }}
                 </div>
-                {_feedChip()}
+                <StatusGlyph
+                    status={feed}
+                    showLabel={True}
+                    label={f"STALLED {stalledFor}s" if feed == "stalled" else ""}
+                />
             </div>
 
             {not found and <div className="flex flex-1 items-center justify-center"><span className="micro-label">NO RUN DATA</span></div>}
@@ -486,19 +491,22 @@ def:pub Train(active: bool) -> JsxElement {
     }
 
     # ---- HISTORY tab ----
-    def _hasRun(pool: list, nm: str, md: str) -> bool {
+    # `pool: any` — receives the all-optional `pastSessions` props param (see _historyRuns).
+    def _hasRun(pool: any, nm: str, md: str) -> bool {
         for s in pool {
             if str(s["name"]) == nm and str(s["mode"]) == md { return True; }
         }
         return False;
     }
 
-    def _historyRuns(pastSessions: list) -> JsxElement {
-        if len(pastSessions) == 0 {
+    # `pastSessions: any` — receives a props dict at the call site (same quirk as _cmpRow).
+    def _historyRuns(pastSessions: any = None) -> JsxElement {
+        pool: list = list(pastSessions);
+        if len(pool) == 0 {
             return <div className="flex flex-1 items-center justify-center"><span className="micro-label">NO FINISHED RUNS</span></div>;
         }
         mdls: list[str] = [];
-        for s in pastSessions {
+        for s in pool {
             nm = str(s["name"]);
             if nm not in mdls { mdls.append(nm); }
         }
@@ -510,16 +518,14 @@ def:pub Train(active: bool) -> JsxElement {
                     <span className="micro-label">MODEL</span>
                     <div className="flex gap-2">
                         {for name in mdls {
-                            <button
+                            <Chip
                                 key={name}
                                 onClick={lambda e: MouseEvent { pickHistory(name, selModeH); }}
-                                className={"rounded-md border px-4 py-1.5 font-mono text-xs transition-colors " + (
-                                    "border-neutral-500 bg-[#1a1a1a] text-neutral-100" if selModel == name
-                                    else "border-neutral-800 text-neutral-400 hover:border-neutral-600 hover:text-neutral-200"
-                                )}
+                                selected={selModel == name}
+                                className="px-4 py-1.5 font-mono"
                             >
                                 {name}
-                            </button>
+                            </Chip>
                         }}
                     </div>
                 </div>
@@ -530,11 +536,11 @@ def:pub Train(active: bool) -> JsxElement {
                         {for mode in ["sft", "dpo"] {
                             <button
                                 key={mode}
-                                disabled={not (_hasRun(pastSessions, selModel, mode) if selModel != "" else True)}
+                                disabled={not (_hasRun(pool, selModel, mode) if selModel != "" else True)}
                                 onClick={lambda e: MouseEvent { pickHistory(selModel if selModel != "" else mdls[0], mode); }}
                                 className={"rounded-md border px-4 py-1.5 font-mono text-xs uppercase tracking-widest transition-colors disabled:opacity-30 " + (
-                                    ("border-[#b89ce8]/50 bg-[#1a1a1a] text-[#b89ce8]" if mode == "dpo" else "border-[#7aa2f7]/50 bg-[#1a1a1a] text-[#7aa2f7]") if selModeH == mode
-                                    else "border-neutral-800 text-neutral-400 hover:border-neutral-600 hover:text-neutral-200"
+                                    ("border-chart-4/50 bg-accent text-chart-4" if mode == "dpo" else "border-chart-1/50 bg-accent text-chart-1") if selModeH == mode
+                                    else "border-border text-muted-foreground hover:border-ring hover:text-foreground"
                                 )}
                             >
                                 {mode}
@@ -543,7 +549,7 @@ def:pub Train(active: bool) -> JsxElement {
                     </div>
                 </div>
 
-                <span className="stat-line pb-1.5 text-neutral-600">{str(MODE_DESC[selModeH]) if selModeH in MODE_DESC else ""}</span>
+                <span className="stat-line pb-1.5 text-muted-foreground/70">{str(MODE_DESC[selModeH]) if selModeH in MODE_DESC else ""}</span>
             </div>
 
             {histName == "" and <div className="flex flex-1 items-center justify-center"><span className="micro-label">SELECT A MODEL ABOVE</span></div>}
@@ -575,7 +581,7 @@ def:pub Train(active: bool) -> JsxElement {
         return <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto p-4">
             <div className="flex flex-wrap items-center gap-3">
                 <Segmented options={["runs", "compare"]} value={historyView} onSet={lambda v: str { historyView = v; }} />
-                <span className="stat-line text-neutral-600">{"inspect one finished run in detail" if historyView == "runs" else "overlay every run of one stage"}</span>
+                <span className="stat-line text-muted-foreground/70">{"inspect one finished run in detail" if historyView == "runs" else "overlay every run of one stage"}</span>
             </div>
             {historyView == "runs" and _historyRuns({"pastSessions": pastSessions})}
             {historyView == "compare" and _historyCompare()}
@@ -583,25 +589,9 @@ def:pub Train(active: bool) -> JsxElement {
     }
 
     return <div className="flex h-full min-w-0 flex-1 flex-col">
-        <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-2.5">
+        <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
             <SubTabs tabs={TABS} active={tab.upper()} onTab={onTab} />
-            <div className="flex items-center gap-2">
-                <button
-                    onClick={lambda e: MouseEvent { handleUpdate(); }}
-                    disabled={updateState == "updating"}
-                    className={"rounded-lg border border-neutral-600 px-3 py-1 font-mono text-[10px] transition-colors hover:border-neutral-400 disabled:opacity-30 " + (
-                        "text-neutral-100" if updateState == "confirm" else "text-neutral-400"
-                    )}
-                >
-                    {_updateLabel()}
-                </button>
-                <span className="micro-label text-neutral-600">TRAIN.CTL</span>
-            </div>
         </div>
-
-        {updateState == "updating" and <div className="border-b border-neutral-800 px-4 py-1">
-            <span className="stat-line text-neutral-500">restarting · page reloads in ~20s</span>
-        </div>}
 
         <div className="min-h-0 flex-1 overflow-y-auto">
             {tab == "launch" and _launch()}

@@ -11,8 +11,9 @@ app (deleted) and the earlier web_app/ + dashboard_app/.
     ./studio/start.sh             # one process: API :8001 + Vite UI :8000
     open http://localhost:8000
 
-Models/dataset/results are read from `JAC_STUDIO_DATA_ROOT` (default: the
-main DataGeneration checkout — those dirs are gitignored, worktrees lack them).
+Models/dataset/results are read from `JAC_STUDIO_DATA_ROOT` (default: this
+repo's root). SFT/DPO fused models and gemma adapters are symlinks into the
+legacy DataGeneration checkout — those dirs are gitignored, worktrees lack them.
 
 ## Layout
 

@@ -6,7 +6,7 @@ on evals.sv.jac (called directly over RPC, not walkers). The active run is polle
 every 2.5s while it is running via a setInterval re-armed whenever `current` changes
 (dependency effect) — this sidesteps the stale-closure trap of a single mount timer.
 
-Errors render gray (text-neutral-100), never red — matches the monochrome theme.
+Errors render gray (text-foreground), never red — matches the monochrome theme.
 """
 
 sv import from ...evals { create_eval, list_evals, get_eval, stop_eval, delete_eval, EvalView }
@@ -15,6 +15,8 @@ import from ..shared.Field { Field, TextInput, Segmented }
 import from ..shared.StatusGlyph { StatusGlyph }
 import from ..shared.LogView { LogView }
 import from ..shared.StatTile { StatTile }
+import from ..shared.Button { Button }
+import from ..shared.Chip { Chip }
 
 def _stripModels(m: str) -> str {
     if m.startswith("models/") { return m[7:]; }
@@ -62,14 +64,15 @@ def _headline(r: any) -> str {
 }
 
 # Latest done eval for (model, holdout); `done` is newest-first, so first match wins.
-def _match(done: list, mdl: any, h: str) -> any {
+# `done: any` — receives an all-optional props param from _cell (see note there).
+def _match(done: any, mdl: any, h: str) -> any {
     for r in done {
         if r.model == mdl and str(r.holdout) == h { return r; }
     }
     return None;
 }
 
-def:pub Evals -> JsxElement {
+def:pub Evals(active: bool = False) -> JsxElement {
     has models: list[ModelView] = [],
         kind: str = "probe",
         modelId: str = "",
@@ -109,10 +112,14 @@ def:pub Evals -> JsxElement {
         await _refreshList();
     }
 
-    # Re-arm the poll timer whenever the active run changes. Clearing the prior
-    # interval first acts as the effect cleanup (this fires on every `current` set).
-    can with [current] entry {
+    # Re-arm the poll timer whenever the active run changes; poll only while the
+    # section is visible (hidden sections must not hammer the backend). On
+    # re-activation the list refreshes once so a run that finished while hidden
+    # resolves immediately.
+    async can with [current, active] entry {
         if pollId { clearInterval(float(str(pollId))); pollId = None; }
+        if not active { return; }
+        await _refreshList();
         c: any = current;
         if c and str(c.status) == "running" {
             cid = str(c.id);
@@ -180,13 +187,13 @@ def:pub Evals -> JsxElement {
         for m in models {
             if m.available { avail.append(m); }
         }
-        return <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-4 pt-5">
-            <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">EVAL.LAUNCH</span>
+        return <div className="relative rounded-md border border-border bg-card p-4 pt-5">
+            <span className="micro-label absolute -top-2 left-3 bg-background px-2">LAUNCH</span>
             <div className="flex flex-col gap-4">
                 <Field label="KIND">
                     <div className="flex flex-col gap-1">
                         <Segmented options={["probe", "idiom"]} value={kind} onSet={lambda v: str { kind = v; }} />
-                        <span className="stat-line text-neutral-600">{
+                        <span className="stat-line text-muted-foreground/70">{
                             "behavioral test-pass on holdout" if kind == "probe"
                             else "ROUGE vs transpile judge: idiomatic similarity score"
                         }</span>
@@ -196,16 +203,14 @@ def:pub Evals -> JsxElement {
                     <div className="flex flex-col gap-2">
                         {len(avail) > 0 and <div className="flex flex-wrap gap-1">
                             {for m in avail {
-                                <button
+                                <Chip
                                     key={str(m.id)}
                                     onClick={lambda e: MouseEvent { modelId = m.id; modelPath = ""; }}
-                                    className={"rounded-md border px-2 py-1 text-xs transition-colors " + (
-                                        "border-neutral-500 bg-[#1a1a1a] text-neutral-100" if (modelId == m.id and not modelPath)
-                                        else "border-neutral-700 text-neutral-500 hover:text-neutral-300"
-                                    )}
+                                    selected={modelId == m.id and not modelPath}
+                                    className="px-2"
                                 >
                                     {m.label}
-                                </button>
+                                </Chip>
                             }}
                         </div>}
                         <TextInput
@@ -228,14 +233,15 @@ def:pub Evals -> JsxElement {
                 {kind == "idiom" and <Field label="SIM THRESHOLD">
                     <TextInput value={simThreshold} onSet={lambda v: str { simThreshold = v; }} placeholder="0.7" mono={True} />
                 </Field>}
-                <button
+                <Button
+                    variant="solid"
                     onClick={lambda e: MouseEvent { start(); }}
                     disabled={busy}
-                    className="mt-1 w-full rounded-md border border-neutral-600 bg-[#1a1a1a] py-1.5 text-xs text-neutral-100 transition-colors hover:border-neutral-400 hover:bg-[#222] disabled:cursor-not-allowed disabled:opacity-40"
+                    className="mt-1 w-full py-1.5"
                 >
                     {"LAUNCHING…" if busy else "LAUNCH"}
-                </button>
-                {error and <span className="stat-line text-neutral-100">{error}</span>}
+                </Button>
+                {error and <span className="stat-line text-foreground">{error}</span>}
             </div>
         </div>;
     }
@@ -260,27 +266,28 @@ def:pub Evals -> JsxElement {
 
     def _runView -> JsxElement {
         run: any = current;
-        return <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-4 pt-5">
-            <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">EVAL.RUN</span>
+        return <div className="relative rounded-md border border-border bg-card p-4 pt-5">
+            <span className="micro-label absolute -top-2 left-3 bg-background px-2">ACTIVE RUN</span>
             {if not run {
-                <span className="micro-label text-neutral-600">NO ACTIVE EVAL</span>
+                <span key="none" className="micro-label text-muted-foreground/70">NO ACTIVE EVAL</span>
                 skip;
             }}
             {if run {
-                <div className="flex flex-col gap-4">
+                <div key="run" className="flex flex-col gap-4">
                     <div className="flex items-center justify-between gap-3">
                         <div className="flex min-w-0 items-center gap-3">
                             <StatusGlyph status={str(run.status)} showLabel={True} />
-                            <span className="truncate font-mono text-xs text-neutral-300">
+                            <span className="truncate font-mono text-xs text-foreground/80">
                                 #{str(run.id)} {str(run.kind)} · {_stripModels(str(run.model))} · {str(run.holdout)}
                             </span>
                         </div>
-                        {str(run.status) == "running" and <button
+                        {str(run.status) == "running" and <Button
+                            variant="ghost"
                             onClick={lambda e: MouseEvent { stopActive(); }}
-                            className="shrink-0 rounded-md border border-neutral-700 px-3 py-1 text-xs text-neutral-400 transition-colors hover:border-neutral-500 hover:text-neutral-200"
+                            className="shrink-0"
                         >
                             STOP
-                        </button>}
+                        </Button>}
                     </div>
                     {run.scores and _scoreTiles({"run": run})}
                     <LogView text={str(run.log_tail)} maxH="16rem" />
@@ -291,17 +298,17 @@ def:pub Evals -> JsxElement {
     }
 
     def _history -> JsxElement {
-        return <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-4 pt-5">
-            <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">EVAL.HISTORY</span>
+        return <div className="relative rounded-md border border-border bg-card p-4 pt-5">
+            <span className="micro-label absolute -top-2 left-3 bg-background px-2">HISTORY</span>
             {if len(history) == 0 {
-                <span className="micro-label text-neutral-600">no evals yet</span>
+                <span className="micro-label text-muted-foreground/70">no evals yet</span>
                 skip;
             }}
             {if len(history) > 0 {
                 <div className="overflow-x-auto">
                     <table className="w-full text-xs">
                         <thead>
-                            <tr className="border-b border-neutral-800 text-neutral-600">
+                            <tr className="border-b border-border text-muted-foreground/70">
                                 <th className="micro-label pb-1.5 pr-3 text-left font-normal">#</th>
                                 <th className="micro-label pb-1.5 pr-3 text-left font-normal">DATE</th>
                                 <th className="micro-label pb-1.5 pr-3 text-left font-normal">KIND</th>
@@ -317,9 +324,9 @@ def:pub Evals -> JsxElement {
                                 <tr
                                     key={str(r.id)}
                                     onClick={lambda e: MouseEvent { openEval(str(r.id)); }}
-                                    className="cursor-pointer border-b border-neutral-900 text-neutral-400 transition-colors hover:bg-[#111] hover:text-neutral-200"
+                                    className="cursor-pointer border-b border-border/50 text-muted-foreground transition-colors hover:bg-popover hover:text-foreground"
                                 >
-                                    <td className="py-1.5 pr-3 font-mono text-neutral-500">{str(r.id)}</td>
+                                    <td className="py-1.5 pr-3 font-mono text-muted-foreground">{str(r.id)}</td>
                                     <td className="whitespace-nowrap py-1.5 pr-3 font-mono">{str(r.started)[:16]}</td>
                                     <td className="py-1.5 pr-3">{str(r.kind)}</td>
                                     <td className="max-w-[160px] truncate py-1.5 pr-3 font-mono" title={str(r.model)}>{_stripModels(str(r.model))}</td>
@@ -327,12 +334,13 @@ def:pub Evals -> JsxElement {
                                     <td className="py-1.5 pr-3 font-mono">{_headline(r)}</td>
                                     <td className="py-1.5 pr-3"><StatusGlyph status={str(r.status)} showLabel={False} /></td>
                                     <td className="py-1.5">
-                                        <button
+                                        <Button
+                                            variant="ghost"
                                             onClick={lambda e: MouseEvent { e.stopPropagation(); removeEval(str(r.id)); }}
-                                            className="micro-label text-neutral-600 transition-colors hover:text-neutral-300"
+                                            className="p-0"
                                         >
                                             DEL
-                                        </button>
+                                        </Button>
                                     </td>
                                 </tr>
                             }}
@@ -344,7 +352,9 @@ def:pub Evals -> JsxElement {
         </div>;
     }
 
-    def _cell(done: list, mdl: any, h: str, bestProbe: dict, bestIdiom: dict) -> JsxElement {
+    # All-optional params: called with a props dict (compiler quirk), which the
+    # checker otherwise flags E1050 "missing required parameters".
+    def _cell(done: any = None, mdl: any = None, h: str = "", bestProbe: any = None, bestIdiom: any = None) -> JsxElement {
         rec = _match(done, mdl, h);
         txt = "·";
         isBest = False;
@@ -360,7 +370,7 @@ def:pub Evals -> JsxElement {
                 }
             }
         }
-        cls = "py-1.5 pr-4 font-mono " + ("font-semibold text-neutral-100" if isBest else "text-neutral-400");
+        cls = "py-1.5 pr-4 font-mono " + ("font-semibold text-foreground" if isBest else "text-muted-foreground");
         return <td key={h} className={cls}>{txt}</td>;
     }
 
@@ -370,9 +380,9 @@ def:pub Evals -> JsxElement {
             if str(r.status) == "done" { done.append(r); }
         }
         if len(done) < 2 {
-            return <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-4 pt-5">
-                <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">MODEL × HOLDOUT</span>
-                <span className="micro-label text-neutral-600">need ≥2 completed evals</span>
+            return <div className="relative rounded-md border border-border bg-card p-4 pt-5">
+                <span className="micro-label absolute -top-2 left-3 bg-background px-2">MODEL × HOLDOUT</span>
+                <span className="micro-label text-muted-foreground/70">need ≥2 completed evals</span>
             </div>;
         }
         modelsU: list = [];
@@ -409,12 +419,12 @@ def:pub Evals -> JsxElement {
             }
         }
 
-        return <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-4 pt-5">
-            <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">MODEL × HOLDOUT</span>
+        return <div className="relative rounded-md border border-border bg-card p-4 pt-5">
+            <span className="micro-label absolute -top-2 left-3 bg-background px-2">MODEL × HOLDOUT</span>
             <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                     <thead>
-                        <tr className="border-b border-neutral-800 text-neutral-600">
+                        <tr className="border-b border-border text-muted-foreground/70">
                             <th className="micro-label pb-1.5 pr-4 text-left font-normal">MODEL</th>
                             {for h in holdouts {
                                 <th key={h} className="micro-label pb-1.5 pr-4 text-left font-normal">{h.upper()}</th>
@@ -423,8 +433,8 @@ def:pub Evals -> JsxElement {
                     </thead>
                     <tbody>
                         {for mdl in modelsU {
-                            <tr key={str(mdl)} className="border-b border-neutral-900">
-                                <td className="max-w-[160px] truncate py-1.5 pr-4 font-mono text-neutral-500" title={str(mdl)}>{_stripModels(str(mdl))}</td>
+                            <tr key={str(mdl)} className="border-b border-border/50">
+                                <td className="max-w-[160px] truncate py-1.5 pr-4 font-mono text-muted-foreground" title={str(mdl)}>{_stripModels(str(mdl))}</td>
                                 {[_cell({"done": done, "mdl": mdl, "h": h, "bestProbe": bestProbe, "bestIdiom": bestIdiom}) for h in holdouts]}
                             </tr>
                         }}
@@ -435,9 +445,8 @@ def:pub Evals -> JsxElement {
     }
 
     return <div className="flex h-full min-w-0 flex-1 flex-col">
-        <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-2.5">
+        <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
             <span className="micro-label">EVALS</span>
-            <span className="micro-label text-neutral-600">EVAL.CTL</span>
         </div>
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
             <div className="grid gap-4" style={{"gridTemplateColumns": "360px 1fr"}}>
