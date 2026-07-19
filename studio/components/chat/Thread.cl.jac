@@ -4,7 +4,84 @@ Asymmetric bubbles: the user is a right-aligned light pill, the assistant is a
 left-aligned borderless block whose fenced ```code``` segments render as labelled
 copy-able OUTPUT panes. When two assistant messages share a `pairGroup` (COMPARE
 mode) they render side-by-side in a 2-col grid of dashed panes labelled per model.
+
+Prose segments (headers/bold/lists/tables/links -- anything outside a fenced
+```code``` block) render through react-markdown + remark-gfm instead of a flat
+whitespace-pre-wrap <p>, so a model's markdown formatting actually shows up
+instead of raw ** and | characters. Component overrides below map each
+markdown element to the app's existing monochrome Tailwind tokens (same
+neutral-800/900 borders and text-neutral-200/500 scale as CodeBlock uses)
+rather than pulling in the Tailwind Typography plugin, which would fight this
+app's deliberately custom look.
 """
+
+cl import from "react-markdown" { default as Markdown }
+cl import from "remark-gfm" { default as remarkGfm }
+
+def _mdH1(props: any) -> JsxElement {
+    return <h2 className="mb-2 mt-3 text-base font-semibold text-neutral-100 first:mt-0">{props.children}</h2>;
+}
+def _mdH2(props: any) -> JsxElement {
+    return <h3 className="mb-2 mt-3 text-sm font-semibold text-neutral-100 first:mt-0">{props.children}</h3>;
+}
+def _mdH3(props: any) -> JsxElement {
+    return <h4 className="mb-1.5 mt-2.5 text-sm font-semibold text-neutral-200 first:mt-0">{props.children}</h4>;
+}
+def _mdP(props: any) -> JsxElement {
+    return <p className="mb-2 text-sm leading-relaxed text-neutral-200 last:mb-0">{props.children}</p>;
+}
+def _mdUl(props: any) -> JsxElement {
+    return <ul className="mb-2 ml-4 list-disc space-y-1 text-sm leading-relaxed text-neutral-200">{props.children}</ul>;
+}
+def _mdOl(props: any) -> JsxElement {
+    return <ol className="mb-2 ml-4 list-decimal space-y-1 text-sm leading-relaxed text-neutral-200">{props.children}</ol>;
+}
+def _mdLi(props: any) -> JsxElement {
+    return <li className="pl-1">{props.children}</li>;
+}
+def _mdStrong(props: any) -> JsxElement {
+    return <strong className="font-semibold text-neutral-50">{props.children}</strong>;
+}
+def _mdEm(props: any) -> JsxElement {
+    return <em className="italic text-neutral-200">{props.children}</em>;
+}
+def _mdCode(props: any) -> JsxElement {
+    return <code className="rounded bg-[#121212] px-1 py-0.5 font-mono text-xs text-neutral-200">{props.children}</code>;
+}
+def _mdA(props: any) -> JsxElement {
+    return <a
+        href={props.href}
+        target="_blank"
+        rel="noreferrer"
+        className="text-neutral-200 underline decoration-neutral-600 underline-offset-2 hover:text-neutral-50"
+    >{props.children}</a>;
+}
+def _mdBlockquote(props: any) -> JsxElement {
+    return <blockquote className="mb-2 border-l-2 border-neutral-700 pl-3 text-sm italic text-neutral-400">{props.children}</blockquote>;
+}
+def _mdHr(props: any) -> JsxElement {
+    return <hr className="my-3 border-neutral-800" />;
+}
+def _mdTable(props: any) -> JsxElement {
+    return <div className="mb-2 overflow-x-auto"><table className="w-full border-collapse text-sm">{props.children}</table></div>;
+}
+def _mdThead(props: any) -> JsxElement {
+    return <thead className="border-b border-neutral-700">{props.children}</thead>;
+}
+def _mdTh(props: any) -> JsxElement {
+    return <th className="px-2 py-1 text-left font-mono text-[10px] uppercase tracking-wide text-neutral-500">{props.children}</th>;
+}
+def _mdTd(props: any) -> JsxElement {
+    return <td className="border-t border-neutral-800 px-2 py-1 text-neutral-200">{props.children}</td>;
+}
+
+glob MD_COMPONENTS: dict = {
+    "h1": _mdH1, "h2": _mdH2, "h3": _mdH3, "h4": _mdH3, "h5": _mdH3, "h6": _mdH3,
+    "p": _mdP, "ul": _mdUl, "ol": _mdOl, "li": _mdLi,
+    "strong": _mdStrong, "em": _mdEm, "code": _mdCode, "a": _mdA,
+    "blockquote": _mdBlockquote, "hr": _mdHr,
+    "table": _mdTable, "thead": _mdThead, "th": _mdTh, "td": _mdTd,
+};
 
 def _copy(text: str) -> None {
     nav: any = navigator;
@@ -102,7 +179,7 @@ def:pub Bubble(msg: dict, label: str, paired: bool, userText: str, onSave: any) 
                     skip;
                 }}
                 {if part["kind"] == "text" {
-                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-neutral-200">{str(part["text"])}</p>
+                    <Markdown remarkPlugins={[remarkGfm]} components={MD_COMPONENTS}>{str(part["text"])}</Markdown>
                     skip;
                 }}
             </div>
