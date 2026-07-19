@@ -22,6 +22,7 @@ import from .sections.Results { Results }
 import from .sections.Generate { Generate }
 import from .sections.CptData { CptData }
 import from .sections.CptTrain { CptTrain }
+import from .sections.CptResults { CptResults }
 import from .sections.Plan { Plan }
 
 glob WS_DEFAULT_MODEL: dict = {"01": "qwen-dpo", "02": "qwen3coder-rl", "03": "qwen-q4"};
@@ -142,17 +143,20 @@ def:pub AppShell -> JsxElement {
             <div className={slot("01", "chat")}><Chat workspace="01" defaultModel={str(WS_DEFAULT_MODEL["01"])} /></div>
             <div className={slot("01", "data")}><Data active={workspace == "01" and str(sections["01"]) == "data"} /></div>
             <div className={slot("01", "train")}><Train active={workspace == "01" and str(sections["01"]) == "train"} /></div>
-            <div className={slot("01", "evals")}><Evals active={workspace == "01" and str(sections["01"]) == "evals"} /></div>
+            <div className={slot("01", "results")}><Evals active={workspace == "01" and str(sections["01"]) == "results"} /></div>
+            <div className={slot("01", "plan")}><Plan workspace="01" /></div>
 
             <div className={slot("02", "chat")}><Chat workspace="02" defaultModel={str(WS_DEFAULT_MODEL["02"])} /></div>
             <div className={slot("02", "data")}><RlData /></div>
+            <div className={slot("02", "train")}><Generate /></div>
             <div className={slot("02", "results")}><Results /></div>
-            <div className={slot("02", "generate")}><Generate /></div>
+            <div className={slot("02", "plan")}><Plan workspace="02" /></div>
 
             <div className={slot("03", "chat")}><Chat workspace="03" defaultModel={str(WS_DEFAULT_MODEL["03"])} /></div>
             <div className={slot("03", "data")}><CptData /></div>
             <div className={slot("03", "train")}><CptTrain active={workspace == "03" and str(sections["03"]) == "train"} /></div>
-            <div className={slot("03", "plan")}><Plan /></div>
+            <div className={slot("03", "results")}><CptResults active={workspace == "03" and str(sections["03"]) == "results"} /></div>
+            <div className={slot("03", "plan")}><Plan workspace="03" /></div>
         </div>
     </div>;
 }

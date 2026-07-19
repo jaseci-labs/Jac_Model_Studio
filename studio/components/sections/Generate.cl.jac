@@ -54,7 +54,7 @@ def:pub Generate -> JsxElement {
 
     return <div className="flex h-full min-w-0 flex-1 flex-col">
         <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
-            <span className="micro-label">GENERATE · best-of-k + compiler verifier (~78%)</span>
+            <span className="micro-label">TRAIN · RL (GRPO ran offline) · deployed artifact: best-of-k + compiler verifier (~78%)</span>
             <span className="micro-label text-muted-foreground/70">{"sampling…" if genBusy else ""}</span>
         </div>
 

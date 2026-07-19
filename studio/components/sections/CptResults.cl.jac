@@ -33,7 +33,10 @@ def:pub CptResults(active: bool = False) -> JsxElement {
 
     def RunBlock(name: any = None) -> JsxElement {
         a: any = all;
-        d: any = a[str(name)] if a and str(name) in a else None;
+        d: any = None;
+        if a {
+            try { d = a[str(name)]; } except Exception { d = None; }
+        }
         if not d {
             return <div key={str(name)}><EmptyState label={"NO DATA · " + str(name)} /></div>;
         }
