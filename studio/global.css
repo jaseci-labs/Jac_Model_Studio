@@ -356,7 +356,7 @@
 
 body {
   background-color: var(--background);
-  background-image: radial-gradient(var(--muted) 1px, transparent 1px);
+  background-image: var(--bg-pattern, radial-gradient(var(--muted) 1px, transparent 1px));
   background-size: 18px 18px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -409,3 +409,81 @@ body {
 [data-ws="01"] { --ws-accent: var(--ws01); }
 [data-ws="02"] { --ws-accent: var(--ws02); }
 [data-ws="03"] { --ws-accent: var(--ws03); }
+
+/* ============================================================================
+   THEME DESIGN LAYER — themes are personalities, not palettes. Each block
+   changes typography, shape language, elevation, density, and background
+   treatment. terminal (default) keeps: dot-grid, flat borders, mono uppercase
+   micro-labels.
+   ========================================================================== */
+
+/* shadcn-light · "studio": clean SaaS — no grid, soft elevation, humanist
+   sentence-case labels. */
+:root[data-theme="shadcn-light"] { --bg-pattern: none; }
+:root[data-theme="shadcn-light"] .micro-label {
+  font-family: var(--font-sans);
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-size: 11px;
+  font-weight: 600;
+}
+:root[data-theme="shadcn-light"] .bg-card {
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.05), 0 4px 12px rgb(0 0 0 / 0.04);
+}
+
+/* shadcn-dark: same humanist type, dark elevation instead of borders-only. */
+:root[data-theme="shadcn-dark"] { --bg-pattern: none; }
+:root[data-theme="shadcn-dark"] .micro-label {
+  font-family: var(--font-sans);
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-size: 11px;
+  font-weight: 600;
+}
+:root[data-theme="shadcn-dark"] .bg-card {
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 8px 24px rgb(0 0 0 / 0.35);
+}
+
+/* linear · dense: the whole UI runs ~7% tighter (rem scale), no grid, quiet
+   flat surfaces, crisper tracking. */
+:root[data-theme="linear"] {
+  --bg-pattern: none;
+  font-size: 93.75%;
+}
+:root[data-theme="linear"] .micro-label { letter-spacing: 0.14em; }
+
+/* paper · editorial: ruled-paper feel — serif italic labels, small radius,
+   hairline rules, no dot grid. */
+:root[data-theme="paper"] {
+  --bg-pattern: none;
+  --radius: 0.25rem;
+}
+:root[data-theme="paper"] .micro-label {
+  font-family: var(--font-heading);
+  text-transform: none;
+  font-style: italic;
+  font-size: 12.5px;
+  letter-spacing: 0.01em;
+}
+:root[data-theme="paper"] .stat-line { font-family: var(--font-heading); font-style: italic; font-size: 11px; }
+:root[data-theme="paper"] .dashed-rule { border-top-style: solid; }
+
+/* gruvbox · retro terminal: chunkier dot grid, near-square corners, heavy
+   mono labels — CRT-era lab equipment. */
+:root[data-theme="gruvbox"] {
+  --bg-pattern: radial-gradient(var(--muted) 1.5px, transparent 1.5px);
+  --radius: 0.125rem;
+}
+:root[data-theme="gruvbox"] .micro-label { font-weight: 700; }
+:root[data-theme="gruvbox"] .bg-card { border-width: 2px; }
+
+/* high-contrast · brutalist: zero radius anywhere, thick borders, hard offset
+   card shadows, shouting labels. */
+:root[data-theme="high-contrast"] { --bg-pattern: none; }
+:root[data-theme="high-contrast"] * { border-radius: 0 !important; }
+:root[data-theme="high-contrast"] .bg-card {
+  box-shadow: 4px 4px 0 0 var(--border);
+  border-width: 2px;
+}
+:root[data-theme="high-contrast"] button { border-width: 2px; }
+:root[data-theme="high-contrast"] .micro-label { font-weight: 700; letter-spacing: 0.3em; }
