@@ -12,7 +12,6 @@ the shell command.
 
 import os;
 import shlex;
-import time;
 import jobs;
 import metrics;
 import models;
@@ -39,6 +38,7 @@ obj BuilderView {
     has stage: str = "",
         status: str = "idle",
         pid: int = 0,
+        run_id: str = "",
         started: str = "",
         log_tail: str = "",
         message: str = "";
@@ -66,6 +66,7 @@ def _build_status(stage: str, message: str = "") -> BuilderView {
         stage=stage,
         status=str(job.get("status", "idle")),
         pid=int(str(job.get("pid") or 0)),
+        run_id=str(job.get("run_id", "")),
         started=str(job.get("started", "")),
         log_tail=tail,
         message=message
@@ -98,31 +99,10 @@ def:pub run_builder(stage: str) -> BuilderView {
     if existing is not None and str(existing.get("status", "")) == "running" {
         return _build_status(stage, "already running");
     }
-    (models.results_dir() / "_builder").mkdir(parents=True, exist_ok=True);
-    # Erase any stale __EXIT__ marker from a prior run.
-    rl.write_text("");
     target = f"01-sft-dpo/sft_dpo/jacgen/{shlex.quote(stage)}.jac";
     inner_cmd = f"{shlex.quote(str(models.jac_bin()))} run {target}";
-    cmd = jobs.with_exit_marker(inner_cmd, rl);
     venv_bin = str(models.data_root() / ".venv" / "bin");
     env_overrides = {"PATH": f"{venv_bin}:{os.environ.get('PATH', '')}"};
-    pid = jobs.spawn_detached(cmd, rl, env_overrides, models.data_root());
-    now = time.strftime("%Y-%m-%d %H:%M:%S");
-    jobs.write_job(jf, {
-        "name": stage,
-        "mode": "builder",
-        "pid": pid,
-        "status": "running",
-        "started": now,
-        "cmd": inner_cmd
-    });
+    jobs.launch(jf, rl, inner_cmd, env_overrides, models.data_root(), {"name": stage, "mode": "builder"});
     return _build_status(stage, "started");
-}
-
-"""Live status for a single builder stage."""
-def:pub get_builder(stage: str) -> BuilderView {
-    if stage not in BUILDERS {
-        return BuilderView(stage=stage, status="idle", message=f"unknown builder stage: {stage}");
-    }
-    return _build_status(stage);
 }
