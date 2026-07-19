@@ -269,11 +269,11 @@ def:pub Evals(active: bool = False) -> JsxElement {
         return <div className="relative rounded-md border border-border bg-card p-4 pt-5">
             <span className="micro-label absolute -top-2 left-3 bg-background px-2">EVAL.RUN</span>
             {if not run {
-                <span className="micro-label text-muted-foreground/70">NO ACTIVE EVAL</span>
+                <span key="none" className="micro-label text-muted-foreground/70">NO ACTIVE EVAL</span>
                 skip;
             }}
             {if run {
-                <div className="flex flex-col gap-4">
+                <div key="run" className="flex flex-col gap-4">
                     <div className="flex items-center justify-between gap-3">
                         <div className="flex min-w-0 items-center gap-3">
                             <StatusGlyph status={str(run.status)} showLabel={True} />

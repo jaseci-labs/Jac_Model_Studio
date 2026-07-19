@@ -38,11 +38,11 @@ def:pub MonoChart(
     return <div className="relative rounded-md border border-border bg-card p-3 pt-4">
         <span className="micro-label absolute -top-2 left-3 bg-background px-2">{title}</span>
         {if len(data) == 0 {
-            <div className="micro-label flex items-center justify-center" style={{"height": 180}}>NO SIGNAL</div>
+            <div key="empty" className="micro-label flex items-center justify-center" style={{"height": 180}}>NO SIGNAL</div>
             skip;
         }}
         {if len(data) > 0 {
-            <ResponsiveContainer width="100%" height={180}>
+            <ResponsiveContainer key="chart" width="100%" height={180}>
                 <LineChart data={rows} margin={{"top": 10, "right": 14, "left": 0, "bottom": 0}}>
                     <CartesianGrid stroke={gridStroke()} vertical={False} />
                     <XAxis dataKey="x" tick={tick()} tickLine={False} axisLine={{"stroke": axisStroke()}} />
