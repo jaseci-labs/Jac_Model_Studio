@@ -1,4 +1,5 @@
-"""CHAT section — 3-pane: history sidebar | thread + composer | sampling rail.
+"""CHAT section — 3-pane: history sidebar | thread + composer | prompt rail.
+Sampling params are server defaults (temp 0.2, top_p 0.9, max_tokens 1024).
 
 Ports ui/components/chat-section.tsx + use-studio.ts. Chats persist to the OSP
 graph (persistence.sv.jac). Completion streams from /function/chat_stream (raw
@@ -14,8 +15,8 @@ sv import from ...models {
 sv import from ...prompts { list_prompts }
 sv import from ...data { add_examples }
 sv import from ...persistence {
-    create_chat, list_chats, delete_chat, get_messages, add_message, today_utc,
-    ChatView, MsgView
+    create_chat, list_chats, rename_chat, delete_chat, get_messages, add_message,
+    today_utc, ChatView, MsgView
 }
 import from ..chat.Sidebar { Sidebar }
 import from ..chat.Rail { Rail }
@@ -43,9 +44,6 @@ def:pub Chat(workspace: str, defaultModel: str) -> JsxElement {
         streaming: bool = False,
         stopRequested: bool = False,
         activeReader: any = None,
-        temperature: float = 0.2,
-        topP: float = 0.9,
-        maxTokens: int = 1024,
         ramGb: float = 0.0,
         residentGb: float = 0.0,
         loadedId: str = "",
@@ -118,6 +116,12 @@ def:pub Chat(workspace: str, defaultModel: str) -> JsxElement {
         messages = ms;
     }
 
+    async def renameChat(id: str, title: str) -> None {
+        await rename_chat(id, title);
+        cs = await list_chats(workspace=workspace);
+        chats = cs;
+    }
+
     async def removeChat(id: str) -> None {
         await delete_chat(id);
         cs = await list_chats(workspace=workspace);
@@ -185,10 +189,7 @@ def:pub Chat(workspace: str, defaultModel: str) -> JsxElement {
                 {
                     "method": "POST",
                     "headers": {"Content-Type": "application/json"},
-                    "body": JSON.stringify({
-                        "messages": hist, "model_id": legModel,
-                        "temperature": temperature, "top_p": topP, "max_tokens": maxTokens
-                    })
+                    "body": JSON.stringify({"messages": hist, "model_id": legModel})
                 }
             );
             reader: any = resp.body.getReader();
@@ -380,6 +381,7 @@ def:pub Chat(workspace: str, defaultModel: str) -> JsxElement {
             chats={chats} activeId={chatId} ramGb={ramGb} residentGb={residentGb}
             todayIso={todayIso} busy={streaming}
             onNew={newChat} onOpen={openChat} onDelete={removeChat}
+            onRename={renameChat}
         />
         <main className="flex min-w-0 flex-1 flex-col">
             <ModelPill
@@ -400,12 +402,9 @@ def:pub Chat(workspace: str, defaultModel: str) -> JsxElement {
         </main>
         <Rail
             prompts={prompts}
-            temperature={temperature} topP={topP} maxTokens={maxTokens} lastStats={lastStats}
+            lastStats={lastStats}
             collapsed={railCollapsed}
             onPick={lambda p: str { draft = p; }}
-            onTemp={lambda v: float { temperature = v; }}
-            onTopP={lambda v: float { topP = v; }}
-            onMaxTokens={lambda v: float { maxTokens = int(v); }}
             onToggle={lambda { railCollapsed = not railCollapsed; }}
         />
     </div>;

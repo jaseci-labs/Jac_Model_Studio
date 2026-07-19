@@ -1,34 +1,15 @@
-"""Chat right rail — prompt library + sampling controls + last-run stats.
-Ports ui/components/rail.tsx."""
+"""Chat right rail — prompt library + last-run stats.
+Ports ui/components/rail.tsx (sampling now uses server defaults)."""
 
 def _trunc(s: str) -> str {
     one = s.split(String.fromCharCode(10))[0];
     return (one[:54] + "…") if len(one) > 54 else one;
 }
 
-def _slider(
-    label: str, val: float, lo: float, hi: float, step: float, fmt: str,
-    onSet: Callable[([float], None)]
-) -> JsxElement {
-    return <div className="mb-3">
-        <div className="mb-1 flex justify-between">
-            <span className="micro-label">{label}</span>
-            <span className="font-mono text-[11px] text-foreground/80">{fmt}</span>
-        </div>
-        <input
-            type="range"
-            min={str(lo)} max={str(hi)} step={str(step)} value={str(val)}
-            onChange={lambda e: ChangeEvent { onSet(float(e.target.value)); }}
-            className="w-full accent-muted-foreground"
-        />
-    </div>;
-}
-
 def:pub Rail(
-    prompts: list, temperature: float, topP: float, maxTokens: int, lastStats: any,
+    prompts: list, lastStats: any,
     collapsed: bool, onPick: Callable[([str], None)],
-    onTemp: Callable[([float], None)], onTopP: Callable[([float], None)],
-    onMaxTokens: Callable[([float], None)], onToggle: Callable[([], None)]
+    onToggle: Callable[([], None)]
 ) -> JsxElement {
     has openCat: str = "py2jac";
 
@@ -68,14 +49,6 @@ def:pub Rail(
                     }}
                 </div>
             }}
-        </div>
-
-        <div className="dashed-rule mx-3" />
-        <div className="border-b border-border px-3 py-2.5"><span className="micro-label">SAMPLING</span></div>
-        <div className="p-3">
-            {_slider("TEMPERATURE", temperature, 0.0, 1.5, 0.05, f"{temperature:.2f}", onTemp)}
-            {_slider("TOP_P", topP, 0.1, 1.0, 0.05, f"{topP:.2f}", onTopP)}
-            {_slider("MAX_TOKENS", float(maxTokens), 128.0, 4096.0, 128.0, str(maxTokens), onMaxTokens)}
         </div>
 
         <div className="dashed-rule mx-3" />

@@ -12,14 +12,44 @@ def:pub Generate -> JsxElement {
     has genPrompt: str = "Write a Jac function `add(a: int, b: int) -> int` that returns their sum.",
         genJac: str = "",
         genNote: str = "",
-        genBusy: bool = False;
+        genBusy: bool = False,
+        startedAt: float = 0.0,
+        elapsed: int = 0,
+        tickId: any = None;
 
+    # rl_generate is a blocking RPC with no cancel endpoint — all we can do
+    # honestly is count elapsed seconds while it holds the connection.
     async def doGen() -> None {
-        genBusy = True; genJac = ""; genNote = "sampling 8 completions + compiler-verifying (~1-2 min, loads the model)…";
-        r = await rl_generate(genPrompt, 8);
+        if genBusy { return; }
+        win: any = window;
+        t0: float = float(str(win.Date.now()));
+        startedAt = t0;
+        elapsed = 0;
+        genBusy = True; genJac = ""; genNote = "";
+        # capture t0/win locally: the interval lambda must not read stale state
+        iv: any = setInterval(lambda -> None {
+            elapsed = int((float(str(win.Date.now())) - t0) / 1000);
+        }, 1000);
+        tickId = iv;
+        try {
+            r = await rl_generate(genPrompt, 8);
+            if ("ok" in r) and (not bool(r["ok"])) {
+                # backend busy-rejection: {"ok": False, "note": "busy: ..."}
+                genNote = "⚠ " + str(r["note"]);
+            } else {
+                genJac = str(r["jac"] or "");
+                genNote = ("✓ " + str(r["note"])) if bool(r["verified"]) else ("⚠ " + str(r["note"]));
+            }
+        } except Exception {
+            genNote = "⚠ generate failed — server unreachable or errored";
+        }
         genBusy = False;
-        genJac = str(r["jac"]);
-        genNote = ("✓ " + str(r["note"])) if r["verified"] else ("⚠ " + str(r["note"]));
+        clearInterval(float(str(iv)));
+        tickId = None;
+    }
+
+    can with exit {
+        if tickId { clearInterval(float(str(tickId))); }
     }
 
     return <div className="flex h-full min-w-0 flex-1 flex-col">
@@ -39,7 +69,8 @@ def:pub Generate -> JsxElement {
                     <Button variant="solid" disabled={genBusy} onClick={lambda e: MouseEvent { doGen(); }}>
                         {"generating…" if genBusy else "▷ generate (sample 8, keep the one that compiles+runs)"}
                     </Button>
-                    {(<span className="stat-line text-muted-foreground">{genNote}</span>) if genNote else <span></span>}
+                    {genBusy and <span key="gen-elapsed" className="stat-line text-muted-foreground">{f"GENERATING · {elapsed}s · loads 30B model, 1-2 min typical"}</span>}
+                    {(not genBusy and genNote != "") and <span key="gen-note" className="stat-line text-muted-foreground">{genNote}</span>}
                 </div>
                 {(<pre className="mt-3 overflow-x-auto rounded-sm border border-border bg-background p-3 font-mono text-xs text-foreground">{genJac}</pre>) if genJac else <span></span>}
                 <div className="stat-line mt-2 text-muted-foreground/70">the jac compiler is the verifier — returns the first of 8 samples that compiles+runs. On the holdout this reaches ~78% vs ~55% greedy. Loads the SFT model per call (~1–2 min).</div>

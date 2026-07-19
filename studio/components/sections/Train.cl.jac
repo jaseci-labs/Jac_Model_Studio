@@ -197,6 +197,7 @@ def:pub Train(active: bool) -> JsxElement {
         "DPO_ITERS": "200", "DPO_LR": "1e-6", "DPO_BETA": "0.1"
     };
     has job: any = None;
+    has launchedRun: dict = {};
     has error: str = "";
     has selName: str = "";
     has selMode: str = "";
@@ -285,16 +286,19 @@ def:pub Train(active: bool) -> JsxElement {
         }
     }, [sessions]);
 
+    # Poll the LAUNCHED run when a launch handle exists (editing the form must
+    # not repoint the status panel); fall back to form fields pre-launch.
     useEffect(lambda {
         iv: any = None;
-        if active and tab == "launch" and formName != "" {
-            nm = formName;
-            md = formMode;
+        pinned: bool = "name" in launchedRun;
+        nm: str = str(launchedRun["name"]) if pinned else formName;
+        md: str = str(launchedRun["mode"]) if pinned else formMode;
+        if active and tab == "launch" and nm != "" {
             _pollStatus(nm, md);
             iv = setInterval(lambda { _pollStatus(nm, md); }, 2500);
         }
         return lambda { if iv is not None { clearInterval(float(str(iv))); } };
-    }, [active, tab, formName, formMode]);
+    }, [active, tab, formName, formMode, launchedRun]);
 
     useEffect(lambda {
         iv: any = None;
@@ -352,18 +356,35 @@ def:pub Train(active: bool) -> JsxElement {
             if k in opts { filtered[k] = str(opts[k]); }
         }
         mid = formModelId if formMode == "sft" else "";
+        nm = formName;
+        md = formMode;
         try {
-            j = await start_training(name=formName, mode=formMode, model_id=mid, opts=filtered);
+            j = await start_training(name=nm, mode=md, model_id=mid, opts=filtered);
             job = j;
             error = "";
+            rid: str = str(j["run_id"]) if "run_id" in j else "";
+            if rid != "" {
+                # launch handle — status panel + stop now target THIS run,
+                # regardless of later form edits.
+                launchedRun = {"name": nm, "mode": md, "run_id": rid};
+            }
         } except Exception {
             error = "start failed";
         }
     }
     async def doStop() -> None {
         try {
-            j = await stop_training(name=formName, mode=formMode);
-            job = j;
+            if "run_id" in launchedRun {
+                j = await stop_training(
+                    name=str(launchedRun["name"]),
+                    mode=str(launchedRun["mode"]),
+                    run_id=str(launchedRun["run_id"])
+                );
+                job = j;
+            } else {
+                j = await stop_training(name=formName, mode=formMode);
+                job = j;
+            }
         } except Exception {
             error = "stop failed";
         }
@@ -372,6 +393,13 @@ def:pub Train(active: bool) -> JsxElement {
     def _launch() -> JsxElement {
         isRunning = job is not None and str(job["status"]) == "running";
         optKeys = SFT_OPT_KEYS if formMode == "sft" else DPO_OPT_KEYS;
+        pinnedLine: str = (
+            f"showing run {launchedRun['run_id']} · {launchedRun['name']}/{launchedRun['mode']}"
+            if "run_id" in launchedRun else ""
+        );
+        # backend messages ("busy: <holder> is running", "run X superseded; not
+        # stopped") arrive on the status/stop dict — must reach the UI.
+        jobMsg: str = str(job["message"] or "") if job is not None else "";
         return <div className="flex items-start gap-4 p-4 pt-5">
             <div className="relative flex min-w-0 flex-1 flex-col gap-3 rounded-md border border-border bg-card p-4 pt-5">
                 <span className="micro-label absolute -top-2 left-3 bg-background px-2">LAUNCH.CONFIG</span>
@@ -407,9 +435,13 @@ def:pub Train(active: bool) -> JsxElement {
             <div className="relative flex min-w-0 flex-1 flex-col gap-3 rounded-md border border-border bg-card p-4 pt-5">
                 <span className="micro-label absolute -top-2 left-3 bg-background px-2">RUN.STATUS</span>
 
+                {pinnedLine != "" and <p key="pinned-run" className="stat-line text-muted-foreground/70">{pinnedLine}</p>}
+
                 <div className="flex flex-wrap items-center gap-3">
                     <StatusGlyph status={str(job["status"]) if job is not None else "idle"} showLabel={True} />
                 </div>
+
+                {jobMsg != "" and <p key="job-msg" className="stat-line text-warning">{jobMsg}</p>}
 
                 {job is not None and <div className="flex flex-col gap-1">
                     {int(str(job["pid"])) > 0 and <span className="font-mono text-[11px] text-muted-foreground">PID {str(job["pid"])}</span>}
@@ -423,16 +455,6 @@ def:pub Train(active: bool) -> JsxElement {
     }
 
     # ---- MONITOR tab ----
-    def _feedChip() -> JsxElement {
-        if feed == "live" {
-            return <span className="font-mono text-[10px] tracking-widest text-foreground">⦿ LIVE</span>;
-        }
-        if feed == "stalled" {
-            return <span className="font-mono text-[10px] tracking-widest text-muted-foreground">⦿ STALLED {str(stalledFor)}s</span>;
-        }
-        return <span className="font-mono text-[10px] tracking-widest text-muted-foreground/70">○ NO FEED</span>;
-    }
-
     def _monitor() -> JsxElement {
         running: list = [s for s in sessions if str(s["status"]) == "running"];
         if len(running) == 0 {
@@ -456,7 +478,11 @@ def:pub Train(active: bool) -> JsxElement {
                         </Chip>
                     }}
                 </div>
-                {_feedChip()}
+                <StatusGlyph
+                    status={feed}
+                    showLabel={True}
+                    label={f"STALLED {stalledFor}s" if feed == "stalled" else ""}
+                />
             </div>
 
             {not found and <div className="flex flex-1 items-center justify-center"><span className="micro-label">NO RUN DATA</span></div>}

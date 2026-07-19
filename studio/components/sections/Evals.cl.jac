@@ -72,7 +72,7 @@ def _match(done: any, mdl: any, h: str) -> any {
     return None;
 }
 
-def:pub Evals -> JsxElement {
+def:pub Evals(active: bool = False) -> JsxElement {
     has models: list[ModelView] = [],
         kind: str = "probe",
         modelId: str = "",
@@ -112,10 +112,14 @@ def:pub Evals -> JsxElement {
         await _refreshList();
     }
 
-    # Re-arm the poll timer whenever the active run changes. Clearing the prior
-    # interval first acts as the effect cleanup (this fires on every `current` set).
-    can with [current] entry {
+    # Re-arm the poll timer whenever the active run changes; poll only while the
+    # section is visible (hidden sections must not hammer the backend). On
+    # re-activation the list refreshes once so a run that finished while hidden
+    # resolves immediately.
+    async can with [current, active] entry {
         if pollId { clearInterval(float(str(pollId))); pollId = None; }
+        if not active { return; }
+        await _refreshList();
         c: any = current;
         if c and str(c.status) == "running" {
             cid = str(c.id);

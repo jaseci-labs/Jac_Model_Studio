@@ -1,22 +1,25 @@
-"""TRAIN section (workspace 03 CPT) — launch/monitor the single CPT LoRA run.
+"""TRAIN section (workspace 03 CPT) — launch/monitor CPT LoRA runs.
 
-Simpler than 01's Train section: one named run ("cpt-v1", the config in
-03-new/cpt_train/config.yaml), no per-mode form, no HISTORY/compare (there's
-only ever one CPT run in flight). START/STOP + live status + loss/lr/tok-s
-charts, polled every 2.5s while this section is active — same feed
-live/stalled/nofeed tracker as 01's Train section, same MonoChart components.
-Backed by cpt.sv.jac's start_cpt_training/stop_cpt_training/get_cpt_status.
+Multi-run: polls get_all_cpt_status() every 2.5s while active and lets a Chip
+row pick between cpt-v1 (plain single run, START/RESUME via start_cpt_training)
+and cpt-v2 (the leg-based flow: one leg = one epoch via start_cpt_leg, which
+persists optimizer state across legs and must run legs in order). Charts,
+stat tiles and log all show the SELECTED run; the feed live/stalled/nofeed
+tracker runs per-run so switching chips keeps liveness honest. Backed by
+cpt.sv.jac's start_cpt_training/start_cpt_leg/stop_cpt_training/
+get_all_cpt_status.
 """
 
 import from react { useEffect }
-sv import from ...cpt { start_cpt_training, stop_cpt_training, get_cpt_status }
+sv import from ...cpt { start_cpt_training, start_cpt_leg, stop_cpt_training, get_all_cpt_status }
 import from ..shared.StatusGlyph { StatusGlyph }
 import from ..shared.StatTile { StatTile }
 import from ..shared.LogView { LogView }
 import from ..shared.MonoChart { MonoChart }
 import from ..shared.Button { Button }
+import from ..shared.Chip { Chip }
 
-glob RUN_NAME: str = "cpt-v1";
+glob RUNS: list[str] = ["cpt-v1", "cpt-v2"];
 glob CC: dict = {"loss": "var(--chart-2)", "lr": "var(--chart-1)", "tps": "var(--chart-5)"};
 
 def _fix(v: any, n: int) -> str {
@@ -24,35 +27,49 @@ def _fix(v: any, n: int) -> str {
 }
 
 def:pub CptTrain(active: bool) -> JsxElement {
-    has status: any = None,
+    has allStatus: any = None,
+        selected: str = "cpt-v2",
         error: str = "",
-        feed: str = "nofeed",
-        stalledFor: int = 0;
+        note: str = "",
+        feeds: dict = {"cpt-v1": "nofeed", "cpt-v2": "nofeed"},
+        stalls: dict = {"cpt-v1": 0, "cpt-v2": 0};
 
     async def _poll(tracker: dict) -> None {
         try {
-            s = await get_cpt_status(name=RUN_NAME);
-            status = s;
+            res = await get_all_cpt_status();
+            allStatus = res;
             error = "";
-            running = str(s["status"]) == "running";
-            if not running {
-                feed = "nofeed";
-                return;
-            }
-            li = int(str(s["last_iter"]));
-            if li > int(str(tracker["iter"])) {
-                tracker["iter"] = li;
-                tracker["same"] = 0;
-                feed = "live";
-                stalledFor = 0;
-            } else {
-                sm = int(str(tracker["same"])) + 1;
-                tracker["same"] = sm;
-                if sm >= 12 {
-                    feed = "stalled";
-                    stalledFor = int(sm * 5 / 2);
+            nf: dict = {};
+            ns: dict = {};
+            for nm in RUNS {
+                s: any = res[nm];
+                t: any = tracker[nm];
+                if str(s["status"]) != "running" {
+                    t["feed"] = "nofeed";
+                    t["same"] = 0;
+                    ns[nm] = 0;
+                } else {
+                    li = int(str(s["last_iter"]));
+                    if li > int(str(t["iter"])) {
+                        t["iter"] = li;
+                        t["same"] = 0;
+                        t["feed"] = "live";
+                        ns[nm] = 0;
+                    } else {
+                        sm = int(str(t["same"])) + 1;
+                        t["same"] = sm;
+                        if sm >= 12 {
+                            t["feed"] = "stalled";
+                            ns[nm] = int(sm * 5 / 2);
+                        } else {
+                            ns[nm] = 0;
+                        }
+                    }
                 }
+                nf[nm] = str(t["feed"]);
             }
+            feeds = nf;
+            stalls = ns;
         } except Exception {
             error = "fetch error";
         }
@@ -61,7 +78,10 @@ def:pub CptTrain(active: bool) -> JsxElement {
     useEffect(lambda {
         iv: any = None;
         if active {
-            tracker: dict = {"iter": -1, "same": 0};
+            tracker: dict = {
+                "cpt-v1": {"iter": -1, "same": 0, "feed": "nofeed"},
+                "cpt-v2": {"iter": -1, "same": 0, "feed": "nofeed"}
+            };
             cb = lambda { _poll(tracker); };
             cb();
             iv = setInterval(cb, 2500);
@@ -70,42 +90,73 @@ def:pub CptTrain(active: bool) -> JsxElement {
     }, [active]);
 
     async def doStart() -> None {
+        note = "";
         try {
-            s = await start_cpt_training(name=RUN_NAME);
-            status = s;
+            s = await start_cpt_training(name=selected);
+            note = str(s["message"] or "");
             error = "";
-        } except Exception {
-            error = "start failed";
+            res = await get_all_cpt_status();
+            allStatus = res;
+        } except Exception as e {
+            ex: any = e;
+            error = str(ex.message or "start failed");
+        }
+    }
+    async def doStartLeg(lg: int) -> None {
+        note = "";
+        try {
+            s = await start_cpt_leg(name=selected, leg=lg);
+            note = str(s["message"] or "");
+            error = "";
+            res = await get_all_cpt_status();
+            allStatus = res;
+        } except Exception as e {
+            # backend raises ValueError on out-of-order legs — surface its text
+            ex: any = e;
+            error = str(ex.message or "start leg failed");
         }
     }
     async def doStop() -> None {
         try {
-            s = await stop_cpt_training(name=RUN_NAME);
-            status = s;
-        } except Exception {
-            error = "stop failed";
+            cur: any = allStatus;
+            rid = str(cur[selected]["run_id"] or "") if cur is not None and cur[selected] is not None else "";
+            s = await stop_cpt_training(name=selected, run_id=rid);
+            note = str(s["message"] or "");
+            res = await get_all_cpt_status();
+            allStatus = res;
+        } except Exception as e {
+            ex: any = e;
+            error = str(ex.message or "stop failed");
         }
     }
 
-    def _feedChip() -> JsxElement {
-        if feed == "live" {
-            return <span className="font-mono text-[10px] tracking-widest text-foreground">⦿ LIVE</span>;
-        }
-        if feed == "stalled" {
-            return <span className="font-mono text-[10px] tracking-widest text-muted-foreground">⦿ STALLED {str(stalledFor)}s</span>;
-        }
-        return <span className="font-mono text-[10px] tracking-widest text-muted-foreground/70">○ NO FEED</span>;
-    }
+    status: any = allStatus[selected] if allStatus is not None else None;
+    feed = str(feeds[selected]);
+    stalledFor = int(str(stalls[selected]));
 
     isRunning = status is not None and str(status["status"]) == "running";
 
     lastIter = int(str(status["last_iter"])) if status is not None else 0;
-    totalIters = int(str(status["total_iters"])) if status is not None else 2586;
+    totalIters = int(str(status["total_iters"])) if status is not None else 0;
     pct = (lastIter * 100.0) / totalIters if totalIters > 0 else 0.0;
     # leg/leg_ceiling are only nonzero for the CPT-v2 multi-leg flow
-    # (start_cpt_leg in cpt.sv.jac); 0 for the plain cpt-v1 single run.
+    # (start_cpt_leg in cpt.sv.jac); leg_ceiling == 0 means plain single run.
     leg = int(str(status["leg"])) if status is not None else 0;
     legCeiling = int(str(status["leg_ceiling"])) if status is not None else 0;
+    isLeg = legCeiling > 0;
+    isComplete = totalIters > 0 and lastIter >= totalIters;
+
+    # Next-leg derivation: status only carries `leg` while a leg job record is
+    # live, so when idle we recover completed legs from the cumulative iter
+    # count: floor(last_iter / (total_iters / leg_ceiling)); next = that + 1.
+    doneLegs = 0;
+    nextLeg = 1;
+    if legCeiling > 0 and totalIters > 0 {
+        doneLegs = int((lastIter * legCeiling) / totalIters);
+        nextLeg = doneLegs + 1;
+    }
+    curLeg = leg if (isRunning and leg > 0) else doneLegs;
+    legDone = isLeg and nextLeg > legCeiling;
 
     train: list = list(status["train"]) if status is not None else [];
     val: list = list(status["val"]) if status is not None else [];
@@ -117,14 +168,36 @@ def:pub CptTrain(active: bool) -> JsxElement {
 
     return <div className="flex h-full min-w-0 flex-1 flex-col">
         <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
-            <span className="micro-label">TRAIN · CPT LoRA (cpt-v1)</span>
+            <span className="micro-label">TRAIN · CPT LoRA · {selected}</span>
             <div className="flex items-center gap-3">
-                {_feedChip()}
+                <StatusGlyph
+                    status={feed}
+                    showLabel={True}
+                    label={("STALLED " + str(stalledFor) + "s") if feed == "stalled" else ""}
+                />
                 <span className="micro-label text-muted-foreground/70">TRAIN.CTL</span>
             </div>
         </div>
 
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
+            <div className="flex flex-wrap items-center gap-2">
+                <span className="micro-label">RUN</span>
+                {for nm in RUNS {
+                    <Chip
+                        key={nm}
+                        onClick={lambda e: MouseEvent { selected = nm; note = ""; error = ""; }}
+                        selected={selected == nm}
+                        className="flex items-center gap-2 px-4 py-1.5 font-mono text-[10px] tracking-widest"
+                    >
+                        <StatusGlyph
+                            status={str(allStatus[nm]["status"]) if allStatus is not None and allStatus[nm] is not None else "idle"}
+                            showLabel={False}
+                        />
+                        <span key="nm">{nm}</span>
+                    </Chip>
+                }}
+            </div>
+
             <div className="grid grid-cols-4 gap-3">
                 <StatTile label="STATUS" value={(str(status["status"]).upper() if status is not None else "IDLE")} sub="" dim={False} />
                 <StatTile label="ITER" value={f"{lastIter}/{totalIters}"} sub={_fix(pct, 1) + "%"} dim={False} />
@@ -133,22 +206,26 @@ def:pub CptTrain(active: bool) -> JsxElement {
             </div>
 
             <div className="relative rounded-md border border-border bg-card p-3 pt-4">
-                <span className="micro-label absolute -top-2 left-3 bg-background px-2">RUN.CTL</span>
+                <span className="micro-label absolute -top-2 left-3 bg-background px-2">RUN.CTL · {selected}</span>
                 <div className="flex items-center gap-3">
                     <StatusGlyph status={str(status["status"]) if status is not None else "idle"} showLabel={True} />
                     <div className="h-1 flex-1 rounded-full bg-accent">
                         <div className="h-1 rounded-full bg-primary transition-all" style={{"width": _fix(pct, 1) + "%"}}></div>
                     </div>
                 </div>
+                {isLeg and <p className="stat-line mt-2 text-foreground">LEG {str(curLeg)}/{str(legCeiling)}{(" · next: leg " + str(nextLeg)) if not isRunning and not legDone else ""}</p>}
+                {note and <p className="stat-line mt-2 text-foreground">{note}</p>}
                 {status is not None and status["message"] and <p className="stat-line mt-2 text-muted-foreground">{str(status["message"])}</p>}
-                {leg > 0 and <p className="stat-line mt-1 text-muted-foreground">LEG {str(leg)}/{str(legCeiling)}</p>}
+                {not isLeg and isComplete and <p className="stat-line mt-1 text-muted-foreground">already complete ({str(lastIter)}/{str(totalIters)}) — nothing left to run</p>}
                 {status is not None and str(status["started"]) and <p className="stat-line mt-1 text-muted-foreground/70">STARTED {str(status["started"])}{(" · PID " + str(status["pid"])) if int(str(status["pid"])) > 0 else ""}</p>}
                 <div className="mt-3 flex gap-2">
-                    <Button variant="solid" onClick={lambda e: MouseEvent { doStart(); }} disabled={isRunning}>▶ START / RESUME</Button>
+                    {not isLeg and <Button variant="solid" onClick={lambda e: MouseEvent { doStart(); }} disabled={isRunning or isComplete}>▶ START / RESUME</Button>}
+                    {isLeg and <Button variant="solid" onClick={lambda e: MouseEvent { doStartLeg(nextLeg); }} disabled={isRunning or legDone}>{(("▶ START LEG " + str(nextLeg)) if not legDone else "✓ ALL LEGS DONE")}</Button>}
                     <Button variant="outline" onClick={lambda e: MouseEvent { doStop(); }} disabled={not isRunning}>■ STOP</Button>
                 </div>
-                {error and <p className="stat-line mt-1 text-muted-foreground">{error}</p>}
-                <p className="stat-line mt-2 text-muted-foreground/70">3 epochs over 862 windows (2586 iters) · resumes from the last checkpoint if stopped and restarted</p>
+                {error and <p className="stat-line mt-1 text-warning">{error}</p>}
+                {not isLeg and <p className="stat-line mt-2 text-muted-foreground/70">single mlx_lm.lora run · resumes from the last checkpoint if stopped and restarted</p>}
+                {isLeg and <p className="stat-line mt-2 text-muted-foreground/70">one leg = one epoch · optimizer state persists across legs · legs must run in order</p>}
             </div>
 
             <div className="grid grid-cols-2 gap-4">

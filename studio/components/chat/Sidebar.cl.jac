@@ -1,8 +1,9 @@
 """Chat history sidebar — ports ui/components/sidebar.tsx.
 
 Chats are grouped by day (most-recent first) under TODAY / ISO-date micro-labels;
-each row reveals a DEL action on hover. The footer MEM gauge shows resident vs
-total RAM as `{used} / {ram} GB` plus an 8-cell ▮/░ bar."""
+each row reveals REN / DEL actions on hover. REN swaps the title for an inline
+input (Enter/blur commits via onRename, Escape cancels). The footer MEM gauge
+shows resident vs total RAM as `{used} / {ram} GB` plus an 8-cell ▮/░ bar."""
 
 import from ..shared.Button { Button }
 
@@ -56,8 +57,28 @@ def:pub Sidebar(
     busy: bool,
     onNew: Callable[([], None)],
     onOpen: Callable[([str], None)],
-    onDelete: Callable[([str], None)]
+    onDelete: Callable[([str], None)],
+    onRename: Callable[([str, str], None)]
 ) -> JsxElement {
+    has editingId: str = "",
+        draft: str = "";
+
+    def startEdit(id: str, title: str) -> None {
+        editingId = id;
+        draft = title;
+    }
+
+    def commitRename -> None {
+        if editingId {
+            t = draft.strip();
+            if t {
+                onRename(editingId, t);
+            }
+        }
+        editingId = "";
+        draft = "";
+    }
+
     return <aside className="flex w-56 shrink-0 flex-col border-r border-border bg-card p-3">
         <div className="micro-label mb-3">JAC.STUDIO · fig.1</div>
         <Button
@@ -86,12 +107,45 @@ def:pub Sidebar(
                                     else "text-muted-foreground hover:bg-muted"
                                 ) + (" opacity-50" if busy else "")}
                             >
-                                <span className="truncate" title={str(c.title)}>{c.title if c.title else "untitled"}</span>
-                                <Button
-                                    variant="ghost"
-                                    onClick={lambda e: MouseEvent { e.stopPropagation(); if not busy { onDelete(str(c.id)); } }}
-                                    className="hidden px-1 py-0 group-hover:block"
-                                >DEL</Button>
+                                {if editingId == str(c.id) {
+                                    <input
+                                        key="edit"
+                                        autoFocus={True}
+                                        value={draft}
+                                        onClick={lambda e: MouseEvent { e.stopPropagation(); }}
+                                        onChange={lambda e: ChangeEvent { draft = str(e.target.value); }}
+                                        onKeyDown={lambda e: KeyboardEvent {
+                                            if e.key == "Enter" {
+                                                commitRename();
+                                            } elif e.key == "Escape" {
+                                                editingId = "";
+                                                draft = "";
+                                            }
+                                        }}
+                                        onBlur={lambda e: FocusEvent { commitRename(); }}
+                                        className="w-full rounded border border-input bg-popover px-1 py-0.5 text-xs text-foreground outline-none"
+                                    />
+                                    skip;
+                                }}
+                                {if editingId != str(c.id) {
+                                    <span key="title" className="truncate" title={str(c.title)}>{c.title if c.title else "untitled"}</span>
+                                    skip;
+                                }}
+                                {if editingId != str(c.id) {
+                                    <div key="acts" className="hidden shrink-0 group-hover:flex">
+                                        <Button
+                                            variant="ghost"
+                                            onClick={lambda e: MouseEvent { e.stopPropagation(); if not busy { startEdit(str(c.id), str(c.title) if c.title else ""); } }}
+                                            className="px-1 py-0"
+                                        >REN</Button>
+                                        <Button
+                                            variant="ghost"
+                                            onClick={lambda e: MouseEvent { e.stopPropagation(); if not busy { onDelete(str(c.id)); } }}
+                                            className="px-1 py-0"
+                                        >DEL</Button>
+                                    </div>
+                                    skip;
+                                }}
                             </div>
                         }}
                     </div>

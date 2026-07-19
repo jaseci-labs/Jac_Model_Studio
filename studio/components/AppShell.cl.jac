@@ -110,9 +110,9 @@ def:pub AppShell -> JsxElement {
         <NavRail workspace={workspace} section={sections[workspace]} onWorkspace={goWorkspace} onSection={go} />
 
         <div className={slot("01", "chat")}><Chat workspace="01" defaultModel={str(WS_DEFAULT_MODEL["01"])} /></div>
-        <div className={slot("01", "data")}><Data /></div>
+        <div className={slot("01", "data")}><Data active={workspace == "01" and str(sections["01"]) == "data"} /></div>
         <div className={slot("01", "train")}><Train active={workspace == "01" and str(sections["01"]) == "train"} /></div>
-        <div className={slot("01", "evals")}><Evals /></div>
+        <div className={slot("01", "evals")}><Evals active={workspace == "01" and str(sections["01"]) == "evals"} /></div>
 
         <div className={slot("02", "chat")}><Chat workspace="02" defaultModel={str(WS_DEFAULT_MODEL["02"])} /></div>
         <div className={slot("02", "data")}><RlData /></div>

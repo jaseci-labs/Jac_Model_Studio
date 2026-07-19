@@ -9,6 +9,7 @@ stacked bar doesn't need recharts) + the code-gate table + a RowBrowser over the
 sv import from ...cpt { cpt_manifest, cpt_files, cpt_rows }
 import from ..shared.StatTile { StatTile }
 import from ..shared.RowBrowser { RowBrowser }
+import from ...hooks.useRowPager { useRowPager }
 
 # Foreground-opacity ramp for the composition bar (strong→faint, ordered like
 # SRC_ORDER) — tracks --foreground so the 5 steps stay distinguishable in both
@@ -37,48 +38,19 @@ def _k(n: int) -> str {
 }
 
 def:pub CptData -> JsxElement {
-    has man: any = None,
-        files: list = [],
-        path: str = "",
-        rows: list = [],
-        offset: int = 0,
-        total: int = 0,
-        expanded: int = -1;
+    has man: any = None;
 
-    async def _fetch(p: str, off: int) -> None {
-        r = await cpt_rows(p, off, 25);
-        rows = list(r["rows"]);
-        total = int(r["total"]);
+    async def _files -> any {
+        return await cpt_files();
     }
 
-    async def openFile(p: str) -> None {
-        path = p;
-        offset = 0;
-        expanded = -1;
-        await _fetch(p, 0);
+    async def _rows(p: str, off: int) -> any {
+        return await cpt_rows(p, off, 25);
     }
 
-    def toggleRow(idx: int) -> None {
-        expanded = -1 if expanded == idx else idx;
-    }
-
-    async def prevPage -> None {
-        if offset > 0 {
-            noff = max(0, offset - 25);
-            offset = noff;
-            expanded = -1;
-            await _fetch(path, noff);
-        }
-    }
-
-    async def nextPage -> None {
-        if offset + len(rows) < total {
-            noff = offset + 25;
-            offset = noff;
-            expanded = -1;
-            await _fetch(path, noff);
-        }
-    }
+    # files/path/rows/offset/total/expanded + pager actions; loads the file
+    # list and opens the first file on mount.
+    pager = useRowPager(_files, _rows);
 
     async can with entry {
         m = await cpt_manifest();
@@ -93,11 +65,6 @@ def:pub CptData -> JsxElement {
             }
         }
         man = m;
-        fs = await cpt_files();
-        files = fs;
-        if len(list(fs)) > 0 {
-            await openFile(str(fs[0].path));
-        }
     }
 
     def _tiles() -> JsxElement {
@@ -189,10 +156,10 @@ def:pub CptData -> JsxElement {
             {_composition()}
             {_gate()}
             <RowBrowser
-                files={files} path={path} rows={rows} offset={offset}
-                total={total} expanded={expanded}
-                onOpen={openFile} onToggle={toggleRow}
-                onPrev={prevPage} onNext={nextPage}
+                files={pager["files"]} path={pager["path"]} rows={pager["rows"]} offset={pager["offset"]}
+                total={pager["total"]} expanded={pager["expanded"]}
+                onOpen={pager["openFile"]} onToggle={pager["toggleRow"]}
+                onPrev={pager["prevPage"]} onNext={pager["nextPage"]}
             />
         </div>
     </div>;
