@@ -99,6 +99,10 @@ def:pub run_builder(stage: str) -> BuilderView {
     if existing is not None and str(existing.get("status", "")) == "running" {
         return _build_status(stage, "already running");
     }
+    grab = jobs.heavy_acquire(f"builder:{stage}", jf, rl);
+    if not grab["ok"] {
+        return _build_status(stage, f"busy: {grab['busy_with']} is running");
+    }
     target = f"01-sft-dpo/sft_dpo/jacgen/{shlex.quote(stage)}.jac";
     inner_cmd = f"{shlex.quote(str(models.jac_bin()))} run {target}";
     venv_bin = str(models.data_root() / ".venv" / "bin");

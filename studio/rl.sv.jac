@@ -17,6 +17,7 @@ a rung-indexed curve (one line per model·cond, gen pass@1), and the line keys.
 import os;
 import json;
 import subprocess;
+import jobs;
 import from pathlib { Path }
 
 # rl.sv.jac lives at studio/ root = <repo>/jac_ml_studio/studio ; results/ is at <repo>.
@@ -120,6 +121,10 @@ def:pub rl_generate(prompt: str, k: int = 8) -> dict {
     if not os.path.exists(GEN_MODEL) {
         return {"ok": False, "verified": False, "jac": "", "note": "SFT model missing: " + GEN_MODEL};
     }
+    grab = jobs.heavy_acquire("rl_generate");
+    if not grab["ok"] {
+        return {"ok": False, "verified": False, "jac": "", "note": f"busy: {grab['busy_with']} is running"};
+    }
     env = dict(os.environ);
     env["JAC_GEN_MODEL"] = GEN_MODEL;
     env["K"] = str(k);
@@ -136,5 +141,7 @@ def:pub rl_generate(prompt: str, k: int = 8) -> dict {
         return {"ok": True, "verified": verified, "jac": jac, "note": note, "k": k};
     } except Exception as e {
         return {"ok": False, "verified": False, "jac": "", "note": str(e)};
+    } finally {
+        jobs.heavy_release("rl_generate");
     }
 }

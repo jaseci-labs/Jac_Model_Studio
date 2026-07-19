@@ -87,6 +87,11 @@ def:pub start_training(name: str, mode: str, model_id: str = "", opts: dict = {}
         return _build_status(name, mode, "already running");
     }
 
+    grab = jobs.heavy_acquire(f"train:{name}:{mode}", jf, rl);
+    if not grab["ok"] {
+        return _build_status(name, mode, f"busy: {grab['busy_with']} is running");
+    }
+
     run_dir = models.results_dir() / name;
     run_dir.mkdir(parents=True, exist_ok=True);
 
