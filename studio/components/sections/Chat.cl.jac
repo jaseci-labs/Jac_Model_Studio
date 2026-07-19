@@ -13,6 +13,7 @@ sv import from ...models {
     list_models, system_ram, loaded_model, warm_model, ModelView
 }
 sv import from ...prompts { list_prompts }
+sv import from ...chat { stop_generation }
 sv import from ...data { add_examples }
 sv import from ...persistence {
     create_chat, list_chats, rename_chat, delete_chat, get_messages, add_message,
@@ -44,6 +45,7 @@ def:pub Chat(workspace: str, defaultModel: str) -> JsxElement {
         streaming: bool = False,
         stopRequested: bool = False,
         activeReader: any = None,
+        activeGenId: str = "",
         ramGb: float = 0.0,
         residentGb: float = 0.0,
         loadedId: str = "",
@@ -235,7 +237,9 @@ def:pub Chat(workspace: str, defaultModel: str) -> JsxElement {
                     } elif data {
                         try {
                             msg: any = JSON.parse(data);
-                            if msg.kind == "token" {
+                            if msg.kind == "load" {
+                                activeGenId = str(msg.gen_id or "");
+                            } elif msg.kind == "token" {
                                 acc = str(msg.text);
                                 work[ai] = {
                                     "role": "assistant", "content": acc, "stats": None,
@@ -291,13 +295,22 @@ def:pub Chat(workspace: str, defaultModel: str) -> JsxElement {
         }
     }
 
-    # Cancel the in-flight stream (if any) so the composer frees up immediately.
+    # Cancel the in-flight stream so the composer frees up immediately, AND tell
+    # the server to stop decoding (stop_generation flips a lock-free flag the
+    # token loop checks — covers the case where a proxy keeps the upstream pipe
+    # alive after reader.cancel(), which otherwise decodes to max_tokens).
     async def stop -> None {
         stopRequested = True;
         r: any = activeReader;
         if r {
             try {
                 await r.cancel();
+            } except Exception { }
+        }
+        gid = activeGenId;
+        if gid {
+            try {
+                await stop_generation(gen_id=gid);
             } except Exception { }
         }
     }
