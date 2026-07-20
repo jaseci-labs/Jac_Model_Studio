@@ -25,7 +25,7 @@ import from .sections.CptTrain { CptTrain }
 import from .sections.CptResults { CptResults }
 import from .sections.Plan { Plan }
 
-glob WS_DEFAULT_MODEL: dict = {"01": "qwen-dpo", "02": "qwen3coder-rl", "03": "qwen-q4"};
+glob WS_DEFAULT_MODEL: dict = {"01": "qwen2-dpo", "02": "qwen2-dpo", "03": "qwen2-sft"};
 
 def:pub AppShell -> JsxElement {
     has workspace: str = "03",
