@@ -9,7 +9,7 @@ Each workspace's Chat gets its own history (persistence scopes by workspace) + a
 default model.
 """
 
-sv import from ..models { system_ram, loaded_model }
+sv import from ..models { system_ram }
 import from .NavRail { NavRail }
 import from .Offline { Offline }
 import from .shared.EmptyState { EmptyState }
@@ -31,25 +31,14 @@ def:pub AppShell -> JsxElement {
     has workspace: str = "03",
         sections: dict = {"01": "chat", "02": "chat", "03": "chat"},
         online: int = -1,  # -1 unknown, 0 offline, 1 online
-        layout: str = "split",
-        ramGb: float = 0.0,
-        loadedInfo: any = None,
         probeId: any = None;
 
     async def probe -> None {
         try {
-            r = await system_ram();
-            ramGb = float(str(r));
+            await system_ram();
             online = 1;
         } except Exception {
             online = 0;
-            return;
-        }
-        # cockpit layout shows resident model + memory; piggyback on the probe
-        if layout == "cockpit" {
-            try {
-                loadedInfo = await loaded_model();
-            } except Exception { }
         }
     }
 
@@ -67,20 +56,10 @@ def:pub AppShell -> JsxElement {
                 workspace = str(saved);
             }
         } except Exception { }
-        # Re-apply the stored theme before the first real paint — the
-        # loading/offline screens render before NavRail (and its ThemeSwitcher)
-        # mounts. One-frame FOUC on the default theme is accepted.
+        # Single theme (terminal) + single layout (split) now: clear any stale
+        # data-theme a previous multi-theme build stamped.
         try {
-            th: any = win.localStorage.getItem("jacml.theme");
-            if th and th != "terminal" {
-                doc.documentElement.setAttribute("data-theme", str(th));
-            }
-        } except Exception { }
-        try {
-            lo: any = win.localStorage.getItem("jacml.layout");
-            if lo == "split" or lo == "rail" or lo == "icons" or lo == "cockpit" or lo == "topbar" or lo == "deck" or lo == "dock" {
-                layout = str(lo);
-            }
+            doc.documentElement.removeAttribute("data-theme");
         } except Exception { }
         await probe();
         probeId = setInterval(lambda -> None { probe(); }, 3000);
@@ -95,14 +74,6 @@ def:pub AppShell -> JsxElement {
         win: any = window;
         try {
             win.localStorage.setItem("jacml.workspace", w);
-        } except Exception { }
-    }
-
-    def applyLayout(l: str) -> None {
-        layout = l;
-        win: any = window;
-        try {
-            win.localStorage.setItem("jacml.layout", l);
         } except Exception { }
     }
 
@@ -132,26 +103,16 @@ def:pub AppShell -> JsxElement {
     if online == -1 {
         return <div className="flex h-screen items-center justify-center bg-background"><EmptyState label="CONNECTING" pulse={True} /></div>;
     }
-    return <div className={"flex h-screen overflow-hidden " + ("flex-col" if layout == "topbar" or layout == "deck" or layout == "split" else "")} data-ws={workspace} data-layout={layout}>
-        {layout == "split" and <NavRail
+    return <div className="flex h-screen flex-col overflow-hidden" data-ws={workspace}>
+        <NavRail
             workspace={workspace} section={sections[workspace]}
-            onWorkspace={goWorkspace} onSection={go}
-            layout={layout} onLayout={applyLayout}
-            loadedInfo={loadedInfo} ramGb={ramGb} part="top"
-        />}
-        {layout != "split" and <NavRail
-            workspace={workspace} section={sections[workspace]}
-            onWorkspace={goWorkspace} onSection={go}
-            layout={layout} onLayout={applyLayout}
-            loadedInfo={loadedInfo} ramGb={ramGb}
-        />}
-        <div className={"flex min-h-0 min-w-0 flex-1 " + ("pb-16" if layout == "dock" else "")}>
-            {layout == "split" and <NavRail
+            onWorkspace={goWorkspace} onSection={go} part="top"
+        />
+        <div className="flex min-h-0 min-w-0 flex-1">
+            <NavRail
                 workspace={workspace} section={sections[workspace]}
-                onWorkspace={goWorkspace} onSection={go}
-                layout={layout} onLayout={applyLayout}
-                loadedInfo={loadedInfo} ramGb={ramGb} part="side"
-            />}
+                onWorkspace={goWorkspace} onSection={go} part="side"
+            />
             <div className={slot("01", "chat")}><Chat workspace="01" defaultModel={str(WS_DEFAULT_MODEL["01"])} /></div>
             <div className={slot("01", "data")}><Data active={workspace == "01" and str(sections["01"]) == "data"} /></div>
             <div className={slot("01", "train")}><Train active={workspace == "01" and str(sections["01"]) == "train"} /></div>
