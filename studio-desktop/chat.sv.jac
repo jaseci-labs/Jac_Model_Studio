@@ -13,7 +13,7 @@ Frames: {kind:"load",load_s,model_id} once, {kind:"token",token,text} per token,
 import inference;
 import models;
 
-def:pub chat_stream(
+def chat_stream(
     messages: list[dict], model_id: str,
     temperature: float = 0.2, top_p: float = 0.9, max_tokens: int = 1024
 ) -> any {

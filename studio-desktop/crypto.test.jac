@@ -10,7 +10,7 @@ import os;
 
 test "roundtrip with a master key recovers the plaintext" {
     os.environ["JAC_SECRET_KEY"] = "test-master-key-please-ignore";
-    secret = "vast-abc123-DEADBEEF";
+    secret = "spheron-abc123-DEADBEEF";
     token = encrypt(secret);
     assert token.startswith("enc:v1:");
     assert token != secret;

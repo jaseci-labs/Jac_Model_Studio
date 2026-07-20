@@ -11,30 +11,33 @@ dict values are `any` so the pid is `int(str(job.get("pid") or 0))` and status/s
 go through `str(...)`; EXCLUDED_RUN_DIRS is a list[str] membership test.
 """
 
-import os;
 import time;
 import shlex;
+import auth;
 import jobs;
 import metrics;
 import models;
+import backends;
+import workspace;
 import from pathlib { Path }
 
-glob SFT_KEYS: list[str] = ["EVAL_EVERY", "SUBSET", "DRY_ITERS", "SKIP_DRY", "LIVE_EVAL"];
-glob DPO_KEYS: list[str] = ["DPO_ITERS", "DPO_LR", "DPO_BETA", "DPO_LAYERS", "SUBSET"];
+# SFT/DPO option-key whitelists now live in studio.workspace.toml (workspace.sv.jac).
 
+# All SFT/DPO artifacts resolve under the caller's per-user results dir so a
+# tenant can only see/stop/delete their own training runs.
 def _job_file(name: str, mode: str) -> Path {
-    return models.results_dir() / name / f".job-{mode}.json";
+    return auth.user_results_dir() / name / f".job-{mode}.json";
 }
 
 def _run_log(name: str, mode: str) -> Path {
-    return models.results_dir() / name / f"run-{mode}.log";
+    return auth.user_results_dir() / name / f"run-{mode}.log";
 }
 
 def _train_log(name: str, mode: str) -> Path {
     if mode == "dpo" {
-        return models.results_dir() / name / "dpo" / "train.log";
+        return auth.user_results_dir() / name / "dpo" / "train.log";
     }
-    return models.results_dir() / name / "train.log";
+    return auth.user_results_dir() / name / "train.log";
 }
 
 """Build a JobStatus dict from the job file + live resolution (shape == _build_status)."""
@@ -69,9 +72,9 @@ def _build_status(name: str, mode: str, message: str = "") -> dict {
 }
 
 """Start an SFT or DPO training run (detached). Returns the JobStatus dict."""
-def:pub start_training(name: str, mode: str, model_id: str = "", opts: dict = {}) -> dict {
+def start_training(name: str, mode: str, model_id: str = "", opts: dict = {}, backend: str = "") -> dict {
     if not jobs.safe(name) { raise ValueError("invalid name"); }
-    if name in models.EXCLUDED_RUN_DIRS { raise ValueError("reserved name"); }
+    if name in workspace.excluded_run_dirs() { raise ValueError("reserved name"); }
     if mode != "sft" and mode != "dpo" { raise ValueError("mode must be sft|dpo"); }
     if mode == "sft" {
         if not model_id or not jobs.safe(model_id, allow_slash=True) {
@@ -86,43 +89,33 @@ def:pub start_training(name: str, mode: str, model_id: str = "", opts: dict = {}
         return _build_status(name, mode, "already running");
     }
 
-    run_dir = models.results_dir() / name;
+    run_dir = auth.user_results_dir() / name;
     run_dir.mkdir(parents=True, exist_ok=True);
 
-    keys = SFT_KEYS if mode == "sft" else DPO_KEYS;
-    env_overrides: dict = {};
-    for k in keys {
-        if k in opts {
-            val = str(opts[k]);
-            if jobs.safe(val) { env_overrides[k] = val; }
-        }
-    }
-
-    ignored: list = [k for k in opts if k not in keys];
+    rendered = backends.render({
+        "backend": backend if backend else workspace.training_backend_default(),
+        "method": mode,
+        "vars": {"run_name": shlex.quote(name), "model_id": shlex.quote(model_id)},
+        "opts": opts
+    });
+    env_overrides = dict(rendered["env"]);
+    ignored: list = list(rendered.get("ignored_opts", []));
     msg = ("ignored opts: " + ", ".join(sorted(ignored))) if ignored else "started";
-
-    venv_bin = str(models.data_root() / ".venv" / "bin");
-    current_path = os.environ.get("PATH", "");
-    env_overrides["PATH"] = f"{venv_bin}:{current_path}";
-
-    inner = "";
-    if mode == "sft" {
-        inner = f"./run_probe.sh {shlex.quote(model_id)} {shlex.quote(name)}";
-    } else {
-        inner = f"./run_dpo.sh {shlex.quote(name)}";
-    }
+    inner = str(rendered["cmd"]);
+    launch_cwd = Path(str(rendered["cwd"]));
 
     cmd = jobs.with_exit_marker(inner, rl);
     # Truncate the runlog so a previous run's __EXIT__ marker is erased; otherwise
     # live_status would instantly mark the new run as done.
     rl.write_text("");
 
-    pid = jobs.spawn_detached(cmd, runlog=rl, env=env_overrides, cwd=models.data_root());
+    pid = jobs.spawn_detached(cmd, runlog=rl, env=env_overrides, cwd=launch_cwd);
 
     now = time.strftime("%Y-%m-%d %H:%M:%S");
     jobs.write_job(jf, {
         "name": name,
         "mode": mode,
+        "backend": str(rendered["backend"]),
         "pid": pid,
         "status": "running",
         "started": now,
@@ -133,7 +126,7 @@ def:pub start_training(name: str, mode: str, model_id: str = "", opts: dict = {}
 }
 
 """Stop a running training job (SIGTERM the process group). Returns JobStatus."""
-def:pub stop_training(name: str, mode: str) -> dict {
+def stop_training(name: str, mode: str) -> dict {
     if not jobs.safe(name) { raise ValueError("invalid name"); }
     if mode != "sft" and mode != "dpo" { raise ValueError("mode must be sft|dpo"); }
     jf = _job_file(name, mode);
@@ -143,20 +136,21 @@ def:pub stop_training(name: str, mode: str) -> dict {
 }
 
 """Poll status for a (name, mode) job. Returns JobStatus."""
-def:pub get_status(name: str, mode: str = "sft") -> dict {
+def get_status(name: str, mode: str = "sft") -> dict {
     if not jobs.safe(name) { raise ValueError("invalid name"); }
     if mode != "sft" and mode != "dpo" { raise ValueError("mode must be sft|dpo"); }
     return _build_status(name, mode);
 }
 
-"""List every training session (SFT + DPO) across all run dirs. {"sessions": [...]}"""
-def:pub list_sessions() -> dict {
-    base = models.results_dir();
+"""List every training session (SFT + DPO) across the caller's run dirs.
+{"sessions": [...]} — scoped to the caller's per-user results tree."""
+def list_sessions() -> dict {
+    base = auth.user_results_dir();
     out: list = [];
     if not base.exists() { return {"sessions": out}; }
     for child in sorted(base.iterdir()) {
         if not child.is_dir() { continue; }
-        if child.name in models.EXCLUDED_RUN_DIRS { continue; }
+        if child.name in workspace.excluded_run_dirs() { continue; }
         nm = child.name;
         for mode in ["sft", "dpo"] {
             logp: Path = child / "dpo" / "train.log" if mode == "dpo" else child / "train.log";

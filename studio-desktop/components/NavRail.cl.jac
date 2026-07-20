@@ -1,23 +1,8 @@
 """Left navigation rail — workspace switcher (top) + active workspace's sections.
 
-Three workspace tiles (01 SFT/DPO, 02 RL/GRPO, 03 CPT) with a per-workspace accent
-dot; below a divider, the active workspace's own section nav. Same monochrome theme
-everywhere — accent (dot + active left-bar) is the only per-workspace color, driven
-by --ws-accent (stamped by data-ws on the shell root).
+Workspaces are read from the graph via ui_layout (root --> Workspace, SQLite-persisted).
+Accent dots use --ws01/--ws02/--ws03 CSS vars (stamped on the shell root via data-ws).
 """
-
-glob WS_ORDER: list[str] = ["01", "02", "03"];
-glob WS_NAME: dict = {"01": "SFT/DPO", "02": "RL/GRPO", "03": "CPT"};
-glob WS_DOT: dict = {"01": "var(--ws01)", "02": "var(--ws02)", "03": "var(--ws03)"};
-glob SECTIONS: dict = {
-    "01": ["chat", "data", "train", "evals"],
-    "02": ["chat", "data", "results", "generate"],
-    "03": ["chat", "data", "train", "plan"]
-};
-glob LABELS: dict = {
-    "chat": "CHAT", "train": "TRAIN", "data": "DATA", "evals": "EVALS",
-    "rl": "RL", "results": "RESULTS", "generate": "GENERATE", "plan": "PLAN"
-};
 
 def _glyph(s: str) -> JsxElement {
     if s == "chat" {
@@ -58,6 +43,11 @@ def _glyph(s: str) -> JsxElement {
             <path d="M10.5 11.5l1.5 1.5L14.5 10" />
         </svg>;
     }
+    if s == "cloud" {
+        return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.25">
+            <path d="M4.5 11.5h7a2.5 2.5 0 000-5 3 3 0 00-5.8-1A2.2 2.2 0 004.5 11.5z" />
+        </svg>;
+    }
     # results (also the old rl fallback): sparkline + point
     return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.25">
         <path d="M2 13h12" stroke="#444" />
@@ -66,46 +56,68 @@ def _glyph(s: str) -> JsxElement {
     </svg>;
 }
 
+def _sectionsFor(layout: any, workspace: str) -> list {
+    for ws in list(layout["workspaces"]) {
+        wd = ws as dict;
+        if str(wd["id"]) == workspace {
+            return list(wd["sections"]);
+        }
+    }
+    return [];
+}
+
 def:pub NavRail(
-    workspace: str, section: str,
-    onWorkspace: Callable[([str], None)], onSection: Callable[([str], None)]
+    layout: any, workspace: str, section: str,
+    onWorkspace: Callable[([str], None)], onSection: Callable[([str], None)],
+    onSettings: Callable[[], None]
 ) -> JsxElement {
+    wsList: list = list(layout["workspaces"]);
+    secList: list = _sectionsFor(layout, workspace);
     return <nav className="flex w-40 shrink-0 flex-col border-r border-neutral-800 bg-[#0d0d0d] px-2 py-3">
         <span className="micro-label mb-4 px-2">JAC·ML STUDIO</span>
         <div className="flex flex-col gap-1">
-            {for w in WS_ORDER {
+            {for ws in wsList {
+                wd = ws as dict;
+                wid = str(wd["id"]);
+                accent = str(wd["accent"]);
                 <button
-                    key={w}
-                    onClick={lambda e: MouseEvent { onWorkspace(w); }}
+                    key={wid}
+                    onClick={lambda e: MouseEvent { onWorkspace(wid); }}
                     className={"relative flex h-9 items-center gap-2.5 rounded-md px-3 transition-colors " + (
-                        "bg-[#161616] text-neutral-100" if w == workspace
+                        "bg-[#161616] text-neutral-100" if wid == workspace
                         else "text-neutral-500 hover:bg-[#121212] hover:text-neutral-300"
                     )}
                 >
-                    {w == workspace and <span className="absolute left-0 top-2 bottom-2 w-[2px]" style={{"background": "var(--ws-accent)"}} />}
-                    <span className="h-2 w-2 shrink-0 rounded-full" style={{"background": str(WS_DOT[w]), "opacity": (1.0 if w == workspace else 0.4)}} />
-                    <span className="font-mono text-[10px] tracking-[0.12em]">{w} {str(WS_NAME[w])}</span>
+                    {wid == workspace and <span className="absolute left-0 top-2 bottom-2 w-[2px]" style={{"background": "var(--ws-accent)"}} />}
+                    <span className="h-2 w-2 shrink-0 rounded-full" style={{"background": "var(--" + accent + ")", "opacity": (1.0 if wid == workspace else 0.4)}} />
+                    <span className="font-mono text-[10px] tracking-[0.12em]">{wid} {str(wd["label"])}</span>
                 </button>
             }}
         </div>
         <div className="dashed-rule my-3"></div>
         <div className="flex flex-col gap-1">
-            {for s in list(SECTIONS[workspace]) {
+            {for sec in secList {
+                sd = sec as dict;
+                sid = str(sd["id"]);
                 <button
-                    key={s}
-                    onClick={lambda e: MouseEvent { onSection(s); }}
+                    key={sid}
+                    onClick={lambda e: MouseEvent { onSection(sid); }}
                     className={"relative flex h-9 items-center gap-3 rounded-md px-3 transition-colors " + (
-                        "bg-[#161616] text-neutral-100" if s == section
+                        "bg-[#161616] text-neutral-100" if sid == section
                         else "text-neutral-600 hover:bg-[#121212] hover:text-neutral-300"
                     )}
                 >
-                    {s == section and <span className="absolute left-0 top-2 bottom-2 w-[2px]" style={{"background": "var(--ws-accent)"}} />}
-                    {_glyph({"s": s})}
-                    <span className="font-mono text-[11px] tracking-[0.15em]">{LABELS[s]}</span>
+                    {sid == section and <span className="absolute left-0 top-2 bottom-2 w-[2px]" style={{"background": "var(--ws-accent)"}} />}
+                    {_glyph(sid)}
+                    <span className="font-mono text-[11px] tracking-[0.15em]">{str(sd["label"])}</span>
                 </button>
             }}
         </div>
         <div className="flex-1" />
+        <button
+            onClick={lambda e: MouseEvent { onSettings(); }}
+            className="mb-2 rounded-md px-2 py-1.5 text-left font-mono text-[10px] tracking-wider text-neutral-600 hover:bg-[#121212] hover:text-neutral-300"
+        >⚙ WORKSPACES</button>
         <span className="micro-label px-2">v3</span>
     </nav>;
 }

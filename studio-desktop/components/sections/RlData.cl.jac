@@ -6,11 +6,12 @@ rl_dataset_files/rl_dataset_rows in data.sv.jac) rendered through the shared
 RowBrowser. No pipeline/add-examples here — those are 01-only.
 """
 
-sv import from ...data { rl_dataset_files, rl_dataset_rows, FileRefView, DataRowView }
+sv import from ...data { rl_sources, rl_dataset_files, rl_dataset_rows, FileRefView, DataRowView }
 import from ..shared.Field { Segmented }
 import from ..shared.RowBrowser { RowBrowser }
 
-glob RL_SOURCES: list[str] = ["SFT", "GRPO", "conversion", "synthetic", "splits"];
+# The source picker list is fetched from the server (data.rl_sources, backed by
+# studio.workspace.toml) on mount — no client-side duplicate of the source axis.
 
 def:pub RlData -> JsxElement {
     has rlSource: str = "SFT",
@@ -19,7 +20,8 @@ def:pub RlData -> JsxElement {
         rows: list = [],
         offset: int = 0,
         total: int = 0,
-        expanded: int = -1;
+        expanded: int = -1,
+        sources: list = [];
 
     # `src`/`p`/`off` passed explicitly — reading state right after setting it
     # returns the stale value (React writes are async).
@@ -77,7 +79,11 @@ def:pub RlData -> JsxElement {
     }
 
     async can with entry {
-        await _loadSource("SFT");
+        sources = await rl_sources();
+        if len(list(sources)) > 0 {
+            rlSource = str(sources[0]);
+        }
+        await _loadSource(rlSource);
     }
 
     return <div className="flex h-full min-w-0 flex-1 flex-col">
@@ -88,7 +94,7 @@ def:pub RlData -> JsxElement {
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
             <div className="flex flex-wrap items-center gap-2">
                 <span className="micro-label text-neutral-600">SOURCE</span>
-                <Segmented options={RL_SOURCES} value={rlSource} onSet={lambda v: str { switchSource(v); }} />
+                <Segmented options={sources} value={rlSource} onSet={lambda v: str { switchSource(v); }} />
             </div>
             <div className="stat-line text-neutral-600">RL training data (read-only) — SFT gold · GRPO reward tasks · python→jac · synthetic · splits. See RL_FINDINGS.md.</div>
             <RowBrowser

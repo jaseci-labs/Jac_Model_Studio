@@ -14,6 +14,7 @@ runs the confirm→reload state machine without a backend call (NOTE).
 
 import from react { useEffect }
 sv import from ...train { start_training, stop_training, get_status, list_sessions }
+sv import from ...backends { list_backends }
 sv import from ...runs { get_run, compare_runs }
 import from ..shared.SubTabs { SubTabs }
 import from ..shared.Field { Field, TextInput, Segmented }
@@ -24,14 +25,45 @@ import from ..shared.MonoChart { MonoChart }
 import from ..shared.MultiLineChart { MultiLineChart }
 
 glob TABS: list[str] = ["LAUNCH", "MONITOR", "HISTORY"];
-glob SFT_OPT_KEYS: list[str] = ["EVAL_EVERY", "SUBSET", "DRY_ITERS", "SKIP_DRY"];
-glob DPO_OPT_KEYS: list[str] = ["DPO_ITERS", "DPO_LR", "DPO_BETA", "SUBSET"];
 glob CC: dict = {"loss": "#d8a657", "lr": "#7aa2f7", "tps": "#6fc3b2", "acc": "#9ec98f"};
 glob COLORS: list[str] = ["#7aa2f7", "#d8a657", "#9ec98f", "#b89ce8", "#6fc3b2", "#e08a8a"];
 glob MODE_DESC: dict = {
     "sft": "supervised finetune · teaches the model to write Jac",
     "dpo": "preference tuning · pushes outputs toward idiomatic Jac"
 };
+
+def _availBackends(backends: list, mode: str) -> list {
+    out: list = [];
+    for b in backends {
+        for m in list(b["methods"]) {
+            if str(m) == mode {
+                out.append(b);
+                break;
+            }
+        }
+    }
+    return out;
+}
+
+def _backendDesc(backends: list, backendId: str) -> str {
+    for b in backends {
+        if str(b["id"]) == backendId { return str(b["description"]); }
+    }
+    return "";
+}
+
+def _optKeysFor(backends: list, backendId: str, mode: str) -> list {
+    for b in backends {
+        if str(b["id"]) != backendId { continue; }
+        details = b.get("method_details");
+        if not isinstance(details, dict) { return []; }
+        md = details.get(mode);
+        if not isinstance(md, dict) { return []; }
+        raw = md.get("env_keys");
+        if isinstance(raw, list) { return [str(k) for k in (raw as list)]; }
+    }
+    return [];
+}
 
 # ---------------------------------------------------------------------------
 # numeric/format helpers (no `any` locals in the arithmetic)
@@ -185,8 +217,10 @@ def:pub Train(active: bool) -> JsxElement {
     has sessions: list = [];
     has formModelId: str = "Qwen/Qwen3-Coder-30B-A3B-Instruct";
     has formName: str = "qwen";
-    has formMode: str = "sft";
-    has opts: dict = {
+    has formMode: str = "sft",
+        formBackend: str = "mlx_local",
+        backends: list = [],
+        opts: dict = {
         "EVAL_EVERY": "60", "SUBSET": "50", "DRY_ITERS": "30", "SKIP_DRY": "0",
         "DPO_ITERS": "200", "DPO_LR": "1e-6", "DPO_BETA": "0.1"
     };
@@ -207,6 +241,13 @@ def:pub Train(active: bool) -> JsxElement {
     has timer: any = None;
 
     # ---- async fetchers (set state only; logic params passed explicitly) ----
+    async def _loadBackends() -> None {
+        try {
+            r = await list_backends();
+            backends = list(r["backends"]);
+            formBackend = str(r["default"]);
+        } except Exception {}
+    }
     async def _pollSessions() -> None {
         try {
             r = await list_sessions();
@@ -260,6 +301,20 @@ def:pub Train(active: bool) -> JsxElement {
     }
 
     # ---- polling effects ----
+    useEffect(lambda {
+        if active { _loadBackends(); }
+    }, [active]);
+
+    useEffect(lambda {
+        avail = _availBackends(backends, formMode);
+        if len(avail) == 0 { return; }
+        ok = False;
+        for b in avail {
+            if str(b["id"]) == formBackend { ok = True; break; }
+        }
+        if not ok { formBackend = str(avail[0]["id"]); }
+    }, [formMode, backends]);
+
     useEffect(lambda {
         iv: any = None;
         if active {
@@ -342,14 +397,14 @@ def:pub Train(active: bool) -> JsxElement {
         histName = nm; histMode = md; historyMetrics = None;
     }
     async def doStart() -> None {
-        keys = SFT_OPT_KEYS if formMode == "sft" else DPO_OPT_KEYS;
+        keys = _optKeysFor(backends, formBackend, formMode);
         filtered: dict = {};
         for k in keys {
             if k in opts { filtered[k] = str(opts[k]); }
         }
         mid = formModelId if formMode == "sft" else "";
         try {
-            j = await start_training(name=formName, mode=formMode, model_id=mid, opts=filtered);
+            j = await start_training(formName, formMode, mid, filtered, formBackend);
             job = j;
             error = "";
         } except Exception {
@@ -389,11 +444,31 @@ def:pub Train(active: bool) -> JsxElement {
     # ---- LAUNCH tab ----
     def _launch() -> JsxElement {
         isRunning = job is not None and str(job["status"]) == "running";
-        optKeys = SFT_OPT_KEYS if formMode == "sft" else DPO_OPT_KEYS;
+        optKeys = _optKeysFor(backends, formBackend, formMode);
+        availBackends = _availBackends(backends, formMode);
         btn = "rounded-lg border border-neutral-600 px-3 py-1 font-mono text-[10px] transition-colors hover:border-neutral-400 disabled:opacity-30 ";
         return <div className="flex items-start gap-4 p-4 pt-5">
             <div className="relative flex min-w-0 flex-1 flex-col gap-3 rounded-md border border-neutral-800 bg-[#0d0d0d] p-4 pt-5">
                 <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">LAUNCH.CONFIG</span>
+
+                {len(availBackends) > 0 and <Field label="BACKEND">
+                    <div className="flex flex-wrap gap-1">
+                        {for b in availBackends {
+                            bid = str(b["id"]);
+                            <button
+                                key={bid}
+                                onClick={lambda e: MouseEvent { formBackend = bid; }}
+                                className={"rounded-md border px-3 py-1 text-xs transition-colors " + (
+                                    "border-neutral-500 bg-[#1a1a1a] text-neutral-100" if formBackend == bid
+                                    else "border-neutral-700 text-neutral-500 hover:text-neutral-300"
+                                )}
+                            >
+                                {str(b["label"])}
+                            </button>
+                        }}
+                    </div>
+                    {formBackend and <p className="stat-line text-neutral-600">{_backendDesc(backends, formBackend)}</p>}
+                </Field>}
 
                 {formMode == "sft" and <Field label="BASE MODEL (HF ID)">
                     <TextInput value={formModelId} onSet={lambda v: str { updateForm("modelId", v); }} placeholder="org/model" mono={True} />

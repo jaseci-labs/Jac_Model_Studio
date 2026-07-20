@@ -30,6 +30,70 @@ def:pub local_mode() -> bool {
     return bool(os.environ.get("JAC_LOCAL_USER", ""));
 }
 
+# Fixed credentials for the implicit local desktop user. Only ever used against
+# a JAC_LOCAL_USER server on the user's own machine; the graph is local.
+glob LOCAL_EMAIL: str = "local@studio.local";
+glob LOCAL_PASSWORD: str = "local-desktop-session";
+
+"""Local-desktop auto-session: register (idempotent) + login the implicit local
+user IN-PROCESS and return a JWT.
+
+Why this exists: the desktop webview target can't reach `/user/register` +
+`/user/login` over HTTP. The only HTTP server in webview mode is the loopback
+oauth broker (the `studio` binary), which serves `/__jac/*` + static files and
+does NOT proxy `/user/*` to the in-process jac-scale server (that proxying is
+wired only in CEF mode via sv_bridge). The in-process API is reachable only
+through the native `__jac_invoke` bridge, which dispatches `/walker/*` and
+`/function/*` — so the client calls THIS endpoint over that bridge and gets
+back a token it can `jacSetToken()` with, after which every authenticated
+`def:priv` call succeeds.
+
+Uses the in-process TestClient (`_tc`) directly so the token is minted by the
+SAME server that will validate it — no separate user-manager instance, no
+JWT-secret or SQLite-path matching. The re-entrant `tc.post` is safe: each call
+runs the ASGI app on its own anyio portal thread, and `dispatch()` does not
+hold `_sv_lock`. Returns "" on any failure or when not in local mode; the
+client then falls back to the production login gate.
+
+`def:pub` (no auth) so a logged-out client can bootstrap. The `local_mode()`
+guard is defense-in-depth — prod never calls this."""
+def:pub local_session() -> str {
+    if not local_mode() { return ""; }
+    import from jaclang.runtimelib.client.targets.desktop.native.inprocess_dispatch { _tc };
+    tc = _tc;
+    if tc is None { return ""; }
+    identities: list[dict[str, any]] = [{"type": "username", "value": LOCAL_EMAIL}];
+    credential: dict[str, any] = {"type": "password", "password": LOCAL_PASSWORD};
+    # Register; idempotent — "identity taken" on second+ launch is expected and
+    # the body is swallowed. The subsequent /user/login succeeds either way.
+    try {
+        tc.post(
+            "/user/register",
+            json={"identities": identities, "credential": credential},
+        );
+    } except Exception { }
+    try {
+        resp = tc.post(
+            "/user/login",
+            json={"identity": identities[0], "credential": credential},
+        );
+        if resp.status_code == 200 {
+            body: dict[str, any] = resp.json() as dict[str, any];
+            data: any = body.get("data", {});
+            if isinstance(data, dict) and "token" in data {
+                return str(data["token"]);
+            }
+        }
+    } except Exception { }
+    return "";
+}
+
+"""Lightweight auth probe for the client keepalive loop. `def:priv` — a 401 means
+the JWT expired or is invalid; the client then re-mints (local) or shows login."""
+def session_alive() -> bool {
+    return True;
+}
+
 """Stable per-user id — the caller's root jid. Request-context only."""
 def uid() -> str {
     return jid(root);

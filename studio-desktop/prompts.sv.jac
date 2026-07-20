@@ -1,15 +1,13 @@
 """studio - prompt library. Serves studio/prompts.json (ported from server).
 
-Resolved relative to THIS module file (not cwd) so it works regardless of where
-`jac start` is launched from — matches the old `Path(__file__).parent` behavior.
+Resolved relative to studio_root() so it works regardless of cwd.
 """
 
 import json;
-import os;
+import paths;
 
-def:pub list_prompts() -> dict {
-    here = os.path.dirname(os.path.abspath(__file__));
-    path = os.path.join(here, "prompts.json");
+def list_prompts() -> dict {
+    path = str(paths.studio_root() / "prompts.json");
     try {
         with open(path) as f {
             return dict(json.load(f));

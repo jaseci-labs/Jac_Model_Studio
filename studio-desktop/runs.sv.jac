@@ -11,13 +11,29 @@ are `any`, so float/int casts go via `float(str(...))` / `int(str(...))`;
 live_status returns dict|None → guard None.
 """
 
+import auth;
+import backends;
 import jobs;
+import json;
 import metrics;
 import models;
+import workspace;
 import from pathlib { Path }
 
 def _run_dir(name: str) -> Path {
-    return models.results_dir() / name;
+    return auth.user_results_dir() / name;
+}
+
+"""Backend recorded in the job file, else workspace default."""
+def _job_backend(name: str, mode: str) -> str {
+    jf = _run_dir(name) / f".job-{mode}.json";
+    if not jf.exists() { return workspace.training_backend_default(); }
+    try {
+        job = dict(json.loads(jf.read_text()));
+        raw = job.get("backend");
+        if raw { return str(raw); }
+    } except Exception { }
+    return workspace.training_backend_default();
 }
 
 def _f(d: dict, k: str) -> float {
@@ -31,8 +47,8 @@ def _i(d: dict, k: str) -> int {
 """True if either the SFT or DPO job file shows status "running"."""
 def _is_running(name: str) -> bool {
     for mode in ["sft", "dpo"] {
-        jf = models.results_dir() / name / f".job-{mode}.json";
-        runlog = models.results_dir() / name / f"run-{mode}.log";
+        jf = auth.user_results_dir() / name / f".job-{mode}.json";
+        runlog = auth.user_results_dir() / name / f"run-{mode}.log";
         job = jobs.live_status(jf, runlog);
         if job is not None and str(job.get("status")) == "running" { return True; }
     }
@@ -87,7 +103,9 @@ def _get_run_metrics(name: str, mode: str) -> dict {
         }
     }
 
-    t = metrics.parse_train_log(log);
+    t = metrics.parse_train_log_by(
+        backends.log_parser_for(_job_backend(name, mode), mode), log
+    );
     curve: list = [];
     if curve_path is not None { curve = metrics.read_series(curve_path, "test_pass_pct"); }
     isum: dict = {};
@@ -142,13 +160,13 @@ def _last_y(series: any) -> float {
 }
 
 """List all runs with summary info. {"runs": [...]}"""
-def:pub list_runs() -> dict {
-    base = models.results_dir();
+def list_runs() -> dict {
+    base = auth.user_results_dir();
     out: list = [];
     if not base.exists() { return {"runs": out}; }
     for child in sorted(base.iterdir()) {
         if not child.is_dir() { continue; }
-        if child.name in models.EXCLUDED_RUN_DIRS { continue; }
+        if child.name in workspace.excluded_run_dirs() { continue; }
         rdir = child;
         has_sft = (rdir / "train.log").exists() or (rdir / ".train.done").exists();
         has_dpo = (rdir / "dpo").exists();
@@ -164,16 +182,16 @@ def:pub list_runs() -> dict {
 }
 
 """Full RunMetrics for one run."""
-def:pub get_run(name: str, mode: str = "sft") -> dict {
+def get_run(name: str, mode: str = "sft") -> dict {
     if not jobs.safe(name) { raise ValueError("invalid run name"); }
     if mode != "sft" and mode != "dpo" { raise ValueError("mode must be sft|dpo"); }
     return _get_run_metrics(name, mode);
 }
 
 """Overlay every run's curves for the given mode + per-run headline numbers."""
-def:pub compare_runs(mode: str = "sft") -> dict {
+def compare_runs(mode: str = "sft") -> dict {
     if mode != "sft" and mode != "dpo" { raise ValueError("mode must be sft|dpo"); }
-    base = models.results_dir();
+    base = auth.user_results_dir();
     names: list = [];
     trains: dict = {};
     vals: dict = {};
@@ -182,7 +200,7 @@ def:pub compare_runs(mode: str = "sft") -> dict {
     if base.exists() {
         for child in sorted(base.iterdir()) {
             if not child.is_dir() { continue; }
-            if child.name in models.EXCLUDED_RUN_DIRS { continue; }
+            if child.name in workspace.excluded_run_dirs() { continue; }
             m = _get_run_metrics(child.name, mode);
             if not m["found"] { continue; }
             name = child.name;

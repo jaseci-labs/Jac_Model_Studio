@@ -35,7 +35,7 @@ sudo logrotate --debug /etc/logrotate.d/jac-studio   # dry-run: confirm paths
 
 ## Secrets at rest
 
-Per-user Vast.ai API keys are encrypted on the graph via `crypto.sv.jac` using
+Per-user Spheron API keys are encrypted on the graph via `crypto.sv.jac` using
 `JAC_SECRET_KEY` (falls back to `JWT_SECRET`). Set a dedicated `JAC_SECRET_KEY`
 so you can rotate the JWT secret without invalidating stored keys. Rotation
 procedure is documented in `env.example`.

@@ -22,6 +22,7 @@ import from ..chat.Rail { Rail }
 import from ..chat.ModelPill { ModelPill }
 import from ..chat.Thread { Thread }
 import from ..chat.Composer { Composer }
+import from ...auth_session { bearerHeaders, handleUnauthorized }
 
 def _r1(v: any) -> float {
     return float(int(float(str(v)) * 10.0 + 0.5)) / 10.0;
@@ -180,17 +181,38 @@ def:pub Chat(workspace: str, defaultModel: str) -> JsxElement {
         donestats: any = None;
         errtext = "";
         try {
+            # Raw fetch (not sv import) → bearer token + 401 recovery (see auth_session).
+            hdrs: dict = bearerHeaders();
+            body: str = JSON.stringify({
+                "messages": hist, "model_id": legModel,
+                "temperature": temperature, "top_p": topP, "max_tokens": maxTokens
+            });
             resp: any = await fetch(
                 "/function/chat_stream",
-                {
-                    "method": "POST",
-                    "headers": {"Content-Type": "application/json"},
-                    "body": JSON.stringify({
-                        "messages": hist, "model_id": legModel,
-                        "temperature": temperature, "top_p": topP, "max_tokens": maxTokens
-                    })
-                }
+                {"method": "POST", "headers": hdrs, "body": body}
             );
+            if int(str(resp.status)) == 401 {
+                restored: bool = False;
+                restored = await handleUnauthorized();
+                if restored {
+                    hdrs = bearerHeaders();
+                    resp = await fetch(
+                        "/function/chat_stream",
+                        {"method": "POST", "headers": hdrs, "body": body}
+                    );
+                }
+            }
+            if int(str(resp.status)) == 401 {
+                errtext = "session expired — sign in again";
+                activeReader = None;
+                work[ai] = {
+                    "role": "assistant", "content": acc, "stats": donestats,
+                    "modelId": legModel, "pairGroup": pg, "streaming": False,
+                    "error": errtext
+                };
+                messages = list(work);
+                return;
+            }
             reader: any = resp.body.getReader();
             activeReader = reader;
             dec: any = new(TextDecoder);

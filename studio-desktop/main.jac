@@ -31,18 +31,23 @@ import from cpt {
 # Streaming chat endpoint — consumed by a raw fetch reader on the client (not an
 # `sv import` RPC stub), so register it explicitly at the top level.
 import from chat { chat_stream }
-# Vast.ai GPU cloud (vastai SDK) — full instance lifecycle: search/create/list/
-# ssh/logs/exec + start/stop/reboot/destroy.
-import from vast {
-    vast_status, search_gpus, create_gpu_instance,
-    vast_instances, vast_instance, vast_ssh, vast_logs, vast_exec,
-    stop_gpu_instance, start_gpu_instance, reboot_gpu_instance, destroy_gpu_instance,
-    set_vast_key, clear_vast_key, vast_credential_status,
-    dispatch_training_job, list_vast_dispatches, get_vast_dispatch, stop_vast_dispatch
+# Spheron GPU cloud (REST API) — full deployment lifecycle: search offers/
+# providers, deploy instances, list/get/ssh, terminate (+ rename + can-terminate),
+# SSH-key management, and a cloud-init dispatch bridge that deploys a fresh
+# instance with a training command baked into runcmd.
+import from spheron {
+    spheron_status, spheron_credential_status, spheron_providers,
+    search_gpus, create_gpu_instance,
+    spheron_instances, spheron_instance, spheron_ssh,
+    destroy_gpu_instance, can_terminate_gpu_instance, rename_gpu_instance,
+    spheron_ssh_keys, add_spheron_ssh_key,
+    set_spheron_key, clear_spheron_key,
+    dispatch_training_job, list_spheron_dispatches, get_spheron_dispatch, stop_spheron_dispatch
 }
-# Local single-user mode flag — consumed by the client's auth gate to
-# auto-provision a session (desktop) or show the login screen (prod).
-import from auth { local_mode }
+# Local single-user mode: `local_mode()` is the flag the client's auth gate
+# reads; `local_session()` mints an in-process JWT so the desktop client (which
+# can't reach /user/* over HTTP in webview mode) can still establish a session.
+import from auth { local_mode, local_session }
 
 # Client-side UI
 cl {

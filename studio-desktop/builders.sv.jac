@@ -13,26 +13,15 @@ the shell command.
 import os;
 import shlex;
 import time;
+import auth;
 import jobs;
 import metrics;
 import models;
+import paths;
+import workspace;
 import from pathlib { Path }
 
-glob BUILDERS: list[str] = [
-    "seed_conversion",
-    "idiomatic_batch",
-    "idiomatic_batch2",
-    "idiomatic_batch3",
-    "scale_conversion",
-    "dpo_conversion",
-    "build_manifest",
-    "build_splits",
-    "build_dpo_splits",
-    "holdout",
-    "graph_holdout",
-    "dataset_stats",
-    "verify_dataset"
-];
+# Builder stage list now lives in studio.workspace.toml (workspace.sv.jac).
 
 """One builder stage as the client sees it: live status + recent log tail."""
 obj BuilderView {
@@ -45,11 +34,11 @@ obj BuilderView {
 }
 
 def _job_file(stage: str) -> Path {
-    return models.results_dir() / "_builder" / f".job-{stage}.json";
+    return auth.user_results_dir() / "_builder" / f".job-{stage}.json";
 }
 
 def _run_log(stage: str) -> Path {
-    return models.results_dir() / "_builder" / f"run-{stage}.log";
+    return auth.user_results_dir() / "_builder" / f"run-{stage}.log";
 }
 
 def _build_status(stage: str, message: str = "") -> BuilderView {
@@ -72,10 +61,10 @@ def _build_status(stage: str, message: str = "") -> BuilderView {
     );
 }
 
-"""Live status for all 13 builder stages, in BUILDERS order."""
-def:pub list_builders() -> list[BuilderView] {
+"""Live status for all builder stages, in workspace order."""
+def list_builders() -> list[BuilderView] {
     out: list[BuilderView] = [];
-    for s in BUILDERS {
+    for s in workspace.builder_stages() {
         out.append(_build_status(s));
     }
     return out;
@@ -85,8 +74,8 @@ def:pub list_builders() -> list[BuilderView] {
 (cwd = data root, .venv/bin prepended to PATH). No-op with message="already running"
 if the job is live; the run log is truncated first so a stale __EXIT__ marker from a
 previous run can't immediately mark the new run done/failed."""
-def:pub run_builder(stage: str) -> BuilderView {
-    if stage not in BUILDERS {
+def run_builder(stage: str) -> BuilderView {
+    if stage not in workspace.builder_stages() {
         return BuilderView(stage=stage, status="idle", message=f"unknown builder stage: {stage}");
     }
     if not jobs.safe(stage) {
@@ -98,10 +87,10 @@ def:pub run_builder(stage: str) -> BuilderView {
     if existing is not None and str(existing.get("status", "")) == "running" {
         return _build_status(stage, "already running");
     }
-    (models.results_dir() / "_builder").mkdir(parents=True, exist_ok=True);
+    (auth.user_results_dir() / "_builder").mkdir(parents=True, exist_ok=True);
     # Erase any stale __EXIT__ marker from a prior run.
     rl.write_text("");
-    target = f"01-sft-dpo/sft_dpo/jacgen/{shlex.quote(stage)}.jac";
+    target = paths.jacgen_stage(stage);
     inner_cmd = f"{shlex.quote(str(models.jac_bin()))} run {target}";
     cmd = jobs.with_exit_marker(inner_cmd, rl);
     venv_bin = str(models.data_root() / ".venv" / "bin");
@@ -120,8 +109,8 @@ def:pub run_builder(stage: str) -> BuilderView {
 }
 
 """Live status for a single builder stage."""
-def:pub get_builder(stage: str) -> BuilderView {
-    if stage not in BUILDERS {
+def get_builder(stage: str) -> BuilderView {
+    if stage not in workspace.builder_stages() {
         return BuilderView(stage=stage, status="idle", message=f"unknown builder stage: {stage}");
     }
     return _build_status(stage);

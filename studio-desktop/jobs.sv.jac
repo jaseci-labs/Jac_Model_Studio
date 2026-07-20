@@ -15,6 +15,8 @@ import os;
 import re;
 import shlex;
 import time;
+import auth;
+import audit;
 import from pathlib { Path }
 import from signal { SIGTERM }
 import from subprocess { Popen, STDOUT }
@@ -54,6 +56,29 @@ def reap(pid: int) -> None {
     } except Exception {
         return;
     }
+}
+
+"""Max detached jobs per user (running). Override via JAC_MAX_CONCURRENT_JOBS."""
+def _max_concurrent_jobs() -> int {
+    try {
+        return int(str(os.environ.get("JAC_MAX_CONCURRENT_JOBS", "3")));
+    } except Exception {
+        return 3;
+    }
+}
+
+"""Count job.json / .job-*.json files with status=running under caller's tree."""
+def _count_running_jobs() -> int {
+    base = auth.user_results_dir();
+    if not base.exists() { return 0; }
+    n = 0;
+    for jf in base.rglob("*.json") {
+        if "job" not in jf.name { continue; }
+        job = read_job(jf);
+        if job is None { continue; }
+        if str(job.get("status", "")) == "running" { n += 1; }
+    }
+    return n;
 }
 
 def read_job(job_file: Path) -> dict | None {
@@ -142,8 +167,11 @@ def with_exit_marker(cmd: str, runlog: Path) -> str {
 
 """Spawn *cmd* (shell) detached in its own session/process group, stdout+stderr →
 *runlog* (append), with os.environ + *env*. Returns the child pid. Caller must
-append the exit marker (use with_exit_marker)."""
+append the exit marker (use with_exit_marker). Enforces per-user concurrent job cap."""
 def spawn_detached(cmd: str, runlog: Path, env: dict, cwd: Path) -> int {
+    if _count_running_jobs() >= _max_concurrent_jobs() {
+        raise ValueError("concurrent job limit reached");
+    }
     runlog.parent.mkdir(parents=True, exist_ok=True);
     logf: any = open(runlog, "a");
     proc: any = None;
@@ -155,5 +183,7 @@ def spawn_detached(cmd: str, runlog: Path, env: dict, cwd: Path) -> int {
     } finally {
         logf.close();
     }
-    return int(str(proc.pid));
+    pid = int(str(proc.pid));
+    audit.log("job_spawn", {"pid": pid, "cwd": str(cwd), "runlog": str(runlog)});
+    return pid;
 }

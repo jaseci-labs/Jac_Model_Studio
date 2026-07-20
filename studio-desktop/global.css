@@ -160,7 +160,10 @@ body {
 
 /* Per-workspace accent (nav tile dots + active-bars only; interiors stay
    monochrome). --ws-accent is stamped by data-ws on the shell root. */
-:root { --ws01: #7aa2f7; --ws02: #9ec98f; --ws03: #d8a657; --ws-accent: #7aa2f7; }
+:root { --ws01: #7aa2f7; --ws02: #9ec98f; --ws03: #d8a657; --ws04: #b89ce8; --ws05: #6fc3b2; --ws06: #e08a8a; --ws-accent: #7aa2f7; }
 [data-ws="01"] { --ws-accent: var(--ws01); }
 [data-ws="02"] { --ws-accent: var(--ws02); }
 [data-ws="03"] { --ws-accent: var(--ws03); }
+[data-ws="04"] { --ws-accent: var(--ws04); }
+[data-ws="05"] { --ws-accent: var(--ws05); }
+[data-ws="06"] { --ws-accent: var(--ws06); }

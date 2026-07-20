@@ -1,0 +1,269 @@
+# studio.workspace.toml — canonical studio data-config.
+#
+# Single source of truth for everything the studio desktop app used to hard-code
+# as `glob` constants in the models/data/train/builders/evals/cpt/rl .sv.jac
+# modules. Edit this file to adapt the app to a checkout — no code changes.
+#
+# Resolution (see workspace.sv.jac):
+#   1. <workspace_root>/studio.workspace.toml   (this file; JAC_STUDIO_WORKSPACE)
+#   2. <studio_root>/studio.workspace.toml      (shipped fallback inside the app)
+# Missing sections default to empty; the app still boots.
+#
+# Path scopes (relative roots, see paths.sv.jac):
+#   models.*.path / data / builders / evals / train  ->  data_root()
+#   rl.* / cpt.*                                     ->  workspace_root()
+# (model dirs + SFT/DPO datasets live with the data checkout; RL + CPT live in
+#  the jac_ml_studio workspace itself.)
+
+# ---------------------------------------------------------------------------
+# Model registry + eval holdouts (models.sv.jac)
+# ---------------------------------------------------------------------------
+
+# results/ subdirs that are NOT training runs (skipped by train/runs/evals listings)
+[models]
+excluded_run_dirs = ["comparison", "_builder", "_evals"]
+
+# the chat model picker — add/remove a model by adding/removing a block
+[[models.registry]]
+id = "qwen-dpo"
+label = "Qwen · DPO"
+path = "models/qwen-jac-dpo-fused-q8"
+
+[[models.registry]]
+id = "gemma-dpo"
+label = "Gemma · DPO"
+path = "models/gemma-jac-dpo-fused-q8"
+
+[[models.registry]]
+id = "qwen-sft"
+label = "Qwen · SFT"
+path = "models/qwen-jac-fused-q8"
+
+[[models.registry]]
+id = "gemma-sft"
+label = "Gemma · SFT"
+path = "models/gemma-jac-fused-q8"
+
+[[models.registry]]
+id = "qwen3coder-rl"
+label = "Qwen3-Coder · RL"
+path = "models/jac-qwen3coder-r20-rft-q4"
+
+[[models.registry]]
+id = "qwen-q4"
+label = "Qwen · BASE"
+path = "models/qwen-q4"
+
+[[models.registry]]
+id = "qwen-cpt-v1"
+label = "Qwen · CPT-v1"
+path = "models/qwen-cpt-v1-fused-q4"
+
+# eval holdout sets (rel to data root); keys are the client-facing holdout ids
+[models.holdouts]
+function = "01-sft-dpo/dataset/eval_holdout/conversion.jsonl"
+graph = "01-sft-dpo/dataset/eval_holdout/graph_conversion.jsonl"
+
+# ---------------------------------------------------------------------------
+# SFT/DPO dataset browser (data.sv.jac) — rels resolve against data_root()
+# ---------------------------------------------------------------------------
+
+[data]
+# preview-allowed files as [rel, human label]
+preview_files = [
+  ["01-sft-dpo/dataset/conversion/sft.jsonl", "SFT idiomatic core"],
+  ["01-sft-dpo/dataset/conversion/sft_auto.jsonl", "SFT transpile volume"],
+  ["01-sft-dpo/dataset/conversion/dpo.jsonl", "DPO pairs"],
+  ["01-sft-dpo/dataset/mlx/train.jsonl", "MLX SFT train"],
+  ["01-sft-dpo/dataset/mlx/valid.jsonl", "MLX SFT valid"],
+  ["01-sft-dpo/dataset/mlx_dpo/train.jsonl", "MLX DPO train"],
+  ["01-sft-dpo/dataset/mlx_dpo/valid.jsonl", "MLX DPO valid"],
+  ["01-sft-dpo/dataset/eval_holdout/conversion.jsonl", "Holdout (function)"],
+  ["01-sft-dpo/dataset/eval_holdout/graph_conversion.jsonl", "Holdout (graph)"]
+]
+# dataset_stats() SFT file list (rel -> counted into sft_files + sft_total)
+sft_stat_files = [
+  "01-sft-dpo/dataset/conversion/sft.jsonl",
+  "01-sft-dpo/dataset/conversion/sft_auto.jsonl"
+]
+
+# add_examples() targets (key -> rel); keys are the client-facing target ids
+[data.append_targets]
+sft = "01-sft-dpo/dataset/conversion/sft.jsonl"
+dpo = "01-sft-dpo/dataset/conversion/dpo.jsonl"
+
+# dataset_stats() named splits (client-facing key -> rel)
+[data.split_files]
+mlx_train = "01-sft-dpo/dataset/mlx/train.jsonl"
+mlx_valid = "01-sft-dpo/dataset/mlx/valid.jsonl"
+dpo_train = "01-sft-dpo/dataset/mlx_dpo/train.jsonl"
+dpo_valid = "01-sft-dpo/dataset/mlx_dpo/valid.jsonl"
+holdout = "01-sft-dpo/dataset/eval_holdout/conversion.jsonl"
+graph_holdout = "01-sft-dpo/dataset/eval_holdout/graph_conversion.jsonl"
+
+# ---------------------------------------------------------------------------
+# RL (rl.sv.jac / data.sv.jac) — rels resolve against workspace_root()
+# ---------------------------------------------------------------------------
+
+[rl]
+sources = ["SFT", "GRPO", "conversion", "synthetic", "splits"]
+# ladder rung axis (quoted so TOML keeps them textual, matching the old list[str])
+rung_order = ["1", "3", "5", "10", "20", "all"]
+
+# per-source preview files as [rel, label]
+[rl.preview_files]
+SFT = [
+  ["02-rl-grpo/dataset/rl/rft/train.jsonl", "RFT gold · train"],
+  ["02-rl-grpo/dataset/rl/rft/valid.jsonl", "RFT gold · valid"]
+]
+GRPO = [
+  ["02-rl-grpo/dataset/rl/tasks.jsonl", "reward tasks · all"],
+  ["02-rl-grpo/dataset/rl/train.jsonl", "GRPO train pool"],
+  ["02-rl-grpo/dataset/rl/valid.jsonl", "GRPO valid"]
+]
+conversion = [
+  ["02-rl-grpo/dataset/rl_conv/tasks.jsonl", "python→jac · all"],
+  ["02-rl-grpo/dataset/rl_conv/train.jsonl", "conv train"],
+  ["02-rl-grpo/dataset/rl_conv/holdout.jsonl", "conv holdout"]
+]
+synthetic = [
+  ["02-rl-grpo/dataset/rl/synthetic.jsonl", "synthetic · fresh (32)"]
+]
+splits = [
+  ["02-rl-grpo/dataset/rl/holdout.jsonl", "holdout n=18"],
+  ["02-rl-grpo/dataset/rl/holdout_big.jsonl", "holdout n=32 (+syn)"],
+  ["02-rl-grpo/dataset/rl/train_big.jsonl", "train pool (+syn)"]
+]
+
+# ---------------------------------------------------------------------------
+# CPT corpus (cpt.sv.jac) — rels resolve against workspace_root()
+# ---------------------------------------------------------------------------
+
+[cpt]
+manifest_rel = "03-new/dataset/cpt/manifest.json"
+# source order for the composition bar + stat tiles (largest first)
+src_order = ["docs", "code", "rehearsal", "blogs", "osp_paper"]
+# preview-allowed CPT files as [rel, label]
+files = [
+  ["03-new/dataset/cpt/docs/raw.jsonl", "docs · raw"],
+  ["03-new/dataset/cpt/code/raw.jsonl", "code · raw"],
+  ["03-new/dataset/cpt/blogs/raw.jsonl", "blogs · raw"],
+  ["03-new/dataset/cpt/osp_paper/raw.jsonl", "osp_paper · raw"],
+  ["03-new/dataset/cpt/rehearsal/raw.jsonl", "rehearsal · raw"],
+  ["03-new/dataset/cpt/packed/train.jsonl", "packed · train"],
+  ["03-new/dataset/cpt/packed/valid.jsonl", "packed · valid"]
+]
+
+# meta.type -> short kind label for the row browser
+[cpt.kind_map]
+official_doc = "doc"
+llm_doc = "doc"
+paper_section = "paper"
+paper_listing = "paper"
+blog_post = "blog"
+repo_file = "code"
+repo_pack = "code"
+general_code = "rehearsal"
+
+# ---------------------------------------------------------------------------
+# Train / builders / evals (train/builders/evals.sv.jac)
+# ---------------------------------------------------------------------------
+
+# option keys whitelisted into env overrides for start_training()
+[train]
+sft_keys = ["EVAL_EVERY", "SUBSET", "DRY_ITERS", "SKIP_DRY", "LIVE_EVAL"]
+dpo_keys = ["DPO_ITERS", "DPO_LR", "DPO_BETA", "DPO_LAYERS", "SUBSET"]
+
+# 13 dataset-build pipeline stages, in canonical run order
+[builders]
+stages = [
+  "seed_conversion",
+  "idiomatic_batch",
+  "idiomatic_batch2",
+  "idiomatic_batch3",
+  "scale_conversion",
+  "dpo_conversion",
+  "build_manifest",
+  "build_splits",
+  "build_dpo_splits",
+  "holdout",
+  "graph_holdout",
+  "dataset_stats",
+  "verify_dataset"
+]
+
+# valid eval run kinds
+[evals]
+kinds = ["probe", "idiom"]
+
+# ---------------------------------------------------------------------------
+# Training backends (backends.sv.jac) — declarative job specs → shell commands
+# ---------------------------------------------------------------------------
+
+[backends]
+default = "mlx_local"
+
+[backends.mlx_local]
+label = "MLX (local Mac)"
+description = "mlx_lm LoRA + run_probe/run_dpo shell wrappers in the data checkout"
+
+[backends.mlx_local.sft]
+template = "./run_probe.sh {model_id} {run_name}"
+cwd = "data"
+env_keys = ["EVAL_EVERY", "SUBSET", "DRY_ITERS", "SKIP_DRY", "LIVE_EVAL"]
+log_parser = "mlx"
+
+[backends.mlx_local.dpo]
+template = "./run_dpo.sh {run_name}"
+cwd = "data"
+env_keys = ["DPO_ITERS", "DPO_LR", "DPO_BETA", "DPO_LAYERS", "SUBSET"]
+log_parser = "mlx"
+
+[backends.mlx_local.cpt]
+template = "mlx_lm.lora --config {config_file} --adapter-path {adapter_dir} --iters {iters}{resume_flag} > {train_log} 2>&1"
+cwd = "workspace"
+log_parser = "mlx"
+
+# Stub backends — templates are placeholders until wired end-to-end
+[backends.hf_trl]
+label = "HuggingFace TRL"
+description = "accelerate + TRL SFT/DPO (not wired yet)"
+
+[backends.hf_trl.sft]
+template = "accelerate launch train_sft.py --model_name_or_path {base_model} --output_dir {output_dir}"
+cwd = "data"
+env_keys = []
+
+[backends.axolotl]
+label = "Axolotl"
+description = "YAML-driven fine-tuning (not wired yet)"
+
+[backends.axolotl.sft]
+template = "accelerate launch -m axolotl.cli.train {config_yaml}"
+cwd = "data"
+env_keys = []
+
+# ---------------------------------------------------------------------------
+# Spheron remote paths + GPU backend (spheron.sv.jac dispatch bridge)
+# ---------------------------------------------------------------------------
+
+[spheron]
+remote_workspace_root = "/workspace"
+remote_data_root = "/workspace/data"
+remote_studio_root = "/workspace/studio-desktop"
+
+[backends.spheron_gpu]
+label = "Spheron GPU (remote)"
+description = "accelerate + TRL on a Spheron GPU instance (cloud-init dispatch)"
+
+[backends.spheron_gpu.sft]
+template = "accelerate launch train_sft.py --model_name_or_path {model_id} --output_dir results/{run_name}"
+cwd = "data"
+env_keys = ["EVAL_EVERY", "SUBSET", "DRY_ITERS", "SKIP_DRY", "LIVE_EVAL"]
+log_parser = "mlx"
+
+[backends.spheron_gpu.dpo]
+template = "accelerate launch train_dpo.py --output_dir results/{run_name}"
+cwd = "data"
+env_keys = ["DPO_ITERS", "DPO_LR", "DPO_BETA", "DPO_LAYERS", "SUBSET"]
+log_parser = "mlx"

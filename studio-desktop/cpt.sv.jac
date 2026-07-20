@@ -4,7 +4,7 @@ Surfaces the continual-pretrain dataset built by 03-new/cpt_build/build_cpt.py:
 manifest stats (pivoted server-side into chart-ready lists) + per-source raw/packed
 row previews. Like rl.sv.jac, CPT data lives in THIS repo (jac_ml_studio), not the
 studio's data_root (which can point at the DataGeneration checkout), so paths resolve
-against the repo root from __file__ — NOT models.data_root().
+against the workspace root via paths.workspace_root() — NOT models.data_root().
 
 Training control mirrors train.sv.jac/runs.sv.jac (jobs.sv.jac for detached-process
 lifecycle, metrics.sv.jac for log parsing) but scoped to 03-new's own results/adapters
@@ -17,42 +17,24 @@ import os;
 import json;
 import time;
 import shlex;
+import auth;
 import jobs;
 import metrics;
+import paths;
+import backends;
+import workspace;
 import from pathlib { Path }
 import from data { FileRefView, DataRowView }
 
-# studio/ sits directly at repo root (post Jul-10 flatten), so the repo root is
-# two dirnames up from studio/cpt.sv.jac.
-glob CPT_ROOT: str = os.path.dirname(os.path.dirname(os.path.abspath(__file__)));
-
-# Preview-allowed CPT files: 5 raw per-source + 2 packed splits.
-glob CPT_FILES: list[list[str]] = [
-    ["03-new/dataset/cpt/docs/raw.jsonl", "docs · raw"],
-    ["03-new/dataset/cpt/code/raw.jsonl", "code · raw"],
-    ["03-new/dataset/cpt/blogs/raw.jsonl", "blogs · raw"],
-    ["03-new/dataset/cpt/osp_paper/raw.jsonl", "osp_paper · raw"],
-    ["03-new/dataset/cpt/rehearsal/raw.jsonl", "rehearsal · raw"],
-    ["03-new/dataset/cpt/packed/train.jsonl", "packed · train"],
-    ["03-new/dataset/cpt/packed/valid.jsonl", "packed · valid"]
-];
-glob MANIFEST_REL: str = "03-new/dataset/cpt/manifest.json";
-# Source order for the composition bar + stat tiles (largest first).
-glob SRC_ORDER: list[str] = ["docs", "code", "rehearsal", "blogs", "osp_paper"];
-# meta.type -> short kind label for the row browser.
-glob KIND_MAP: dict = {
-    "official_doc": "doc", "llm_doc": "doc",
-    "paper_section": "paper", "paper_listing": "paper",
-    "blog_post": "blog", "repo_file": "code", "repo_pack": "code",
-    "general_code": "rehearsal"
-};
+# CPT layout (files, manifest, src order, kind map) lives in
+# studio.workspace.toml (workspace.sv.jac); paths resolve via workspace_root().
 
 def _abs(rel: str) -> Path {
-    return Path(CPT_ROOT) / rel;
+    return paths.resolve(rel, "workspace");
 }
 
 def _allowed(rel: str) -> bool {
-    for pair in CPT_FILES {
+    for pair in workspace.cpt_files() {
         if pair[0] == rel { return True; }
     }
     return False;
@@ -98,7 +80,7 @@ def _build_row(idx: int, rec: any) -> DataRowView {
     meta = rec.get("meta", {});
     src = str(meta.get("source", "—"));
     typ = str(meta.get("type", ""));
-    kind = str(KIND_MAP.get(typ, src));
+    kind = str(workspace.cpt_kind_map().get(typ, src));
     text = str(rec.get("text", ""));
     diff = "";
     uw = meta.get("upsample_weight", None);
@@ -114,8 +96,8 @@ def _build_row(idx: int, rec: any) -> DataRowView {
 Returns: sources (ordered [{name, rows, tokens, windows, pct}]), totals, gate
 ([{repo, files, passed, pct}] sorted by files desc), decontam ([{source, dropped}]),
 packed {train, valid}, and passthrough scalars (seq_len, split, tokenizer, eos, fim)."""
-def:pub cpt_manifest() -> dict {
-    p = _abs(MANIFEST_REL);
+def cpt_manifest() -> dict {
+    p = _abs(workspace.cpt_manifest_rel());
     if not p.exists() {
         return {"ok": False};
     }
@@ -126,7 +108,7 @@ def:pub cpt_manifest() -> dict {
     total_tokens = 0;
     for k in src_raw { total_tokens += int(src_raw[k].get("tokens", 0)); }
     sources: list = [];
-    for name in SRC_ORDER {
+    for name in workspace.cpt_src_order() {
         if name in src_raw {
             s = src_raw[name];
             tok = int(s.get("tokens", 0));
@@ -173,16 +155,16 @@ def:pub cpt_manifest() -> dict {
 }
 
 """All preview-allowed CPT files with line counts."""
-def:pub cpt_files() -> list[FileRefView] {
+def cpt_files() -> list[FileRefView] {
     out: list[FileRefView] = [];
-    for pair in CPT_FILES {
+    for pair in workspace.cpt_files() {
         out.append(FileRefView(path=pair[0], label=pair[1], count=len(_read_lines(pair[0]))));
     }
     return out;
 }
 
 """A page of parsed rows from a CPT jsonl (cap 40), gated by the allowlist."""
-def:pub cpt_rows(path: str, offset: int, limit: int) -> dict {
+def cpt_rows(path: str, offset: int, limit: int) -> dict {
     if not _allowed(path) {
         return {"rows": [], "total": 0};
     }
@@ -215,12 +197,15 @@ glob CPT_TOTAL_ITERS: dict = {
     "cpt-v3": 2586   # 3 epochs, rank-32
 };
 
+# CPT training outputs (adapters + results) are namespaced per-user under the
+# shared repo checkout, so each tenant trains/resumes independently on their own
+# adapter tree. The CPT CORPUS (read by cpt_manifest/files/rows) stays shared.
 def _cpt_results_dir(name: str) -> Path {
-    return Path(CPT_ROOT) / "03-new" / "results" / name;
+    return auth.user_workspace_dir("03-new", "results") / name;
 }
 
 def _cpt_adapter_dir(name: str) -> Path {
-    return Path(CPT_ROOT) / "03-new" / "adapters" / name;
+    return auth.user_workspace_dir("03-new", "adapters") / name;
 }
 
 def _cpt_job_file(name: str) -> Path {
@@ -261,7 +246,7 @@ def _cpt_build_status(name: str, message: str = "") -> dict {
     rl = _cpt_run_log(name);
     tl = _cpt_train_log(name);
     job = jobs.live_status(jf, rl);
-    parsed = metrics.parse_train_log(tl);
+    parsed = metrics.parse_train_log_by(backends.log_parser_for("mlx_local", "cpt"), tl);
     total_iters = CPT_TOTAL_ITERS.get(name, 2586);
 
     if job is None {
@@ -286,13 +271,13 @@ def _cpt_build_status(name: str, message: str = "") -> dict {
 03-new/adapters/<name> already has checkpoints, only the REMAINING iters run,
 picking up from the latest via --resume-adapter-file (same convention as
 run_probe.sh). Returns the status dict."""
-def:pub start_cpt_training(name: str = "cpt-v1", config: str = "") -> dict {
+def start_cpt_training(name: str = "cpt-v1", config: str = "") -> dict {
     if not jobs.safe(name) {
         raise ValueError("invalid name");
     }
 
-    config_file = CPT_CONFIGS.get(name, CPT_CONFIGS["cpt-v1"]);
-    if config { config_file = config; }
+    config_file = str(CPT_CONFIGS.get(name, CPT_CONFIGS["cpt-v1"]));
+    if config { config_file = str(config); }
     total_iters = CPT_TOTAL_ITERS.get(name, 2586);
 
     jf = _cpt_job_file(name);
@@ -319,22 +304,26 @@ def:pub start_cpt_training(name: str = "cpt-v1", config: str = "") -> dict {
         tl.write_text("");  # fresh start clears the learning curve
     }
 
-    venv_bin = str(Path(CPT_ROOT) / ".venv" / "bin");
-    env_overrides = {"PATH": f"{venv_bin}:{os.environ.get('PATH', '')}"};
-
     ckpt = str(resume["ckpt"]);
     resume_flag = f" --resume-adapter-file {shlex.quote(ckpt)}" if ckpt else "";
-    inner = (
-        f"mlx_lm.lora --config {shlex.quote(config_file)} "
-        f"--adapter-path {shlex.quote(str(adapter_dir))} "
-        f"--iters {remain}{resume_flag} "
-        f"> {shlex.quote(str(tl))} 2>&1"
-    );
+    rendered = backends.render({
+        "method": "cpt",
+        "vars": {
+            "config_file": shlex.quote(config_file),
+            "adapter_dir": shlex.quote(str(adapter_dir)),
+            "iters": str(remain),
+            "resume_flag": resume_flag,
+            "train_log": shlex.quote(str(tl))
+        }
+    });
+    inner = str(rendered["cmd"]);
+    env_overrides = dict(rendered["env"]);
+    launch_cwd = Path(str(rendered["cwd"]));
 
     cmd = jobs.with_exit_marker(inner, rl);
     rl.write_text("");  # erase a previous run's __EXIT__ marker
 
-    pid = jobs.spawn_detached(cmd, runlog=rl, env=env_overrides, cwd=Path(CPT_ROOT));
+    pid = jobs.spawn_detached(cmd, runlog=rl, env=env_overrides, cwd=launch_cwd);
 
     now = time.strftime("%Y-%m-%d %H:%M:%S");
     jobs.write_job(jf, {
@@ -353,7 +342,7 @@ def:pub start_cpt_training(name: str = "cpt-v1", config: str = "") -> dict {
 }
 
 """Stop a running CPT job (SIGTERM the process group). Returns status."""
-def:pub stop_cpt_training(name: str = "cpt-v1") -> dict {
+def stop_cpt_training(name: str = "cpt-v1") -> dict {
     if not jobs.safe(name) {
         raise ValueError("invalid name");
     }
@@ -362,7 +351,7 @@ def:pub stop_cpt_training(name: str = "cpt-v1") -> dict {
 }
 
 """Poll live status + full loss/lr/tps curves for a CPT run."""
-def:pub get_cpt_status(name: str = "cpt-v1") -> dict {
+def get_cpt_status(name: str = "cpt-v1") -> dict {
     if not jobs.safe(name) {
         raise ValueError("invalid name");
     }
@@ -370,7 +359,7 @@ def:pub get_cpt_status(name: str = "cpt-v1") -> dict {
 }
 
 """Get status of all CPT runs for comparison view."""
-def:pub get_all_cpt_status() -> dict {
+def get_all_cpt_status() -> dict {
     out: dict = {};
     for name in ["cpt-v1", "cpt-v2", "cpt-v3"] {
         out[name] = _cpt_build_status(name);

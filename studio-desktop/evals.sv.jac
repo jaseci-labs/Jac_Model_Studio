@@ -19,13 +19,17 @@ import os;
 import shlex;
 import shutil;
 import datetime;
+import auth;
 import jobs;
 import metrics;
 import models;
+import paths;
 import from pathlib { Path }
 import from uuid { uuid4 }
+import workspace;
 
-glob VALID_KINDS: list[str] = ["probe", "idiom"];
+# Eval-run lifecycle reads its valid kinds + holdout set from studio.workspace.toml
+# (workspace.sv.jac). VALID_KINDS / models.HOLDOUTS used to be hard-coded here.
 
 def _now() -> str {
     return datetime.datetime.now(datetime.UTC).replace(tzinfo=None).isoformat() + "Z";
@@ -78,9 +82,11 @@ node EvalRun {
     }
 }
 
-"""Return (and create) the artifacts dir for *eid*."""
+"""Return (and create) the caller's per-user artifacts dir for *eid*. Namespaced
+under <results>/users/<uid>/_evals/<eid> so a tenant cannot read/stop/delete
+another tenant's eval by guessing the eid."""
 def eval_dir(eid: str) -> Path {
-    d = models.results_dir() / "_evals" / eid;
+    d = auth.user_results_dir() / "_evals" / eid;
     d.mkdir(parents=True, exist_ok=True);
     return d;
 }
@@ -110,7 +116,7 @@ def _start(run: EvalRun, limit: int, sim_threshold: float) -> int {
     env: dict = {
         "JAC_EVAL_MODE": "mlx",
         "JAC_EVAL_MODEL": run.model,
-        "JAC_HOLDOUT": str(models.HOLDOUTS[run.holdout]),
+        "JAC_HOLDOUT": str(workspace.holdouts()[run.holdout]),
         "PATH": f"{venv_bin}:{current_path}"
     };
     if run.adapter {
@@ -130,7 +136,7 @@ def _start(run: EvalRun, limit: int, sim_threshold: float) -> int {
         script = "idiom_eval.jac";
     }
 
-    inner = f"{shlex.quote(str(models.jac_bin()))} run srccurrent/jacgen/{script}";
+    inner = f"{shlex.quote(str(models.jac_bin()))} run {paths.jacgen_script(script)}";
     cmd = jobs.with_exit_marker(inner, run_log);
     pid = jobs.spawn_detached(cmd, run_log, env, models.data_root());
     jobs.write_job(ed / "job.json", {"pid": pid, "status": "running"});
@@ -165,7 +171,7 @@ def _refresh(run: EvalRun) -> None {
 on-disk model) or *model_path* (sandboxed to data root); *adapter* is optional. A
 limit of 0 / sim_threshold of 0.0 means "unset". Returns the run (no log_tail) or
 None on a validation failure."""
-def:pub create_eval(
+def create_eval(
     kind: str,
     model_id: str = "",
     model_path: str = "",
@@ -174,8 +180,8 @@ def:pub create_eval(
     limit: int = 0,
     sim_threshold: float = 0.0
 ) -> EvalView | None {
-    if kind not in VALID_KINDS { return None; }
-    if holdout not in models.HOLDOUTS { return None; }
+    if kind not in workspace.eval_kinds() { return None; }
+    if holdout not in workspace.holdouts() { return None; }
 
     model_rel = "";
     if model_path {
@@ -210,8 +216,10 @@ def:pub create_eval(
     return run.to_view("");
 }
 
-"""All eval runs, newest-first, each refreshed. Mirrors `ORDER BY id DESC`."""
-def:pub list_evals() -> dict {
+"""All eval runs on the caller's root, newest-first, each refreshed. EvalRun nodes
+hang off the caller's own root (multi-tenant isolation), so this only sees the
+caller's evals."""
+def list_evals() -> dict {
     out: list[EvalView] = [];
     for r in [root -->][?:EvalRun] {
         _refresh(r);
@@ -221,8 +229,9 @@ def:pub list_evals() -> dict {
     return {"evals": out};
 }
 
-"""One eval run with the last 60 run.log lines (refreshed). None if unknown."""
-def:pub get_eval(eval_id: str) -> EvalView | None {
+"""One eval run with the last 60 run.log lines (refreshed). None if unknown — and
+None for another user's eid, since _find() scans the caller's root only."""
+def get_eval(eval_id: str) -> EvalView | None {
     run = _find(eval_id);
     if run is None { return None; }
     _refresh(run);
@@ -230,8 +239,9 @@ def:pub get_eval(eval_id: str) -> EvalView | None {
     return run.to_view(tail);
 }
 
-"""Kill a running eval (jobs.stop) and mark it stopped. None if unknown."""
-def:pub stop_eval(eval_id: str) -> EvalView | None {
+"""Kill a running eval (jobs.stop) and mark it stopped. None if unknown / not
+the caller's."""
+def stop_eval(eval_id: str) -> EvalView | None {
     run = _find(eval_id);
     if run is None { return None; }
     if run.status == "running" {
@@ -243,8 +253,9 @@ def:pub stop_eval(eval_id: str) -> EvalView | None {
     return run.to_view("");
 }
 
-"""Stop if running, then delete the node and its artifacts dir. False if unknown."""
-def:pub delete_eval(eval_id: str) -> bool {
+"""Stop if running, then delete the node and the caller's per-user artifacts dir.
+False if unknown / not the caller's."""
+def delete_eval(eval_id: str) -> bool {
     run = _find(eval_id);
     if run is None { return False; }
     eid = run.eid;
@@ -253,6 +264,6 @@ def:pub delete_eval(eval_id: str) -> bool {
         jobs.stop(ed / "job.json", ed / "run.log");
     }
     del run;
-    shutil.rmtree(str(models.results_dir() / "_evals" / eid), ignore_errors=True);
+    shutil.rmtree(str(auth.user_results_dir() / "_evals" / eid), ignore_errors=True);
     return True;
 }

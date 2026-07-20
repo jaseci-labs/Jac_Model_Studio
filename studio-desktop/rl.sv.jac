@@ -17,14 +17,22 @@ a rung-indexed curve (one line per model·cond, gen pass@1), and the line keys.
 import os;
 import json;
 import subprocess;
+import paths;
+import workspace;
 import from pathlib { Path }
 
-# rl.sv.jac lives at studio/ root = <repo>/jac_ml_studio/studio ; results/ is at <repo>.
-# studio/ sits directly at repo root (post Jul-10 flatten) → two dirnames up.
-glob RL_REPO: str = os.path.dirname(os.path.dirname(os.path.abspath(__file__)));
-glob RUNG_ORDER: list = ["1", "3", "5", "10", "20", "all"];
-glob GEN_PY: str = os.path.join(RL_REPO, ".venv", "bin", "python3") if os.path.exists(os.path.join(RL_REPO, ".venv", "bin", "python3")) else "python3";
-glob GEN_MODEL: str = os.path.join(RL_REPO, "models", "jac-qwen3coder-r20-rft-q4");
+# Ladder rung axis lives in studio.workspace.toml (workspace.sv.jac).
+
+def _ws() -> Path { return paths.workspace_root(); }
+
+def _gen_py() -> str {
+    p = _ws() / ".venv" / "bin" / "python3";
+    return str(p) if p.exists() else "python3";
+}
+
+def _gen_model() -> str {
+    return str(_ws() / "models" / "jac-qwen3coder-r20-rft-q4");
+}
 
 def _pivot(p: str) -> dict {
     if not os.path.exists(p) {
@@ -77,7 +85,7 @@ def _pivot(p: str) -> dict {
     # N/A marker instead of silently dropping the series from the tooltip.
     all_keys: list = sorted(keys);
     curve: list = [];
-    for r in RUNG_ORDER {
+    for r in workspace.rung_order() {
         if r in curve_map {
             cp: dict = curve_map[r];
             for lk in all_keys {
@@ -87,16 +95,17 @@ def _pivot(p: str) -> dict {
         }
     }
     def _rk(row: dict) -> int {
-        return RUNG_ORDER.index(str(row["rung"])) if str(row["rung"]) in RUNG_ORDER else 99;
+        return workspace.rung_order().index(str(row["rung"])) if str(row["rung"]) in workspace.rung_order() else 99;
     }
     out_cells.sort(key=lambda r: r and (str(r["model"]), _rk(r), str(r["cond"])));
     return {"cells": out_cells, "curve": curve, "curve_keys": sorted(keys), "families": sorted(fams), "count": len(out_cells)};
 }
 
-def:pub get_rl_ladder() -> dict {
-    primary = _pivot(os.environ.get("JAC_RL_RESULTS", os.path.join(RL_REPO, "02-rl-grpo", "results", "rl_ladder.jsonl")));
-    sg = _pivot(os.path.join(RL_REPO, "02-rl-grpo", "results", "rl_ladder_sg.jsonl"));
-    v84 = _pivot(os.path.join(RL_REPO, "02-rl-grpo", "results", "rl_ladder_v84.jsonl"));
+def get_rl_ladder() -> dict {
+    ws = str(_ws());
+    primary = _pivot(os.environ.get("JAC_RL_RESULTS", os.path.join(ws, "02-rl-grpo", "results", "rl_ladder.jsonl")));
+    sg = _pivot(os.path.join(ws, "02-rl-grpo", "results", "rl_ladder_sg.jsonl"));
+    v84 = _pivot(os.path.join(ws, "02-rl-grpo", "results", "rl_ladder_v84.jsonl"));
     return {
         "cells": primary["cells"], "curve": primary["curve"], "curve_keys": primary["curve_keys"],
         "families": primary["families"], "count": primary["count"],
@@ -104,29 +113,31 @@ def:pub get_rl_ladder() -> dict {
     };
 }
 
-def:pub get_rl_corrected() -> dict {
+def get_rl_corrected() -> dict {
     # The corrected results (fixed eval+reward) — assembled by 02-rl-grpo/rl/make_summary.py.
-    p = os.path.join(RL_REPO, "02-rl-grpo", "resultspub", "rl", "corrected_summary.json");
+    p = str(_ws() / "02-rl-grpo" / "resultspub" / "rl" / "corrected_summary.json");
     if not os.path.exists(p) {
         return {"ladder": [], "holdouts": [], "headline": {}, "note": ""};
     }
     return json.loads(Path(p).read_text());
 }
 
-def:pub rl_generate(prompt: str, k: int = 8) -> dict {
+def rl_generate(prompt: str, k: int = 8) -> dict {
     # Best-of-k Jac generation: sample k from the SFT model, return the first the jac
     # compiler accepts (02-rl-grpo/rl/generate.py). Loads a 30B model per call (~1-2 min) — this
     # is the deployable artifact from RL_FINDINGS.md (~78% vs 55% greedy).
-    if not os.path.exists(GEN_MODEL) {
-        return {"ok": False, "verified": False, "jac": "", "note": "SFT model missing: " + GEN_MODEL};
+    gen_model = _gen_model();
+    if not os.path.exists(gen_model) {
+        return {"ok": False, "verified": False, "jac": "", "note": "SFT model missing: " + gen_model};
     }
+    ws = str(_ws());
     env = dict(os.environ);
-    env["JAC_GEN_MODEL"] = GEN_MODEL;
+    env["JAC_GEN_MODEL"] = gen_model;
     env["K"] = str(k);
     try {
         p = subprocess.run(
-            [GEN_PY, os.path.join(RL_REPO, "02-rl-grpo", "rl", "generate.py"), "--prompt", prompt],
-            capture_output=True, text=True, timeout=900, cwd=RL_REPO, env=env
+            [_gen_py(), os.path.join(ws, "02-rl-grpo", "rl", "generate.py"), "--prompt", prompt],
+            capture_output=True, text=True, timeout=900, cwd=ws, env=env
         );
         raw = str(p.stdout);
         verified = "verified by jac" in raw;

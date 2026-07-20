@@ -1,0 +1,19 @@
+[Unit]
+Description=Jac ML Studio (multi-tenant)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=jac
+Group=jac
+WorkingDirectory=/opt/jac_ml_studio/studio-desktop
+EnvironmentFile=/etc/jac-studio/env
+ExecStart=/opt/jac_ml_studio/studio-desktop/start_prod.sh
+Restart=on-failure
+RestartSec=5
+# jac start exits when stdin closes; systemd provides /dev/null implicitly
+StandardInput=null
+
+[Install]
+WantedBy=multi-user.target
