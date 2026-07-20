@@ -88,6 +88,31 @@ def:pub NavRail(
     onWorkspace: Callable[([str], None)], onSection: Callable[([str], None)],
     part: str = ""
 ) -> JsxElement {
+    has mode: str = "dark";
+
+    can with entry {
+        win: any = window;
+        try {
+            saved: any = win.localStorage.getItem("jacml.mode");
+            if saved == "light" or saved == "dark" { mode = str(saved); }
+        } except Exception { }
+    }
+
+    def toggleMode() -> None {
+        m = "light" if mode == "dark" else "dark";
+        mode = m;
+        doc: any = document;
+        win: any = window;
+        if m == "light" {
+            doc.documentElement.setAttribute("data-theme", "light");
+        } else {
+            doc.documentElement.removeAttribute("data-theme");
+        }
+        try {
+            win.localStorage.setItem("jacml.mode", m);
+        } except Exception { }
+    }
+
     if part == "top" {
         return <nav className="grid h-12 w-full shrink-0 grid-cols-[1fr_auto_1fr] items-center border-b border-border bg-card px-4">
             <span className="micro-label justify-self-start">JAC MODEL STUDIO</span>
@@ -96,7 +121,16 @@ def:pub NavRail(
                     <WsBtn key={w} w={w} workspace={workspace} onWorkspace={onWorkspace} />
                 }}
             </div>
-            <span className="micro-label justify-self-end text-muted-foreground/70">v4</span>
+            <div className="flex items-center gap-3 justify-self-end">
+                <button
+                    onClick={lambda e: MouseEvent { toggleMode(); }}
+                    title="toggle light/dark"
+                    className="micro-label rounded-md border border-input px-2 py-1 transition-colors hover:border-ring hover:text-foreground/80"
+                >
+                    {"☀ LIGHT" if mode == "dark" else "☾ DARK"}
+                </button>
+                <span className="micro-label text-muted-foreground/70">v4</span>
+            </div>
         </nav>;
     }
     return <nav className="flex w-44 shrink-0 flex-col gap-1 border-r border-border bg-card px-2 py-4">

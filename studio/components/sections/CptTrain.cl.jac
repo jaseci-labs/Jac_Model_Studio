@@ -207,7 +207,7 @@ def:pub CptTrain(active: bool) -> JsxElement {
                 <div className="flex items-center gap-3">
                     <StatusGlyph status={str(status["status"]) if status is not None else "idle"} showLabel={True} />
                     <div className="h-1 flex-1 rounded-full bg-accent">
-                        <div className="h-1 rounded-full bg-primary transition-all" style={{"width": _fix(pct, 1) + "%"}}></div>
+                        <div className="h-1 rounded-full transition-all" style={{"width": _fix(pct, 1) + "%", "background": "var(--ws-accent)"}}></div>
                     </div>
                 </div>
                 {isLeg and <p className="stat-line mt-2 text-foreground">LEG {str(curLeg)}/{str(legCeiling)}{(" · next: leg " + str(nextLeg)) if not isRunning and not legDone else ""}</p>}

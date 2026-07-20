@@ -56,10 +56,16 @@ def:pub AppShell -> JsxElement {
                 workspace = str(saved);
             }
         } except Exception { }
-        # Single theme (terminal) + single layout (split) now: clear any stale
-        # data-theme a previous multi-theme build stamped.
+        # Apply the stored light/dark mode before first paint (the loading and
+        # offline screens render before the top bar's toggle mounts); anything
+        # else stamped by an older multi-theme build is cleared.
         try {
-            doc.documentElement.removeAttribute("data-theme");
+            md: any = win.localStorage.getItem("jacml.mode");
+            if md == "light" {
+                doc.documentElement.setAttribute("data-theme", "light");
+            } else {
+                doc.documentElement.removeAttribute("data-theme");
+            }
         } except Exception { }
         await probe();
         probeId = setInterval(lambda -> None { probe(); }, 3000);

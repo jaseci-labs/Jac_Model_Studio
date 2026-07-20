@@ -67,7 +67,7 @@
   --muted-foreground: #8a8a8a;
   --accent: #1a1a1a;
   --accent-foreground: #ededed;
-  --destructive: #d4d4d4; /* monochrome: errors are gray + typography, not red */
+  --destructive: #e08a8a; /* failures read red now (user: "more colors") */
   --success: #9ec98f;
   --warning: #d8a657;
   --border: #262626;
@@ -94,6 +94,49 @@
   --font-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   --font-heading: var(--font-sans);
+}
+
+/* Light mode — same terminal design language (dot grid, mono labels, accent
+   bars), inverted palette with darker chart/accent hues for white-background
+   contrast. Toggled by data-theme="light" on <html> (☾/☀ in the top bar,
+   persisted as localStorage jacml.mode). */
+:root[data-theme="light"] {
+  --background: #fafafa;
+  --foreground: #1a1a1a;
+  --card: #ffffff;
+  --card-foreground: #1a1a1a;
+  --popover: #f2f2f0;
+  --popover-foreground: #1a1a1a;
+  --primary: #1a1a1a;
+  --primary-foreground: #fafafa;
+  --secondary: #ececea;
+  --secondary-foreground: #1a1a1a;
+  --muted: #ececea;
+  --muted-foreground: #6b6b6b;
+  --accent: #e4e4e2;
+  --accent-foreground: #1a1a1a;
+  --destructive: #c0392b;
+  --success: #3d7c3a;
+  --warning: #9c6f1f;
+  --border: #e0e0de;
+  --input: #cfcfcd;
+  --ring: #a0a0a0;
+  --label: #7a7a7a;
+  --chart-1: #3b6fd4;
+  --chart-2: #a16207;
+  --chart-3: #4d7c0f;
+  --chart-4: #7c5cd6;
+  --chart-5: #0f766e;
+  --chart-6: #b91c1c;
+  --tok-kw: #7c3aed;
+  --tok-type: #0f766e;
+  --tok-bi: #1d4ed8;
+  --tok-str: #15803d;
+  --tok-num: #a16207;
+  --tok-com: #9ca3af;
+  --ws01: #3b6fd4;
+  --ws02: #4d7c0f;
+  --ws03: #a16207;
 }
 
 @layer base {

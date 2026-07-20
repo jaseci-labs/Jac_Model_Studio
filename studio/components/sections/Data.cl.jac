@@ -157,7 +157,7 @@ def:pub Data(active: bool = False) -> JsxElement {
                     <span className="stat-line text-muted-foreground">{str(doneCount)}/{str(nstages)} DONE</span>
                 </div>
                 <div className="h-1 w-full rounded-full bg-border">
-                    <div className="h-1 rounded-full bg-primary transition-all" style={{"width": str(pct) + "%"}}></div>
+                    <div className="h-1 rounded-full transition-all" style={{"width": str(pct) + "%", "background": "var(--ws-accent)"}}></div>
                 </div>
             </div>
             <div className="relative flex flex-col gap-0.5 pl-3">
