@@ -1,0 +1,29 @@
+# Reverse proxy for Jac ML Studio on a single VM.
+# Replace studio.example.com with your domain; point DNS A/AAAA at this host.
+#
+# Caddy auto-provisions TLS via Let's Encrypt.
+# The Jac process should bind loopback only (start_prod.sh defaults API :8001, UI :8000).
+
+studio.example.com {
+	# Vite UI (static + HMR disabled in prod build)
+	handle / {
+		reverse_proxy 127.0.0.1:8000
+	}
+
+	# Jac Scale API (/function/*, /user/*, /health, /ws/*, …)
+	handle /function/* {
+		reverse_proxy 127.0.0.1:8001
+	}
+	handle /user/* {
+		reverse_proxy 127.0.0.1:8001
+	}
+	handle /health {
+		reverse_proxy 127.0.0.1:8001
+	}
+	handle /ready {
+		reverse_proxy 127.0.0.1:8001
+	}
+	handle /ws/* {
+		reverse_proxy 127.0.0.1:8001
+	}
+}

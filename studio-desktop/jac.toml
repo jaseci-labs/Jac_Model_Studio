@@ -1,0 +1,87 @@
+[project]
+name = "studio"
+version = "0.1.0"
+description = "A full-stack Jac application"
+entry-point = "main.jac"
+
+# Spheron GPU cloud integration talks to the REST API directly via stdlib urllib
+# (spheron.sv.jac), so — unlike the vastai SDK it replaced — there is no Python
+# dependency to declare here.
+
+[dependencies.npm]
+react = "^18.2.0"
+react-dom = "^18.2.0"
+react-router-dom = "^6.22.0"
+react-error-boundary = "^5.0.0"
+react-hook-form = "^7.71.0"
+zod = "^4.3.6"
+"@hookform/resolvers" = "^5.2.2"
+tailwindcss = "latest"
+"@tailwindcss/vite" = "latest"
+tw-animate-css = "latest"
+recharts = "latest"
+clsx = "latest"
+tailwind-merge = "latest"
+
+[dependencies.npm.dev]
+vite = "^6.4.1"
+"@vitejs/plugin-react" = "^4.2.1"
+typescript = "^5.3.3"
+"@types/react" = "^18.2.0"
+"@types/react-dom" = "^18.2.0"
+
+[dev-dependencies]
+watchdog = ">=3.0.0"
+
+# Unit + integration tests live in `<mod>.test.jac` annexes next to each module
+# (metrics/data/persistence today). `jac test` discovers them; graph-state tests
+# share a persisted root, so `verbose`/`fail_fast` help triage a re-run flake.
+[test]
+verbose = true
+
+[scripts]
+test = "jac test"
+
+[serve]
+base_route_app = "app"
+
+# Single-process monolith: client `sv import` stubs call the main server in-process.
+# Disable auto-spawn / gateway microservice mode (no sv-to-sv imports in this app).
+[plugins.scale.microservices]
+enabled = false
+
+# --- Production hardening (multi-tenant, shared host) --------------------------
+# See jac guide jac-sv-deploy + jac-sv-auth. The default JWT signing secret is
+# public and MUST be overridden. Interpolated from the env at start time; set
+# JWT_SECRET in the environment (start_prod.sh / systemd EnvironmentFile).
+[plugins.scale.jwt]
+secret = "${JWT_SECRET}"
+
+[plugins.scale.server]
+docs_enabled = false             # disable /docs, /redoc, /openapi.json in prod
+suppress_health_check_logs = true
+
+[plugins.client.vite]
+plugins = ["tailwindcss()"]
+lib_imports = ["import tailwindcss from '@tailwindcss/vite'"]
+
+# Durable fix for the dev-mode full-reload loop. The generated Vite dev config
+# hardcodes `server.watch = { usePolling: true, interval: 100 }` with NO ignore
+# list, and watches `.jac/client/` as root. The desktop runtime writes its
+# SQLite anchor store at `.jac/client/desktop/.jac/data/anchor_store.db*`
+# (~1-2x/sec), so every WAL write triggers a polling-watcher full-reload ->
+# the screen flashes continuously. Injecting a second `server.watch` block
+# here appends it AFTER the hardcoded one in the generated config; in a JS
+# object literal the last duplicate key wins, so this overrides cleanly.
+# `usePolling`/`interval` are repeated because the override replaces (not
+# merges with) the hardcoded block.
+# (Upstream template: jaclang/runtimelib/client/impl/vite_bundler.impl.jac)
+[plugins.client.vite.server.watch]
+usePolling = true
+interval = 100
+ignored = [
+    "**/.jac/data/**",
+    "**/*.db",
+    "**/*.db-wal",
+    "**/*.db-shm",
+]
