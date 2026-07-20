@@ -8,11 +8,8 @@ import os;
 import json;
 import re;
 import models;
-import paths;
-import workspace;
 import from pathlib { Path }
 
-<<<<<<<< HEAD:jms/data.sv.jac
 # RL data lives in THIS repo (jac_ml_studio), not the studio's data_root (which points
 # at the DataGeneration checkout). Resolve RL files against the repo root, like rl.sv.jac.
 # studio/ sits directly at repo root (post Jul-10 flatten) → two dirnames up.
@@ -43,12 +40,6 @@ glob RL_PREVIEW_FILES: dict = {
     "synthetic": [["model-experiments/02-rl-grpo/dataset/rl/synthetic.jsonl", "synthetic · fresh (32)"]],
     "splits": [["model-experiments/02-rl-grpo/dataset/rl/holdout.jsonl", "holdout n=18"], ["model-experiments/02-rl-grpo/dataset/rl/holdout_big.jsonl", "holdout n=32 (+syn)"], ["model-experiments/02-rl-grpo/dataset/rl/train_big.jsonl", "train pool (+syn)"]]
 };
-========
-# Dataset + RL file maps now live in studio.workspace.toml (workspace.sv.jac):
-# preview_files / append_targets / split_files / sft_stat_files / rl_preview_files.
-# RL data still resolves against the workspace checkout (paths.workspace_root),
-# not the studio data_root when JAC_STUDIO_DATA_ROOT points elsewhere.
->>>>>>>> origin/main:studio-desktop/data.sv.jac
 
 obj FileRefView {
     has path: str = "", label: str = "", count: int = 0;
@@ -65,7 +56,7 @@ def _abs(rel: str) -> Path {
 }
 
 def _allowed(rel: str) -> bool {
-    for pair in workspace.preview_files() {
+    for pair in PREVIEW_FILES {
         if pair[0] == rel {
             return True;
         }
@@ -148,8 +139,8 @@ def _build_row(idx: int, rec: any) -> DataRowView {
     } elif "chosen" in rec {
         kind = "dpo";
         prompt = _strip_fences(str(rec.get("prompt", "")));
-        chosen = _fence(str(rec["chosen"]), "jac") or str(rec["chosen"]).strip();
-        rejected = _fence(str(rec["rejected"]), "jac") or str(rec["rejected"]).strip();
+        chosen = _fence(str(rec.get("chosen", "")), "jac") or str(rec.get("chosen", "")).strip();
+        rejected = _fence(str(rec.get("rejected", "")), "jac") or str(rec.get("rejected", "")).strip();
         py = _fence(str(rec.get("prompt", "")), "python");
         nm = _funcname(chosen) or _funcname(py);
     } elif "python" in rec {
@@ -179,13 +170,8 @@ def _build_row(idx: int, rec: any) -> DataRowView {
 }
 
 """Dataset statistics: counts per SFT file, DPO pairs, split sizes."""
-<<<<<<<< HEAD:jms/data.sv.jac
 def:pub dataset_stats() -> dict {
     sft_rels = ["model-experiments/01-sft-dpo/dataset/conversion/sft.jsonl", "model-experiments/01-sft-dpo/dataset/conversion/sft_auto.jsonl"];
-========
-def dataset_stats() -> dict {
-    sft_rels = workspace.data_sft_stat_files();
->>>>>>>> origin/main:studio-desktop/data.sv.jac
     sft_files: list = [];
     grand = 0;
     for rel in sft_rels {
@@ -193,7 +179,6 @@ def dataset_stats() -> dict {
         sft_files.append({"path": rel, "total": n});
         grand += n;
     }
-<<<<<<<< HEAD:jms/data.sv.jac
     splits = {
         "mlx_train": _line_count("model-experiments/01-sft-dpo/dataset/mlx/train.jsonl"),
         "mlx_valid": _line_count("model-experiments/01-sft-dpo/dataset/mlx/valid.jsonl"),
@@ -202,13 +187,6 @@ def dataset_stats() -> dict {
         "holdout": _line_count("model-experiments/01-sft-dpo/dataset/eval_holdout/conversion.jsonl"),
         "graph_holdout": _line_count("model-experiments/01-sft-dpo/dataset/eval_holdout/graph_conversion.jsonl")
     };
-========
-    split_rels = workspace.data_split_files();
-    splits: dict = {};
-    for k in split_rels {
-        splits[k] = _line_count(str(split_rels[k]));
-    }
->>>>>>>> origin/main:studio-desktop/data.sv.jac
     return {
         "sft_files": sft_files, "sft_total": grand,
         "dpo_pairs": _line_count("model-experiments/01-sft-dpo/dataset/conversion/dpo.jsonl"), "splits": splits
@@ -216,16 +194,16 @@ def dataset_stats() -> dict {
 }
 
 """All preview-allowed files with line counts."""
-def dataset_files() -> list[FileRefView] {
+def:pub dataset_files() -> list[FileRefView] {
     out: list[FileRefView] = [];
-    for pair in workspace.preview_files() {
+    for pair in PREVIEW_FILES {
         out.append(FileRefView(path=pair[0], label=pair[1], count=_line_count(pair[0])));
     }
     return out;
 }
 
 """A page of parsed rows from the JSONL at `path` (cap 40)."""
-def dataset_rows(path: str, offset: int, limit: int) -> dict {
+def:pub dataset_rows(path: str, offset: int, limit: int) -> dict {
     if not _allowed(path) {
         return {"rows": [], "total": 0};
     }
@@ -245,15 +223,14 @@ def dataset_rows(path: str, offset: int, limit: int) -> dict {
 }
 
 def _rl_allowed(source: str, rel: str) -> bool {
-    pairs = (workspace.rl_preview_files().get(source, []) as list[list[str]]);
-    for pair in pairs {
+    for pair in RL_PREVIEW_FILES.get(source, []) {
         if pair[0] == rel { return True; }
     }
     return False;
 }
 
 def _rl_read_lines(rel: str) -> list {
-    p = paths.resolve(rel, "workspace");
+    p = Path(RL_ROOT) / rel;
     if not p.exists() { return []; }
     out: list = [];
     for line in p.read_text().split("\n") {
@@ -262,25 +239,17 @@ def _rl_read_lines(rel: str) -> list {
     return out;
 }
 
-"""The RL source axis (SFT/GRPO/conversion/synthetic/splits) from
-studio.workspace.toml — drives the RlData section's source picker so it stays in
-sync with the server (no client-side duplicate of the source list)."""
-def rl_sources() -> list[str] {
-    return workspace.rl_sources();
-}
-
 """RL dataset sources (SFT/GRPO/conversion/synthetic/splits) with their files + counts."""
-def rl_dataset_files(source: str) -> list[FileRefView] {
+def:pub rl_dataset_files(source: str) -> list[FileRefView] {
     out: list[FileRefView] = [];
-    pairs = (workspace.rl_preview_files().get(source, []) as list[list[str]]);
-    for pair in pairs {
+    for pair in RL_PREVIEW_FILES.get(source, []) {
         out.append(FileRefView(path=pair[0], label=pair[1], count=len(_rl_read_lines(pair[0]))));
     }
     return out;
 }
 
 """A page of parsed rows from an RL dataset file (cap 40), gated by source."""
-def rl_dataset_rows(source: str, path: str, offset: int, limit: int) -> dict {
+def:pub rl_dataset_rows(source: str, path: str, offset: int, limit: int) -> dict {
     if not _rl_allowed(source, path) {
         return {"rows": [], "total": 0};
     }
@@ -299,18 +268,18 @@ def rl_dataset_rows(source: str, path: str, offset: int, limit: int) -> dict {
     return {"rows": result, "total": total};
 }
 
-"""Append valid JSONL rows to *target* (key in workspace.append_targets() — sft/dpo). Each
+"""Append valid JSONL rows to *target* (key in APPEND_TARGETS — sft/dpo). Each
 non-empty line is validated as JSON with the required schema (DPO needs
 prompt/chosen/rejected; SFT needs a messages list). Returns {added, errors, total}.
 
 # studio: the original used a binary seek(-1, 2) to test for a trailing newline;
 # here read_text().endswith is simpler and the file is small (also re-read by
 # _line_count). Unknown targets return an error dict instead of raising."""
-def add_examples(target: str, jsonl: str) -> dict {
-    if target not in workspace.append_targets() {
+def:pub add_examples(target: str, jsonl: str) -> dict {
+    if target not in APPEND_TARGETS {
         return {"added": 0, "errors": [f"unknown target: {target}"], "total": 0};
     }
-    rel = str(workspace.append_targets()[target]);
+    rel = str(APPEND_TARGETS[target]);
     is_dpo = target == "dpo";
     valid: list[str] = [];
     errors: list[str] = [];

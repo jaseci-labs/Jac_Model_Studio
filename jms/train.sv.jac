@@ -11,33 +11,29 @@ dict values are `any` so the pid is `int(str(job.get("pid") or 0))` and status/s
 go through `str(...)`; EXCLUDED_RUN_DIRS is a list[str] membership test.
 """
 
-import time;
+import os;
 import shlex;
-import auth;
 import jobs;
 import metrics;
 import models;
-import backends;
-import workspace;
 import from pathlib { Path }
 
-# SFT/DPO option-key whitelists now live in studio.workspace.toml (workspace.sv.jac).
+glob SFT_KEYS: list[str] = ["EVAL_EVERY", "SUBSET", "DRY_ITERS", "SKIP_DRY", "LIVE_EVAL"];
+glob DPO_KEYS: list[str] = ["DPO_ITERS", "DPO_LR", "DPO_BETA", "DPO_LAYERS", "SUBSET"];
 
-# All SFT/DPO artifacts resolve under the caller's per-user results dir so a
-# tenant can only see/stop/delete their own training runs.
 def _job_file(name: str, mode: str) -> Path {
-    return auth.user_results_dir() / name / f".job-{mode}.json";
+    return models.results_dir() / name / f".job-{mode}.json";
 }
 
 def _run_log(name: str, mode: str) -> Path {
-    return auth.user_results_dir() / name / f"run-{mode}.log";
+    return models.results_dir() / name / f"run-{mode}.log";
 }
 
 def _train_log(name: str, mode: str) -> Path {
     if mode == "dpo" {
-        return auth.user_results_dir() / name / "dpo" / "train.log";
+        return models.results_dir() / name / "dpo" / "train.log";
     }
-    return auth.user_results_dir() / name / "train.log";
+    return models.results_dir() / name / "train.log";
 }
 
 """Build a JobStatus dict from the job file + live resolution (shape == _build_status)."""
@@ -53,6 +49,7 @@ def _build_status(name: str, mode: str, message: str = "") -> dict {
             "mode": mode,
             "status": status,
             "pid": 0,
+            "run_id": "",
             "started": "",
             "last_iter": metrics.last_iter(tl),
             "log_tail": metrics.tail(rl, 40),
@@ -64,6 +61,7 @@ def _build_status(name: str, mode: str, message: str = "") -> dict {
         "mode": mode,
         "status": str(job.get("status", "idle")),
         "pid": int(str(job.get("pid") or 0)),
+        "run_id": str(job.get("run_id", "")),
         "started": str(job.get("started", "")),
         "last_iter": metrics.last_iter(_train_log(name, mode)),
         "log_tail": metrics.tail(rl, 40),
@@ -72,9 +70,9 @@ def _build_status(name: str, mode: str, message: str = "") -> dict {
 }
 
 """Start an SFT or DPO training run (detached). Returns the JobStatus dict."""
-def start_training(name: str, mode: str, model_id: str = "", opts: dict = {}, backend: str = "") -> dict {
+def:pub start_training(name: str, mode: str, model_id: str = "", opts: dict = {}) -> dict {
     if not jobs.safe(name) { raise ValueError("invalid name"); }
-    if name in workspace.excluded_run_dirs() { raise ValueError("reserved name"); }
+    if name in models.EXCLUDED_RUN_DIRS { raise ValueError("reserved name"); }
     if mode != "sft" and mode != "dpo" { raise ValueError("mode must be sft|dpo"); }
     if mode == "sft" {
         if not model_id or not jobs.safe(model_id, allow_slash=True) {
@@ -89,27 +87,30 @@ def start_training(name: str, mode: str, model_id: str = "", opts: dict = {}, ba
         return _build_status(name, mode, "already running");
     }
 
-    run_dir = auth.user_results_dir() / name;
+    grab = jobs.heavy_acquire(f"train:{name}:{mode}", jf, rl);
+    if not grab["ok"] {
+        return _build_status(name, mode, f"busy: {grab['busy_with']} is running");
+    }
+
+    run_dir = models.results_dir() / name;
     run_dir.mkdir(parents=True, exist_ok=True);
 
-    rendered = backends.render({
-        "backend": backend if backend else workspace.training_backend_default(),
-        "method": mode,
-        "vars": {"run_name": shlex.quote(name), "model_id": shlex.quote(model_id)},
-        "opts": opts
-    });
-    env_overrides = dict(rendered["env"]);
-    ignored: list = list(rendered.get("ignored_opts", []));
+    keys = SFT_KEYS if mode == "sft" else DPO_KEYS;
+    env_overrides: dict = {};
+    for k in keys {
+        if k in opts {
+            val = str(opts[k]);
+            if jobs.safe(val) { env_overrides[k] = val; }
+        }
+    }
+
+    ignored: list = [k for k in opts if k not in keys];
     msg = ("ignored opts: " + ", ".join(sorted(ignored))) if ignored else "started";
-    inner = str(rendered["cmd"]);
-    launch_cwd = Path(str(rendered["cwd"]));
 
-    cmd = jobs.with_exit_marker(inner, rl);
-    # Truncate the runlog so a previous run's __EXIT__ marker is erased; otherwise
-    # live_status would instantly mark the new run as done.
-    rl.write_text("");
+    venv_bin = str(models.data_root() / ".venv" / "bin");
+    current_path = os.environ.get("PATH", "");
+    env_overrides["PATH"] = f"{venv_bin}:{current_path}";
 
-<<<<<<<< HEAD:jms/train.sv.jac
     # The run scripts live in model-experiments/01-sft-dpo/sft_dpo/ (post-flatten layout); they
     # re-cd themselves to the repo root, so cwd=data_root stays correct.
     inner = "";
@@ -118,50 +119,42 @@ def start_training(name: str, mode: str, model_id: str = "", opts: dict = {}, ba
     } else {
         inner = f"./model-experiments/01-sft-dpo/sft_dpo/run_dpo.sh {shlex.quote(name)}";
     }
-========
-    pid = jobs.spawn_detached(cmd, runlog=rl, env=env_overrides, cwd=launch_cwd);
->>>>>>>> origin/main:studio-desktop/train.sv.jac
 
-    now = time.strftime("%Y-%m-%d %H:%M:%S");
-    jobs.write_job(jf, {
-        "name": name,
-        "mode": mode,
-        "backend": str(rendered["backend"]),
-        "pid": pid,
-        "status": "running",
-        "started": now,
-        "cmd": inner
-    });
+    jobs.launch(jf, rl, inner, env_overrides, models.data_root(), {"name": name, "mode": mode});
 
     return _build_status(name, mode, msg);
 }
 
-"""Stop a running training job (SIGTERM the process group). Returns JobStatus."""
-def stop_training(name: str, mode: str) -> dict {
+"""Stop a running training job (SIGTERM the process group). When *run_id* is
+given, only that exact run is stopped — a newer run under the same (name, mode)
+is left alone and the message says so. Returns JobStatus."""
+def:pub stop_training(name: str, mode: str, run_id: str = "") -> dict {
     if not jobs.safe(name) { raise ValueError("invalid name"); }
     if mode != "sft" and mode != "dpo" { raise ValueError("mode must be sft|dpo"); }
     jf = _job_file(name, mode);
     rl = _run_log(name, mode);
-    jobs.stop(jf, rl);
+    res = jobs.stop(jf, rl, run_id=run_id);
+    if res is not None and str(res.get("status", "")) == "superseded" {
+        return _build_status(name, mode, f"run {run_id} superseded; not stopped");
+    }
     return _build_status(name, mode, "stop signal sent");
 }
 
 """Poll status for a (name, mode) job. Returns JobStatus."""
-def get_status(name: str, mode: str = "sft") -> dict {
+def:pub get_status(name: str, mode: str = "sft") -> dict {
     if not jobs.safe(name) { raise ValueError("invalid name"); }
     if mode != "sft" and mode != "dpo" { raise ValueError("mode must be sft|dpo"); }
     return _build_status(name, mode);
 }
 
-"""List every training session (SFT + DPO) across the caller's run dirs.
-{"sessions": [...]} — scoped to the caller's per-user results tree."""
-def list_sessions() -> dict {
-    base = auth.user_results_dir();
+"""List every training session (SFT + DPO) across all run dirs. {"sessions": [...]}"""
+def:pub list_sessions() -> dict {
+    base = models.results_dir();
     out: list = [];
     if not base.exists() { return {"sessions": out}; }
     for child in sorted(base.iterdir()) {
         if not child.is_dir() { continue; }
-        if child.name in workspace.excluded_run_dirs() { continue; }
+        if child.name in models.EXCLUDED_RUN_DIRS { continue; }
         nm = child.name;
         for mode in ["sft", "dpo"] {
             logp: Path = child / "dpo" / "train.log" if mode == "dpo" else child / "train.log";

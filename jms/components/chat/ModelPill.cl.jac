@@ -35,38 +35,34 @@ def:pub ModelPill(
     has pickerOpen: bool = False,
         cmpOpen: bool = False;
 
-<<<<<<<< HEAD:jms/components/chat/ModelPill.cl.jac
     return <div className="section-header flex items-center justify-between border-b border-border px-4 py-2.5">
-========
-    return <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-2.5">
->>>>>>>> origin/main:studio-desktop/components/chat/ModelPill.cl.jac
         <div className="flex items-center gap-2">
             <div className="relative">
                 <button
                     onClick={lambda e: MouseEvent { pickerOpen = not pickerOpen; cmpOpen = False; }}
-                    className="rounded-full border border-neutral-700 bg-[#161616] px-4 py-1 text-xs text-neutral-200 hover:border-neutral-500"
+                    className="rounded-full border border-input bg-muted px-4 py-1 text-xs text-foreground hover:border-ring"
                 >
                     {if loadingId {
-                        <span>{"loading " + _label(models, loadingId) + "… " + str(loadElapsed) + "s"}</span>
+                        <span key="loading">{"loading " + _label(models, loadingId) + "… " + str(loadElapsed) + "s"}</span>
                         skip;
                     }}
                     {if not loadingId {
-                        <span>{_label(models, modelId)} <span className="text-neutral-500">▾</span></span>
+                        <span key="ready">{_label(models, modelId)} <span className="text-muted-foreground">▾</span></span>
                         skip;
                     }}
                 </button>
                 {if pickerOpen {
-                    <div className="fixed inset-0 z-10" onClick={lambda e: MouseEvent { pickerOpen = False; }} />
-                    <div className="absolute left-0 top-full z-20 mt-1 w-56 rounded-md border border-neutral-800 bg-[#121212] p-1">
+                    <div key="overlay" className="fixed inset-0 z-10" onClick={lambda e: MouseEvent { pickerOpen = False; }} />
+                    <div key="panel" className="absolute left-0 top-full z-20 mt-1 w-56 rounded-md border border-border bg-popover p-1">
                         {for m in models {
                             <button
                                 key={str(m.id)}
                                 disabled={not m.available}
                                 onClick={lambda e: MouseEvent { onPick(str(m.id)); pickerOpen = False; }}
-                                className="flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-xs text-neutral-300 hover:bg-[#1a1a1a] disabled:opacity-40"
+                                className="flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-xs text-foreground/80 hover:bg-accent disabled:opacity-40"
                             >
                                 <span>{str(m.label)}</span>
-                                <span className="font-mono text-[9px] text-neutral-500">
+                                <span className="font-mono text-[9px] text-muted-foreground">
                                     {("● LOADED" if str(m.id) == loadedId else (str(m.size_gb) + "GB" if m.available else "MISSING"))}
                                 </span>
                             </button>
@@ -75,26 +71,26 @@ def:pub ModelPill(
                     skip;
                 }}
             </div>
-            {compareId and <span className="font-mono text-[10px] text-neutral-500">vs {_label(models, compareId)}</span>}
-            {loadError and <span className="font-mono text-[10px] text-neutral-400 border border-dashed border-neutral-600 px-2 py-0.5">LOAD ERR: {loadError[:60]}</span>}
+            {compareId and <span className="font-mono text-[10px] text-muted-foreground">vs {_label(models, compareId)}</span>}
+            {loadError and <span className="font-mono text-[10px] text-muted-foreground border border-dashed border-ring px-2 py-0.5">LOAD ERR: {loadError[:60]}</span>}
         </div>
         <div className="relative">
             <button
                 onClick={lambda e: MouseEvent { cmpOpen = not cmpOpen; pickerOpen = False; }}
-                className="micro-label hover:text-neutral-300"
+                className="micro-label hover:text-foreground/80"
             >{"⇄ COMPARE" + (" ·ON" if compareId else "")}</button>
             {if cmpOpen {
-                <div className="fixed inset-0 z-10" onClick={lambda e: MouseEvent { cmpOpen = False; }} />
-                <div className="absolute right-0 top-full z-20 mt-1 w-56 rounded-md border border-neutral-800 bg-[#121212] p-1">
+                <div key="overlay" className="fixed inset-0 z-10" onClick={lambda e: MouseEvent { cmpOpen = False; }} />
+                <div key="panel" className="absolute right-0 top-full z-20 mt-1 w-56 rounded-md border border-border bg-popover p-1">
                     <button
                         onClick={lambda e: MouseEvent { onPickCompare(""); cmpOpen = False; }}
-                        className="w-full rounded px-2 py-1.5 text-left text-xs text-neutral-400 hover:bg-[#1a1a1a]"
+                        className="w-full rounded px-2 py-1.5 text-left text-xs text-muted-foreground hover:bg-accent"
                     >off</button>
                     {for m in _cmp_opts(models, modelId) {
                         <button
                             key={str(m.id)}
                             onClick={lambda e: MouseEvent { onPickCompare(str(m.id)); cmpOpen = False; }}
-                            className="w-full rounded px-2 py-1.5 text-left text-xs text-neutral-300 hover:bg-[#1a1a1a]"
+                            className="w-full rounded px-2 py-1.5 text-left text-xs text-foreground/80 hover:bg-accent"
                         >{str(m.label)}</button>
                     }}
                 </div>

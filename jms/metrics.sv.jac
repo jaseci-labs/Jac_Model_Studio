@@ -57,12 +57,6 @@ def parse_train_log(path: Path) -> dict {
     return {"train": train, "val": val, "lr": lr, "tps": tps, "last_iter": last_it};
 }
 
-"""Dispatch to a named train-log parser (mlx is the only wired parser today)."""
-def parse_train_log_by(parser: str, path: Path) -> dict {
-    if parser == "mlx" { return parse_train_log(path); }
-    return parse_train_log(path);
-}
-
 """Read a JSONL file as [{x: step, y: <ykey>}]. Skips non-object / incomplete rows."""
 def read_series(path: Path, ykey: str) -> list[dict] {
     out: list[dict] = [];

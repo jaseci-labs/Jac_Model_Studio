@@ -13,7 +13,7 @@ Frames: {kind:"load",load_s,model_id} once, {kind:"token",token,text} per token,
 import inference;
 import models;
 
-def chat_stream(
+def:pub chat_stream(
     messages: list[dict], model_id: str,
     temperature: float = 0.2, top_p: float = 0.9, max_tokens: int = 1024
 ) -> any {
@@ -32,4 +32,12 @@ def chat_stream(
     for frame in gen {
         yield frame;
     }
+}
+
+"""Cancel the in-flight generation (*gen_id* from the stream's load frame, or the
+current one when omitted). Lock-free: the streaming generator holds the model
+lock, and this flag is how STOP actually frees the GPU — client-side reader
+cancellation alone left the model decoding to max_tokens."""
+def:pub stop_generation(gen_id: str = "") -> dict {
+    return {"stopped": inference.request_cancel(gen_id)};
 }

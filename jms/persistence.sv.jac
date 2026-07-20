@@ -5,8 +5,6 @@
 """
 
 import datetime;
-import os;
-import audit;
 
 def _now() -> str {
     return datetime.datetime.now(datetime.UTC).replace(tzinfo=None).isoformat() + "Z";
@@ -15,7 +13,7 @@ def _now() -> str {
 """Current UTC date as YYYY-MM-DD — the sidebar groups chats by day and labels the
 current day TODAY. Computed server-side so the client needs no Date object (both
 this and chat timestamps are UTC, so the grouping lines up)."""
-def today_utc() -> str {
+def:pub today_utc() -> str {
     return datetime.datetime.now(datetime.UTC).date().isoformat();
 }
 
@@ -41,8 +39,7 @@ node Chat {
     has title: str = "",
         workspace: str = "01",
         created_at: str = "",
-        updated_at: str = "",
-        deleted_at: str = "";
+        updated_at: str = "";
 
     def to_view -> ChatView {
         return ChatView(
@@ -69,35 +66,9 @@ node Msg {
     }
 }
 
-def _is_deleted(c: Chat) -> bool {
-    try {
-        return bool(c.deleted_at);
-    } except Exception {
-        return False;
-    }
-}
-
-"""Drop chats in trash longer than TRASH_DAYS (default 7). Called from list_chats."""
-def _purge_expired_trash() -> None {
-    days = 7;
-    try {
-        days = int(str(os.environ.get("JAC_TRASH_DAYS", "7")));
-    } except Exception {}
-    cutoff = (
-        datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=days)
-    ).replace(tzinfo=None).isoformat() + "Z";
-    for c in [root -->][?:Chat] {
-        if _is_deleted(c) and c.deleted_at < cutoff {
-            for m in [c -->][?:Msg] { del m; }
-            del c;
-        }
-    }
-}
-
-"""Find a chat by jid on the caller's root; skips soft-deleted chats."""
 def _find_chat(chat_id: str) -> Chat | None {
     for c in [root -->][?:Chat] {
-        if jid(c) == chat_id and not _is_deleted(c) {
+        if jid(c) == chat_id {
             return c;
         }
     }
@@ -116,14 +87,11 @@ def _ws_of(c: Chat) -> str {
     }
 }
 
-"""Chats in the caller's workspace, most-recently-updated first. Plain `def` →
-JWT required + runs on the caller's OWN root, so `[root -->][?:Chat]` only ever
-returns this user's chats (multi-tenant isolation is automatic)."""
-def list_chats(workspace: str = "01") -> list[ChatView] {
-    _purge_expired_trash();
+"""Chats in one workspace, most-recently-updated first (matches old
+`ORDER BY updated_at DESC`). Old chats with no workspace field read as "01"."""
+def:pub list_chats(workspace: str = "01") -> list[ChatView] {
     out: list[ChatView] = [];
     for c in [root -->][?:Chat] {
-        if _is_deleted(c) { continue; }
         if _ws_of(c) == workspace {
             out.append(c.to_view());
         }
@@ -132,13 +100,13 @@ def list_chats(workspace: str = "01") -> list[ChatView] {
     return out;
 }
 
-def create_chat(title: str, workspace: str = "01") -> ChatView {
+def:pub create_chat(title: str, workspace: str = "01") -> ChatView {
     now = _now();
-    c = root ++> Chat(title=title, workspace=workspace, created_at=now, updated_at=now);
+    c = (root ++> Chat(title=title, workspace=workspace, created_at=now, updated_at=now))[0];
     return c.to_view();
 }
 
-def rename_chat(chat_id: str, title: str) -> bool {
+def:pub rename_chat(chat_id: str, title: str) -> bool {
     c = _find_chat(chat_id);
     if c {
         c.title = title;
@@ -148,18 +116,19 @@ def rename_chat(chat_id: str, title: str) -> bool {
     return False;
 }
 
-def delete_chat(chat_id: str) -> bool {
+def:pub delete_chat(chat_id: str) -> bool {
     c = _find_chat(chat_id);
     if c {
-        c.deleted_at = _now();
-        c.updated_at = _now();
-        audit.log("chat_delete", {"chat_id": chat_id, "title": c.title});
+        for m in [c -->][?:Msg] {
+            del m;
+        }
+        del c;
         return True;
     }
     return False;
 }
 
-def get_messages(chat_id: str) -> list[MsgView] {
+def:pub get_messages(chat_id: str) -> list[MsgView] {
     c = _find_chat(chat_id);
     out: list[MsgView] = [];
     if c {
@@ -170,17 +139,17 @@ def get_messages(chat_id: str) -> list[MsgView] {
     return out;
 }
 
-def add_message(
+def:pub add_message(
     chat_id: str, role: str, content: str, model_id: str, stats_json: str, pair_group: str
 ) -> MsgView {
     c = _find_chat(chat_id);
     if not c {
         return MsgView();
     }
-    m = c ++> Msg(
+    m = (c ++> Msg(
         role=role, content=content, model_id=model_id,
         stats_json=stats_json, pair_group=pair_group, created_at=_now()
-    );
+    ))[0];
     c.updated_at = _now();
     return m.to_view();
 }

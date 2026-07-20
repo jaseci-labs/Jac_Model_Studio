@@ -19,6 +19,8 @@ import from ..shared.StatusGlyph { StatusGlyph }
 import from ..shared.LogView { LogView }
 import from ..shared.Field { Segmented }
 import from ..shared.RowBrowser { RowBrowser }
+import from ..shared.Button { Button }
+import from ...hooks.useRowPager { useRowPager }
 
 glob GROUPS: list[dict] = [
     {"label": "SEED", "stages": ["seed_conversion"]},
@@ -30,14 +32,8 @@ glob GROUPS: list[dict] = [
     {"label": "AUDIT", "stages": ["dataset_stats", "verify_dataset"]}
 ];
 
-def:pub Data -> JsxElement {
+def:pub Data(active: bool = False) -> JsxElement {
     has stats: any = None,
-        files: list = [],
-        path: str = "",
-        rows: list = [],
-        offset: int = 0,
-        total: int = 0,
-        expanded: int = -1,
         builders: list = [],
         selectedStage: str = "",
         addTarget: str = "sft",
@@ -48,24 +44,17 @@ def:pub Data -> JsxElement {
         runningStage: str = "",
         pollId: any = None;
 
-    # `p`/`off` are passed explicitly — reading the state right after setting it
-    # returns the stale value (React state writes are async).
-    async def _fetch(p: str, off: int) -> None {
-        r = await dataset_rows(p, off, 25);
-        rows = list(r["rows"]);
-        total = int(r["total"]);
+    async def _files -> any {
+        return await dataset_files();
     }
 
-    async def openFile(p: str) -> None {
-        path = p;
-        offset = 0;
-        expanded = -1;
-        await _fetch(p, 0);
+    async def _rows(p: str, off: int) -> any {
+        return await dataset_rows(p, off, 25);
     }
 
-    def toggleRow(idx: int) -> None {
-        expanded = -1 if expanded == idx else idx;
-    }
+    # files/path/rows/offset/total/expanded + pager actions; loads the file
+    # list and opens the first file on mount.
+    pager = useRowPager(_files, _rows);
 
     async def loadBuilders() -> None {
         bs = await list_builders();
@@ -103,43 +92,25 @@ def:pub Data -> JsxElement {
         addBusy = False;
         if int(r["added"]) > 0 {
             stats = await dataset_stats();
-            fs = await dataset_files();
-            files = fs;
+            await pager["refreshFiles"]();
         }
     }
 
-    async can with entry {
-        stats = await dataset_stats();
-        fs = await dataset_files();
-        files = fs;
-        await loadBuilders();
-        if len(fs) > 0 {
-            await openFile(str(fs[0].path));
+    # Poll the builder pipeline only while this section is visible — 11 sections
+    # stay mounted, and an always-on 3s interval per hidden section is the poll
+    # storm the backend used to eat.
+    async can with [active] entry {
+        if pollId is not None { clearInterval(float(str(pollId))); pollId = None; }
+        if active {
+            stats = await dataset_stats();
+            await loadBuilders();
+            pollId = setInterval(lambda -> None { loadBuilders(); }, 3000);
         }
-        pollId = setInterval(lambda -> None { loadBuilders(); }, 3000);
     }
 
     can with exit {
         if pollId is not None {
             clearInterval(float(str(pollId)));
-        }
-    }
-
-    async def prevPage -> None {
-        if offset > 0 {
-            noff = max(0, offset - 25);
-            offset = noff;
-            expanded = -1;
-            await _fetch(path, noff);
-        }
-    }
-
-    async def nextPage -> None {
-        if offset + len(rows) < total {
-            noff = offset + 25;
-            offset = noff;
-            expanded = -1;
-            await _fetch(path, noff);
         }
     }
 
@@ -179,28 +150,22 @@ def:pub Data -> JsxElement {
     def _rail() -> JsxElement {
         nstages = len(builders) if len(builders) > 0 else 13;
         pct = (doneCount * 100.0) / nstages if nstages > 0 else 0.0;
-        return <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-3 pt-4">
-            <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">PIPELINE</span>
+        return <div className="relative rounded-md border border-border bg-card p-3 pt-4">
+            <span className="micro-label absolute -top-2 left-3 bg-background px-2">PIPELINE</span>
             <div className="mb-3 flex flex-col gap-1.5">
                 <div className="flex items-center justify-between">
-                    <span className="stat-line text-neutral-500">{str(doneCount)}/{str(nstages)} DONE</span>
-                    {runningStage and <span className="micro-label pulse text-neutral-300">⦿ {runningStage}</span>}
+                    <span className="stat-line text-muted-foreground">{str(doneCount)}/{str(nstages)} DONE</span>
                 </div>
-<<<<<<<< HEAD:jms/components/sections/Data.cl.jac
                 <div className="h-1 w-full rounded-full bg-border">
                     <div className="h-1 rounded-full transition-all" style={{"width": str(pct) + "%", "background": "var(--ws-accent)"}}></div>
-========
-                <div className="h-1 w-full rounded-full bg-neutral-800">
-                    <div className="h-1 rounded-full bg-neutral-300 transition-all" style={{"width": str(pct) + "%"}}></div>
->>>>>>>> origin/main:studio-desktop/components/sections/Data.cl.jac
                 </div>
             </div>
             <div className="relative flex flex-col gap-0.5 pl-3">
-                <div className="absolute bottom-1 left-0 top-1 w-px bg-neutral-800"></div>
+                <div className="absolute bottom-1 left-0 top-1 w-px bg-border"></div>
                 {for group in GROUPS {
                     <div key={str(group["label"])} className="mt-2 first:mt-0">
                         <div className="mb-1 flex items-center gap-2">
-                            <span className="micro-label shrink-0 text-neutral-600">{str(group["label"])}</span>
+                            <span className="micro-label shrink-0 text-muted-foreground/70">{str(group["label"])}</span>
                             <div className="dashed-rule flex-1"></div>
                         </div>
                         {for stage in list(group["stages"]) {
@@ -208,20 +173,21 @@ def:pub Data -> JsxElement {
                                 <div
                                     onClick={lambda e: MouseEvent { selectStage(str(stage)); }}
                                     className={"flex cursor-pointer items-center gap-2 rounded px-2 py-1 " + (
-                                        "bg-[#1a1a1a]" if selectedStage == str(stage) else "hover:bg-[#141414]"
+                                        "bg-accent" if selectedStage == str(stage) else "hover:bg-muted"
                                     )}
                                 >
                                     <StatusGlyph status={_statusOf(str(stage))} showLabel={False} />
-                                    <span className="flex-1 truncate font-mono text-xs text-neutral-400">{str(stage)}</span>
-                                    <button
+                                    <span className="flex-1 truncate font-mono text-xs text-muted-foreground">{str(stage)}</span>
+                                    <Button
+                                        variant="ghost"
                                         disabled={_statusOf(str(stage)) == "running"}
                                         onClick={lambda e: MouseEvent { e.stopPropagation(); runStage(str(stage)); }}
-                                        className="micro-label rounded border border-neutral-700 px-1.5 py-0.5 text-neutral-500 transition-colors hover:border-neutral-500 hover:text-neutral-200 disabled:cursor-not-allowed disabled:opacity-30"
+                                        className="px-1.5 py-0.5"
                                     >
                                         RUN
-                                    </button>
+                                    </Button>
                                 </div>
-                                {(str(stage) == "seed_conversion") and <div className="stat-line ml-8 mt-0.5 mb-1 border-l-2 border-neutral-600 pl-2">TRUNCATES sft.jsonl→32 · dpo.jsonl→2 · run idiomatic batches after, then downstream stages</div>}
+                                {(str(stage) == "seed_conversion") and <div className="stat-line ml-8 mt-0.5 mb-1 border-l-2 border-ring pl-2">TRUNCATES sft.jsonl→32 · dpo.jsonl→2 · run idiomatic batches after, then downstream stages</div>}
                             </div>
                         }}
                     </div>
@@ -233,8 +199,8 @@ def:pub Data -> JsxElement {
     def _addExamples() -> JsxElement {
         ph = ('one JSON object per line · sft: {"messages":[...]}' if addTarget == "sft"
             else 'one JSON object per line · dpo: {"prompt","chosen","rejected"}');
-        return <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-3 pt-4">
-            <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">ADD.EXAMPLES</span>
+        return <div className="relative rounded-md border border-border bg-card p-3 pt-4">
+            <span className="micro-label absolute -top-2 left-3 bg-background px-2">ADD EXAMPLES</span>
             <div className="flex flex-col gap-3">
                 <Segmented options={["sft", "dpo"]} value={addTarget} onSet={lambda v: str { addTarget = v; }} />
                 <textarea
@@ -242,15 +208,16 @@ def:pub Data -> JsxElement {
                     value={addText}
                     onChange={lambda e: ChangeEvent { addText = e.target.value; }}
                     placeholder={ph}
-                    className="w-full rounded-md border border-neutral-700 bg-[#121212] px-2 py-1.5 font-mono text-xs text-neutral-100 outline-none placeholder:text-neutral-600 focus:border-neutral-500 resize-none"
+                    className="w-full rounded-md border border-input bg-popover px-2 py-1.5 font-mono text-xs text-foreground outline-none placeholder:text-muted-foreground/70 focus:border-ring resize-none"
                 ></textarea>
-                <button
+                <Button
+                    variant="solid"
                     disabled={addBusy or (not addText.strip())}
                     onClick={lambda e: MouseEvent { submitExamples(); }}
-                    className="micro-label self-start rounded border border-neutral-600 px-3 py-1.5 text-neutral-300 transition-colors hover:border-neutral-400 hover:text-neutral-100 disabled:cursor-not-allowed disabled:opacity-30"
+                    className="self-start py-1.5"
                 >
                     {"APPENDING…" if addBusy else "APPEND"}
-                </button>
+                </Button>
                 {addResult and <div className="flex flex-col gap-2">
                     <div className="stat-line">added {str(addResult["added"])} · total {str(addResult["total"])}</div>
                     {(len(list(addResult["errors"])) > 0) and <LogView text={"\n".join([str(x) for x in list(addResult["errors"])])} maxH="8rem" />}
@@ -260,32 +227,26 @@ def:pub Data -> JsxElement {
     }
 
     return <div className="flex h-full min-w-0 flex-1 flex-col">
-<<<<<<<< HEAD:jms/components/sections/Data.cl.jac
         <div className="section-header flex items-center justify-between border-b border-border px-4 py-2.5">
             <span className="micro-label">DATA · SFT/DPO DATASET</span>
             {runningStage and <span key="running" className="micro-label pulse text-foreground/80">⦿ {runningStage}</span>}
-========
-        <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-2.5">
-            <span className="micro-label">DATA.PIPELINE</span>
-            <span className="micro-label text-neutral-600">DATASET.CTL</span>
->>>>>>>> origin/main:studio-desktop/components/sections/Data.cl.jac
         </div>
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
             {_tiles()}
             <div className="grid gap-4" style={{"gridTemplateColumns": "280px 1fr"}}>
                 <div className="flex flex-col gap-4">
                     {_rail()}
-                    {selectedStage and <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-3 pt-4">
-                        <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">{selectedStage}</span>
+                    {selectedStage and <div className="relative rounded-md border border-border bg-card p-3 pt-4">
+                        <span className="micro-label absolute -top-2 left-3 bg-background px-2">{selectedStage}</span>
                         <LogView text={_logOf(selectedStage)} maxH="14rem" />
                     </div>}
                 </div>
                 <div className="flex flex-col gap-4">
                     <RowBrowser
-                        files={files} path={path} rows={rows} offset={offset}
-                        total={total} expanded={expanded}
-                        onOpen={openFile} onToggle={toggleRow}
-                        onPrev={prevPage} onNext={nextPage}
+                        files={pager["files"]} path={pager["path"]} rows={pager["rows"]} offset={pager["offset"]}
+                        total={pager["total"]} expanded={pager["expanded"]}
+                        onOpen={pager["openFile"]} onToggle={pager["toggleRow"]}
+                        onPrev={pager["prevPage"]} onNext={pager["nextPage"]}
                     />
                     {_addExamples()}
                 </div>
