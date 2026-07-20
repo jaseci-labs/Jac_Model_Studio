@@ -1,4 +1,4 @@
-# Jac Model Studio
+# Jac Model Studio (JMS)
 
 One-stop local ML workbench for the Jac fine-tuning project: chat with the
 trained models, launch + monitor training, run the data pipeline, and run
@@ -8,7 +8,7 @@ app (deleted) and the earlier web_app/ + dashboard_app/.
 
 ## Run
 
-    ./studio/start.sh             # one process: API :8001 + Vite UI :8000
+    ./jms/start.sh                # one process: API :8001 + Vite UI :8000
     open http://localhost:8000
 
 Models/dataset/results are read from `JAC_STUDIO_DATA_ROOT` (default: this
@@ -17,7 +17,7 @@ legacy DataGeneration checkout — those dirs are gitignored, worktrees lack the
 
 ## Layout
 
-Everything lives in this directory (`studio/` at the repo root):
+Everything lives in this directory (`jms/` at the repo root):
 
 - `*.sv.jac` — server endpoints. `models`/`inference` (resident MLX + token
   stream), `chat` (SSE), `persistence` (OSP graph: chats/messages, replaces
@@ -32,5 +32,5 @@ Everything lives in this directory (`studio/` at the repo root):
 
 ## Test
 
-    cd studio && jac check main.jac   # type-check the whole app
-    ./studio/smoke.sh                 # while running
+    cd jms && jac check main.jac      # type-check the whole app
+    ./jms/smoke.sh                    # while running
