@@ -50,21 +50,26 @@ base_route_app = "app"
 
 # Single-process monolith: client `sv import` stubs call the main server in-process.
 # Disable auto-spawn / gateway microservice mode (no sv-to-sv imports in this app).
-[plugins.scale.microservices]
+# Jac 0.34+: top-level `[scale.*]` / `[client.*]` (old `[plugins.*]` paths are ignored).
+[scale.microservices]
 enabled = false
 
 # --- Production hardening (multi-tenant, shared host) --------------------------
 # See jac guide jac-sv-deploy + jac-sv-auth. The default JWT signing secret is
 # public and MUST be overridden. Interpolated from the env at start time; set
 # JWT_SECRET in the environment (start_prod.sh / systemd EnvironmentFile).
-[plugins.scale.jwt]
+[scale.jwt]
 secret = "${JWT_SECRET}"
 
-[plugins.scale.server]
+[scale.server]
 docs_enabled = false             # disable /docs, /redoc, /openapi.json in prod
 suppress_health_check_logs = true
 
-[plugins.client.vite]
+# Tailwind v4 Vite plugin — must be under [client.vite] so jac regenerates
+# vite.dev.config.js with `import tailwindcss from '@tailwindcss/vite'` +
+# `tailwindcss()` in the plugins list. Without it, @import "tailwindcss" in
+# global.css never expands utilities and the UI renders unstyled.
+[client.vite]
 plugins = ["tailwindcss()"]
 lib_imports = ["import tailwindcss from '@tailwindcss/vite'"]
 
@@ -79,7 +84,7 @@ lib_imports = ["import tailwindcss from '@tailwindcss/vite'"]
 # `usePolling`/`interval` are repeated because the override replaces (not
 # merges with) the hardcoded block.
 # (Upstream template: jaclang/runtimelib/client/impl/vite_bundler.impl.jac)
-[plugins.client.vite.server.watch]
+[client.vite.server.watch]
 usePolling = true
 interval = 100
 ignored = [

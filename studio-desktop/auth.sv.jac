@@ -78,10 +78,24 @@ def:pub local_session() -> str {
             json={"identity": identities[0], "credential": credential},
         );
         if resp.status_code == 200 {
-            body: dict[str, any] = resp.json() as dict[str, any];
-            data: any = body.get("data", {});
-            if isinstance(data, dict) and "token" in data {
-                return str(data["token"]);
+            body: any = resp.json();
+            # TransportResponse shape: {ok, data: {token, ...}, ...}. Be liberal
+            # about where the JWT lands so a jac-scale wrap change cannot strand
+            # the desktop auth gate on <Login/>.
+            if isinstance(body, dict) {
+                data: any = body.get("data", {});
+                if isinstance(data, dict) {
+                    if "token" in data and data["token"] {
+                        return str(data["token"]);
+                    }
+                    # Function-style wrap: {data: {result: "<jwt>"}}
+                    if "result" in data and data["result"] {
+                        return str(data["result"]);
+                    }
+                }
+                if "token" in body and body["token"] {
+                    return str(body["token"]);
+                }
             }
         }
     } except Exception { }

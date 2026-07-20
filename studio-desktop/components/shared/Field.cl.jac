@@ -1,6 +1,6 @@
 """Field / TextInput / Segmented form primitives. Ports ui/components/shared/field.tsx.
 
-Named event handlers (not `lambda e: Type { … }`) so client compile works across
+Named event handlers (not `lambda (e: Type) { … }`) so client compile works across
 Jac versions that reject the unparenthesized typed-lambda spelling.
 """
 

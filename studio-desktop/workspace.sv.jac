@@ -266,7 +266,7 @@ node Workspace {
 
     def to_view -> WorkspaceView {
         secs = [s for s in [self -->][?:WorkspaceSection]];
-        secs.sort(key=lambda s: WorkspaceSection -> int { return s.order; });
+        secs.sort(key=lambda (s: WorkspaceSection) -> int { return s.order; });
         return WorkspaceView(
             id=self.wid, label=self.label, accent=self.accent,
             default_model=self.default_model, files=list(self.files),
@@ -363,7 +363,7 @@ def _ensure_workspaces_seeded() -> None {
 """All workspaces on the caller's root, ordered by sort_order then wid."""
 def _all_workspaces() -> list[Workspace] {
     wss = [w for w in [root -->][?:Workspace]];
-    wss.sort(key=lambda w: Workspace -> str {
+    wss.sort(key=lambda (w: Workspace) -> str {
         return str(w.sort_order).zfill(6) + w.wid;
     });
     return wss;

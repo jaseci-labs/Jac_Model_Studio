@@ -172,11 +172,7 @@ def:pub CptData -> JsxElement {
     }
 
     return <div className="flex h-full min-w-0 flex-1 flex-col">
-<<<<<<<< HEAD:jms/components/sections/CptData.cl.jac
-        <div className="section-header flex items-center justify-between border-b border-border px-4 py-2.5">
-========
         <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-2.5">
->>>>>>>> origin/main:studio-desktop/components/sections/CptData.cl.jac
             <span className="micro-label">DATA · CPT CORPUS (read-only)</span>
             <span className="micro-label text-neutral-600">03-new/dataset/cpt</span>
         </div>
@@ -190,10 +186,6 @@ def:pub CptData -> JsxElement {
                 onOpen={openFile} onToggle={toggleRow}
                 onPrev={prevPage} onNext={nextPage}
             />
-<<<<<<<< HEAD:jms/components/sections/CptData.cl.jac
-            <div className="stat-line text-muted-foreground/70">source: model-experiments/03-new/dataset/cpt</div>
-========
->>>>>>>> origin/main:studio-desktop/components/sections/CptData.cl.jac
         </div>
     </div>;
 }

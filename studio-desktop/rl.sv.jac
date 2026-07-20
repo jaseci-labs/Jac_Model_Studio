@@ -97,22 +97,15 @@ def _pivot(p: str) -> dict {
     def _rk(row: dict) -> int {
         return workspace.rung_order().index(str(row["rung"])) if str(row["rung"]) in workspace.rung_order() else 99;
     }
-    out_cells.sort(key=lambda r: r and (str(r["model"]), _rk(r), str(r["cond"])));
+    out_cells.sort(key=lambda (r) { r and (str(r["model"]), _rk(r), str(r["cond"])); });
     return {"cells": out_cells, "curve": curve, "curve_keys": sorted(keys), "families": sorted(fams), "count": len(out_cells)};
 }
 
-<<<<<<<< HEAD:jms/rl.sv.jac
-def:pub get_rl_ladder() -> dict {
-    primary = _pivot(os.environ.get("JAC_RL_RESULTS", os.path.join(RL_REPO, "model-experiments/02-rl-grpo", "results", "rl_ladder.jsonl")));
-    sg = _pivot(os.path.join(RL_REPO, "model-experiments/02-rl-grpo", "results", "rl_ladder_sg.jsonl"));
-    v84 = _pivot(os.path.join(RL_REPO, "model-experiments/02-rl-grpo", "results", "rl_ladder_v84.jsonl"));
-========
 def get_rl_ladder() -> dict {
     ws = str(_ws());
     primary = _pivot(os.environ.get("JAC_RL_RESULTS", os.path.join(ws, "02-rl-grpo", "results", "rl_ladder.jsonl")));
     sg = _pivot(os.path.join(ws, "02-rl-grpo", "results", "rl_ladder_sg.jsonl"));
     v84 = _pivot(os.path.join(ws, "02-rl-grpo", "results", "rl_ladder_v84.jsonl"));
->>>>>>>> origin/main:studio-desktop/rl.sv.jac
     return {
         "cells": primary["cells"], "curve": primary["curve"], "curve_keys": primary["curve_keys"],
         "families": primary["families"], "count": primary["count"],
@@ -120,18 +113,9 @@ def get_rl_ladder() -> dict {
     };
 }
 
-<<<<<<<< HEAD:jms/rl.sv.jac
-def:pub get_rl_corrected() -> dict {
-    # The corrected results (fixed eval+reward) — assembled by model-experiments/02-rl-grpo/rl/make_summary.py.
-    p = os.path.join(RL_REPO, "model-experiments/02-rl-grpo", "resultspub", "rl", "corrected_summary.json");
-    # Fallback/error shapes must carry every key the client dereferences
-    # (Results.cl.jac lists journey/kscale unguarded).
-    empty: dict = {"ladder": [], "holdouts": [], "journey": [], "kscale": [], "headline": {}, "note": ""};
-========
 def get_rl_corrected() -> dict {
     # The corrected results (fixed eval+reward) — assembled by 02-rl-grpo/rl/make_summary.py.
     p = str(_ws() / "02-rl-grpo" / "resultspub" / "rl" / "corrected_summary.json");
->>>>>>>> origin/main:studio-desktop/rl.sv.jac
     if not os.path.exists(p) {
         return {"ladder": [], "holdouts": [], "headline": {}, "note": ""};
     }
@@ -152,13 +136,8 @@ def rl_generate(prompt: str, k: int = 8) -> dict {
     env["K"] = str(k);
     try {
         p = subprocess.run(
-<<<<<<<< HEAD:jms/rl.sv.jac
-            [GEN_PY, os.path.join(RL_REPO, "model-experiments/02-rl-grpo", "rl", "generate.py"), "--prompt", prompt],
-            capture_output=True, text=True, timeout=900, cwd=RL_REPO, env=env
-========
             [_gen_py(), os.path.join(ws, "02-rl-grpo", "rl", "generate.py"), "--prompt", prompt],
             capture_output=True, text=True, timeout=900, cwd=ws, env=env
->>>>>>>> origin/main:studio-desktop/rl.sv.jac
         );
         raw = str(p.stdout);
         verified = "verified by jac" in raw;

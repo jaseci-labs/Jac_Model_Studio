@@ -29,7 +29,21 @@ def:pub bearerHeaders() -> dict {
     return hdrs;
 }
 
-"""Re-mint the implicit local-desktop JWT. No-op (returns False) in prod."""
+"""True when *tok* looks like a usable JWT (non-empty string)."""
+def _usableToken(tok: any) -> bool {
+    if tok is None { return False; }
+    s = str(tok).strip();
+    if not s or s == "None" or s == "null" { return False; }
+    # Reject accidental object stringifications from a bad RPC unwrap.
+    if s.startswith("{") or s.startswith("[") { return False; }
+    return True;
+}
+
+"""Re-mint the implicit local-desktop JWT. No-op (returns False) in prod.
+
+Clears the client endpoint cache before calling `local_session` so a cached
+empty/stale result cannot permanently strand the gate on <Login/> (local_session
+is classified as a non-writer reader and would otherwise be cached for 60s)."""
 async def:pub refreshLocalSession() -> bool {
     lm: bool = False;
     try {
@@ -40,10 +54,16 @@ async def:pub refreshLocalSession() -> bool {
     if not lm {
         return False;
     }
+    # Drop any cached local_session/local_mode results + stale JWT from a prior
+    # server process (JWT secret rotates on restart → 401 storms).
     try {
+        jacLogout();
+    } except Exception {}
+    try {
+        tok: any = None;
         tok = await local_session();
-        if tok {
-            jacSetToken(tok);
+        if _usableToken(tok) {
+            jacSetToken(str(tok).strip());
             return True;
         }
     } except Exception {}

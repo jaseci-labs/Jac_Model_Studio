@@ -11,24 +11,8 @@ import paths;
 import workspace;
 import from pathlib { Path }
 
-<<<<<<<< HEAD:jms/models.sv.jac
-glob DEFAULT_ROOT: str = "/Volumes/ExtremePro/JaseciLabs/jac_model_studio";
-
-glob MODELS: list[dict] = [
-    {"id": "qwen2-dpo", "label": "Qwen2 · DPO", "path": "models/qwen2-jac-dpo-fused-q8"},
-    {"id": "qwen2-sft", "label": "Qwen2 · SFT", "path": "models/qwen2-jac-fused-q8"}
-];
-
-# Eval holdout sets (rel to data root) + run dirs that are NOT training runs.
-glob HOLDOUTS: dict = {
-    "function": "model-experiments/01-sft-dpo/dataset/eval_holdout/conversion.jsonl",
-    "graph": "model-experiments/01-sft-dpo/dataset/eval_holdout/graph_conversion.jsonl"
-};
-glob EXCLUDED_RUN_DIRS: list[str] = ["comparison", "_builder", "_evals"];
-========
 # Model registry, eval holdouts, and excluded run dirs now live in
 # studio.workspace.toml (workspace_root > studio_root). See workspace.sv.jac.
->>>>>>>> origin/main:studio-desktop/models.sv.jac
 
 """One model as the client sees it: registry entry + on-disk availability."""
 obj ModelView {
@@ -61,13 +45,7 @@ def model_available(m: dict) -> bool {
 }
 
 def results_dir() -> Path {
-<<<<<<<< HEAD:jms/models.sv.jac
-    # run_probe.sh / run_dpo.sh cd to the repo root and write under
-    # model-experiments/01-sft-dpo/results/, so the studio must read the same tree.
-    return data_root() / "model-experiments/01-sft-dpo" / "results";
-========
     return data_root() / "results";
->>>>>>>> origin/main:studio-desktop/models.sv.jac
 }
 
 def jac_bin() -> Path {

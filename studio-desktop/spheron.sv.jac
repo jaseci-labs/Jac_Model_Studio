@@ -877,7 +877,7 @@ def list_spheron_dispatches() -> dict {
     for d in [root -->][?:SpheronDispatch] {
         rows.append(_refresh_dispatch(d));
     }
-    rows.sort(key=lambda r: dict -> str { return str(r["started"]); }, reverse=True);
+    rows.sort(key=lambda (r: dict) -> str { return str(r["started"]); }, reverse=True);
     return {"dispatches": rows};
 }
 

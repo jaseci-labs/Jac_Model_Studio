@@ -109,18 +109,7 @@ def start_training(name: str, mode: str, model_id: str = "", opts: dict = {}, ba
     # live_status would instantly mark the new run as done.
     rl.write_text("");
 
-<<<<<<<< HEAD:jms/train.sv.jac
-    # The run scripts live in model-experiments/01-sft-dpo/sft_dpo/ (post-flatten layout); they
-    # re-cd themselves to the repo root, so cwd=data_root stays correct.
-    inner = "";
-    if mode == "sft" {
-        inner = f"./model-experiments/01-sft-dpo/sft_dpo/run_probe.sh {shlex.quote(model_id)} {shlex.quote(name)}";
-    } else {
-        inner = f"./model-experiments/01-sft-dpo/sft_dpo/run_dpo.sh {shlex.quote(name)}";
-    }
-========
     pid = jobs.spawn_detached(cmd, runlog=rl, env=env_overrides, cwd=launch_cwd);
->>>>>>>> origin/main:studio-desktop/train.sv.jac
 
     now = time.strftime("%Y-%m-%d %H:%M:%S");
     jobs.write_job(jf, {

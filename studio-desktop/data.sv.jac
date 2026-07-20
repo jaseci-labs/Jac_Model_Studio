@@ -12,43 +12,10 @@ import paths;
 import workspace;
 import from pathlib { Path }
 
-<<<<<<<< HEAD:jms/data.sv.jac
-# RL data lives in THIS repo (jac_ml_studio), not the studio's data_root (which points
-# at the DataGeneration checkout). Resolve RL files against the repo root, like rl.sv.jac.
-# studio/ sits directly at repo root (post Jul-10 flatten) → two dirnames up.
-glob RL_ROOT: str = os.path.dirname(os.path.dirname(os.path.abspath(__file__)));
-
-glob PREVIEW_FILES: list[list[str]] = [
-    ["model-experiments/01-sft-dpo/dataset/conversion/sft.jsonl", "SFT idiomatic core"],
-    ["model-experiments/01-sft-dpo/dataset/conversion/sft_auto.jsonl", "SFT transpile volume"],
-    ["model-experiments/01-sft-dpo/dataset/conversion/dpo.jsonl", "DPO pairs"],
-    ["model-experiments/01-sft-dpo/dataset/mlx/train.jsonl", "MLX SFT train"],
-    ["model-experiments/01-sft-dpo/dataset/mlx/valid.jsonl", "MLX SFT valid"],
-    ["model-experiments/01-sft-dpo/dataset/mlx_dpo/train.jsonl", "MLX DPO train"],
-    ["model-experiments/01-sft-dpo/dataset/mlx_dpo/valid.jsonl", "MLX DPO valid"],
-    ["model-experiments/01-sft-dpo/dataset/eval_holdout/conversion.jsonl", "Holdout (function)"],
-    ["model-experiments/01-sft-dpo/dataset/eval_holdout/graph_conversion.jsonl", "Holdout (graph)"]
-];
-glob APPEND_TARGETS: dict = {
-    "sft": "model-experiments/01-sft-dpo/dataset/conversion/sft.jsonl", "dpo": "model-experiments/01-sft-dpo/dataset/conversion/dpo.jsonl"
-};
-
-# RL data pipeline — grouped by training use. SFT=gold {messages}; the rest are the
-# {prompt, answer} task pool (GRPO reward / eval). See RL_FINDINGS.md.
-glob RL_SOURCES: list[str] = ["SFT", "GRPO", "conversion", "synthetic", "splits"];
-glob RL_PREVIEW_FILES: dict = {
-    "SFT": [["model-experiments/02-rl-grpo/dataset/rl/rft/train.jsonl", "RFT gold · train"], ["model-experiments/02-rl-grpo/dataset/rl/rft/valid.jsonl", "RFT gold · valid"]],
-    "GRPO": [["model-experiments/02-rl-grpo/dataset/rl/tasks.jsonl", "reward tasks · all"], ["model-experiments/02-rl-grpo/dataset/rl/train.jsonl", "GRPO train pool"], ["model-experiments/02-rl-grpo/dataset/rl/valid.jsonl", "GRPO valid"]],
-    "conversion": [["model-experiments/02-rl-grpo/dataset/rl_conv/tasks.jsonl", "python→jac · all"], ["model-experiments/02-rl-grpo/dataset/rl_conv/train.jsonl", "conv train"], ["model-experiments/02-rl-grpo/dataset/rl_conv/holdout.jsonl", "conv holdout"]],
-    "synthetic": [["model-experiments/02-rl-grpo/dataset/rl/synthetic.jsonl", "synthetic · fresh (32)"]],
-    "splits": [["model-experiments/02-rl-grpo/dataset/rl/holdout.jsonl", "holdout n=18"], ["model-experiments/02-rl-grpo/dataset/rl/holdout_big.jsonl", "holdout n=32 (+syn)"], ["model-experiments/02-rl-grpo/dataset/rl/train_big.jsonl", "train pool (+syn)"]]
-};
-========
 # Dataset + RL file maps now live in studio.workspace.toml (workspace.sv.jac):
 # preview_files / append_targets / split_files / sft_stat_files / rl_preview_files.
 # RL data still resolves against the workspace checkout (paths.workspace_root),
 # not the studio data_root when JAC_STUDIO_DATA_ROOT points elsewhere.
->>>>>>>> origin/main:studio-desktop/data.sv.jac
 
 obj FileRefView {
     has path: str = "", label: str = "", count: int = 0;
@@ -179,13 +146,8 @@ def _build_row(idx: int, rec: any) -> DataRowView {
 }
 
 """Dataset statistics: counts per SFT file, DPO pairs, split sizes."""
-<<<<<<<< HEAD:jms/data.sv.jac
-def:pub dataset_stats() -> dict {
-    sft_rels = ["model-experiments/01-sft-dpo/dataset/conversion/sft.jsonl", "model-experiments/01-sft-dpo/dataset/conversion/sft_auto.jsonl"];
-========
 def dataset_stats() -> dict {
     sft_rels = workspace.data_sft_stat_files();
->>>>>>>> origin/main:studio-desktop/data.sv.jac
     sft_files: list = [];
     grand = 0;
     for rel in sft_rels {
@@ -193,22 +155,11 @@ def dataset_stats() -> dict {
         sft_files.append({"path": rel, "total": n});
         grand += n;
     }
-<<<<<<<< HEAD:jms/data.sv.jac
-    splits = {
-        "mlx_train": _line_count("model-experiments/01-sft-dpo/dataset/mlx/train.jsonl"),
-        "mlx_valid": _line_count("model-experiments/01-sft-dpo/dataset/mlx/valid.jsonl"),
-        "dpo_train": _line_count("model-experiments/01-sft-dpo/dataset/mlx_dpo/train.jsonl"),
-        "dpo_valid": _line_count("model-experiments/01-sft-dpo/dataset/mlx_dpo/valid.jsonl"),
-        "holdout": _line_count("model-experiments/01-sft-dpo/dataset/eval_holdout/conversion.jsonl"),
-        "graph_holdout": _line_count("model-experiments/01-sft-dpo/dataset/eval_holdout/graph_conversion.jsonl")
-    };
-========
     split_rels = workspace.data_split_files();
     splits: dict = {};
     for k in split_rels {
         splits[k] = _line_count(str(split_rels[k]));
     }
->>>>>>>> origin/main:studio-desktop/data.sv.jac
     return {
         "sft_files": sft_files, "sft_total": grand,
         "dpo_pairs": _line_count("model-experiments/01-sft-dpo/dataset/conversion/dpo.jsonl"), "splits": splits

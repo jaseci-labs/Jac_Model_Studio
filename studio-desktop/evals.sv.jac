@@ -136,17 +136,11 @@ def _start(run: EvalRun, limit: int, sim_threshold: float) -> int {
         script = "idiom_eval.jac";
     }
 
-<<<<<<<< HEAD:jms/evals.sv.jac
-    inner = f"{shlex.quote(str(models.jac_bin()))} run model-experiments/01-sft-dpo/sft_dpo/jacgen/{script}";
-    job = jobs.launch(ed / "job.json", run_log, inner, env, models.data_root(), {"eid": run.eid});
-    return int(str(job.get("pid") or 0));
-========
     inner = f"{shlex.quote(str(models.jac_bin()))} run {paths.jacgen_script(script)}";
     cmd = jobs.with_exit_marker(inner, run_log);
     pid = jobs.spawn_detached(cmd, run_log, env, models.data_root());
     jobs.write_job(ed / "job.json", {"pid": pid, "status": "running"});
     return pid;
->>>>>>>> origin/main:studio-desktop/evals.sv.jac
 }
 
 """Refresh a running run's status (live_status-style): resolve the job.json/run.log
@@ -231,7 +225,7 @@ def list_evals() -> dict {
         _refresh(r);
         out.append(r.to_view(""));
     }
-    out.sort(key=lambda v: EvalView -> str { return v.started; }, reverse=True);
+    out.sort(key=lambda (v: EvalView) -> str { return v.started; }, reverse=True);
     return {"evals": out};
 }
 

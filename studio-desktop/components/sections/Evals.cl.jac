@@ -15,12 +15,7 @@ import from ..shared.Field { Field, TextInput, Segmented }
 import from ..shared.StatusGlyph { StatusGlyph }
 import from ..shared.LogView { LogView }
 import from ..shared.StatTile { StatTile }
-<<<<<<<< HEAD:jms/components/sections/Evals.cl.jac
-import from ..shared.Button { Button }
-import from ..shared.Chip { Chip }
 import from ..shared.Gallery { Gallery }
-========
->>>>>>>> origin/main:studio-desktop/components/sections/Evals.cl.jac
 
 def _stripModels(m: str) -> str {
     if m.startswith("models/") { return m[7:]; }
@@ -191,7 +186,7 @@ def:pub Evals -> JsxElement {
             <div className="flex flex-col gap-4">
                 <Field label="KIND">
                     <div className="flex flex-col gap-1">
-                        <Segmented options={["probe", "idiom"]} value={kind} onSet={lambda v: str { kind = v; }} />
+                        <Segmented options={["probe", "idiom"]} value={kind} onSet={lambda (v: str) { kind = v; }} />
                         <span className="stat-line text-neutral-600">{
                             "behavioral test-pass on holdout" if kind == "probe"
                             else "ROUGE vs transpile judge: idiomatic similarity score"
@@ -216,23 +211,23 @@ def:pub Evals -> JsxElement {
                         </div>}
                         <TextInput
                             value={modelPath}
-                            onSet={lambda v: str { modelPath = v; if v { modelId = ""; } }}
+                            onSet={lambda (v: str) { modelPath = v; if v { modelId = ""; } }}
                             placeholder="or model path (models/...)"
                             mono={True}
                         />
                     </div>
                 </Field>
                 <Field label="ADAPTER (optional)">
-                    <TextInput value={adapter} onSet={lambda v: str { adapter = v; }} placeholder="e.g. model-experiments/01-sft-dpo/adapters/qwen-probe" mono={True} />
+                    <TextInput value={adapter} onSet={lambda (v: str) { adapter = v; }} placeholder="e.g. model-experiments/01-sft-dpo/adapters/qwen-probe" mono={True} />
                 </Field>
                 <Field label="HOLDOUT">
-                    <Segmented options={["function", "graph"]} value={holdout} onSet={lambda v: str { holdout = v; }} />
+                    <Segmented options={["function", "graph"]} value={holdout} onSet={lambda (v: str) { holdout = v; }} />
                 </Field>
                 <Field label="LIMIT">
-                    <TextInput value={limit} onSet={lambda v: str { limit = v; }} placeholder="all" mono={True} />
+                    <TextInput value={limit} onSet={lambda (v: str) { limit = v; }} placeholder="all" mono={True} />
                 </Field>
                 {kind == "idiom" and <Field label="SIM THRESHOLD">
-                    <TextInput value={simThreshold} onSet={lambda v: str { simThreshold = v; }} placeholder="0.7" mono={True} />
+                    <TextInput value={simThreshold} onSet={lambda (v: str) { simThreshold = v; }} placeholder="0.7" mono={True} />
                 </Field>}
                 <button
                     onClick={lambda (e: MouseEvent) { start(); }}
@@ -441,14 +436,9 @@ def:pub Evals -> JsxElement {
     }
 
     return <div className="flex h-full min-w-0 flex-1 flex-col">
-<<<<<<<< HEAD:jms/components/sections/Evals.cl.jac
-        <div className="section-header flex items-center justify-between border-b border-border px-4 py-2.5">
-            <span className="micro-label">RESULTS · EVAL RUNS</span>
-========
         <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-2.5">
             <span className="micro-label">EVALS</span>
             <span className="micro-label text-neutral-600">EVAL.CTL</span>
->>>>>>>> origin/main:studio-desktop/components/sections/Evals.cl.jac
         </div>
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
             <div className="grid gap-4" style={{"gridTemplateColumns": "360px 1fr"}}>

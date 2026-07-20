@@ -311,7 +311,7 @@ def:pub WorkspaceSettings(
 
                 <Field label="NEW WORKSPACE">
                     <div className="flex gap-2">
-                        <TextInput value={newWsLabel} onSet={lambda v: str { newWsLabel = v; }} placeholder="Label" mono={False} />
+                        <TextInput value={newWsLabel} onSet={lambda (v: str) { newWsLabel = v; }} placeholder="Label" mono={False} />
                         <button
                             onClick={addWorkspace}
                             disabled={busy}
@@ -323,10 +323,10 @@ def:pub WorkspaceSettings(
                 {if wd {
                     <div className="space-y-3">
                         <Field label="LABEL">
-                            <TextInput value={label} onSet={lambda v: str { label = v; }} placeholder="Workspace label" mono={False} />
+                            <TextInput value={label} onSet={lambda (v: str) { label = v; }} placeholder="Workspace label" mono={False} />
                         </Field>
                         <Field label="ACCENT CSS VAR">
-                            <TextInput value={accent} onSet={lambda v: str { accent = v; }} placeholder="ws01" mono={True} />
+                            <TextInput value={accent} onSet={lambda (v: str) { accent = v; }} placeholder="ws01" mono={True} />
                         </Field>
                         <Field label="DEFAULT MODEL">
                             <select
@@ -340,7 +340,7 @@ def:pub WorkspaceSettings(
                             </select>
                         </Field>
                         <Field label="FILES (comma-separated)">
-                            <TextInput value={filesStr} onSet={lambda v: str { filesStr = v; }} placeholder="01-sft-dpo" mono={True} />
+                            <TextInput value={filesStr} onSet={lambda (v: str) { filesStr = v; }} placeholder="01-sft-dpo" mono={True} />
                         </Field>
                         <div className="flex gap-2">
                             <button onClick={saveWorkspace} disabled={busy} className="rounded-md border border-neutral-600 px-3 py-1 text-xs text-neutral-200 hover:bg-[#161616]">SAVE</button>
@@ -361,7 +361,7 @@ def:pub WorkspaceSettings(
                     sc = secComponent(sid, str(sd["component"]));
                     <div key={sid} className="rounded-md border border-neutral-800 bg-[#0a0a0a] p-2 space-y-2">
                         <div className="font-mono text-[10px] text-neutral-500">{sid}</div>
-                        <TextInput value={sl} onSet={lambda v: str { setSecLabel(sid, v); }} placeholder="LABEL" mono={False} />
+                        <TextInput value={sl} onSet={lambda (v: str) { setSecLabel(sid, v); }} placeholder="LABEL" mono={False} />
                         <select
                             value={sc}
                             onChange={lambda (e: ChangeEvent) { setSecComponent(sid, e.target.value); }}
@@ -391,8 +391,8 @@ def:pub WorkspaceSettings(
 
                 <Field label="ADD SECTION">
                     <div className="space-y-2">
-                        <TextInput value={newSecSid} onSet={lambda v: str { newSecSid = v; }} placeholder="section id" mono={True} />
-                        <TextInput value={newSecLabel} onSet={lambda v: str { newSecLabel = v; }} placeholder="LABEL (optional)" mono={False} />
+                        <TextInput value={newSecSid} onSet={lambda (v: str) { newSecSid = v; }} placeholder="section id" mono={True} />
+                        <TextInput value={newSecLabel} onSet={lambda (v: str) { newSecLabel = v; }} placeholder="LABEL (optional)" mono={False} />
                         <select
                             value={newSecComponent}
                             onChange={lambda (e: ChangeEvent) { newSecComponent = e.target.value; }}

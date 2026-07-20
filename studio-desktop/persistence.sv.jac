@@ -128,7 +128,7 @@ def list_chats(workspace: str = "01") -> list[ChatView] {
             out.append(c.to_view());
         }
     }
-    out.sort(key=lambda v: ChatView -> str { return v.updated_at; }, reverse=True);
+    out.sort(key=lambda (v: ChatView) -> str { return v.updated_at; }, reverse=True);
     return out;
 }
 

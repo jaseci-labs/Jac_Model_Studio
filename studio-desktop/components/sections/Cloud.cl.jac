@@ -406,7 +406,7 @@ def:pub Cloud(active: bool) -> JsxElement {
             <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-4 pt-5">
                 <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">API KEY</span>
                 <Field label="SPHERON API KEY">
-                    <TextInput value={apiKey} onSet={lambda v: str { apiKey = v; }} placeholder="paste key (never echoed back)" mono={True} />
+                    <TextInput value={apiKey} onSet={lambda (v: str) { apiKey = v; }} placeholder="paste key (never echoed back)" mono={True} />
                 </Field>
                 <div className="mt-3 flex gap-2">
                     <button onClick={lambda (e: MouseEvent) { doSaveKey(); }} disabled={busy} className={btn + "text-neutral-100"}>SAVE KEY</button>
@@ -435,10 +435,10 @@ def:pub Cloud(active: bool) -> JsxElement {
                 </div>
                 <div className="mt-3 flex flex-col gap-2">
                     <Field label="NAME">
-                        <TextInput value={newKeyName} onSet={lambda v: str { newKeyName = v; }} placeholder="studio-key" mono={True} />
+                        <TextInput value={newKeyName} onSet={lambda (v: str) { newKeyName = v; }} placeholder="studio-key" mono={True} />
                     </Field>
                     <Field label="PUBLIC KEY">
-                        <TextInput value={newKeyBody} onSet={lambda v: str { newKeyBody = v; }} placeholder="ssh-ed25519 AAAA... user@host" mono={True} />
+                        <TextInput value={newKeyBody} onSet={lambda (v: str) { newKeyBody = v; }} placeholder="ssh-ed25519 AAAA... user@host" mono={True} />
                     </Field>
                     <button onClick={lambda (e: MouseEvent) { doAddSshKey(); }} disabled={busy} className={btn + "text-neutral-100"}>ADD KEY</button>
                 </div>
@@ -501,8 +501,8 @@ def:pub Cloud(active: bool) -> JsxElement {
 
                     <Field label="OFFER SEARCH">
                         <div className="flex gap-2">
-                            <TextInput value={offerQuery} onSet={lambda v: str { offerQuery = v; }} placeholder="rtx-4090" mono={True} />
-                            <Segmented options={["DEDICATED", "SPOT", "CLUSTER"]} value={offerType} onSet={lambda v: str { offerType = v; }} />
+                            <TextInput value={offerQuery} onSet={lambda (v: str) { offerQuery = v; }} placeholder="rtx-4090" mono={True} />
+                            <Segmented options={["DEDICATED", "SPOT", "CLUSTER"]} value={offerType} onSet={lambda (v: str) { offerType = v; }} />
                             <button onClick={lambda (e: MouseEvent) { _runSearch(); }} disabled={busy} className={btn + "text-neutral-100"}>SEARCH</button>
                         </div>
                     </Field>
@@ -565,20 +565,20 @@ def:pub Cloud(active: bool) -> JsxElement {
                     </Field>}
 
                     {formMode == "sft" and <Field label="BASE MODEL (HF ID)">
-                        <TextInput value={formModelId} onSet={lambda v: str { formModelId = v; }} placeholder="org/model" mono={True} />
+                        <TextInput value={formModelId} onSet={lambda (v: str) { formModelId = v; }} placeholder="org/model" mono={True} />
                     </Field>}
 
                     <Field label="SHORT NAME">
-                        <TextInput value={formName} onSet={lambda v: str { formName = v; }} placeholder="qwen-cloud" mono={True} />
+                        <TextInput value={formName} onSet={lambda (v: str) { formName = v; }} placeholder="qwen-cloud" mono={True} />
                     </Field>
 
                     <Field label="MODE">
-                        <Segmented options={["sft", "dpo"]} value={formMode} onSet={lambda v: str { formMode = v; }} />
+                        <Segmented options={["sft", "dpo"]} value={formMode} onSet={lambda (v: str) { formMode = v; }} />
                     </Field>
 
                     {for key in optKeys {
                         <Field key={key} label={str(key)}>
-                            <TextInput value={str(opts[key]) if key in opts else ""} onSet={lambda v: str { updateOpt(str(key), v); }} placeholder={str(key)} mono={True} />
+                            <TextInput value={str(opts[key]) if key in opts else ""} onSet={lambda (v: str) { updateOpt(str(key), v); }} placeholder={str(key)} mono={True} />
                         </Field>
                     }}
 

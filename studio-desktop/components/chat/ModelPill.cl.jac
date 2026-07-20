@@ -35,11 +35,7 @@ def:pub ModelPill(
     has pickerOpen: bool = False,
         cmpOpen: bool = False;
 
-<<<<<<<< HEAD:jms/components/chat/ModelPill.cl.jac
-    return <div className="section-header flex items-center justify-between border-b border-border px-4 py-2.5">
-========
     return <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-2.5">
->>>>>>>> origin/main:studio-desktop/components/chat/ModelPill.cl.jac
         <div className="flex items-center gap-2">
             <div className="relative">
                 <button
