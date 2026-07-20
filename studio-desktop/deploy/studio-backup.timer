@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily Jac ML Studio graph backup
+
+[Timer]
+# 03:15 daily, with a randomized delay so a fleet doesn't all fire at once.
+OnCalendar=*-*-* 03:15:00
+RandomizedDelaySec=900
+Persistent=true
+
+[Install]
+WantedBy=timers.target
