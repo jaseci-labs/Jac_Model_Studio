@@ -1,0 +1,221 @@
+/* Geist + Geist Mono — the defining schematic typeface. The old Next app loaded
+   these via next/font/google; we have no Next here, so pull them from Google
+   Fonts directly. ponytail: @import over an npm font dep — one line, no build
+   config; swap to @fontsource if offline builds ever matter.
+   NOTE: this remote @import must stay FIRST. Vite/PostCSS inlines the local
+   package imports below (tailwindcss, tw-animate-css) into thousands of lines
+   of CSS but leaves remote url() imports in place — so if this isn't first,
+   the inlined CSS pushes it down and breaks "@import must precede all other
+   statements". */
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&display=swap');
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-heading: var(--font-sans);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* The one theme: terminal — dark monochrome surfaces, chart hues + per-workspace
+   accents as the only color, mono uppercase labels, dot-grid page. */
+:root {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  --card: #0d0d0d;
+  --card-foreground: #ededed;
+  --popover: #121212;
+  --popover-foreground: #ededed;
+  --primary: #ededed;
+  --primary-foreground: #0a0a0a;
+  --secondary: #1a1a1a;
+  --secondary-foreground: #ededed;
+  --muted: #161616;
+  --muted-foreground: #8a8a8a;
+  --accent: #1a1a1a;
+  --accent-foreground: #ededed;
+  --destructive: #e08a8a; /* failures read red now (user: "more colors") */
+  --success: #9ec98f;
+  --warning: #d8a657;
+  --border: #262626;
+  --input: #333333;
+  --ring: #525252;
+  --label: #6a6a6a;
+  --radius: 0.625rem;
+  --chart-1: #7aa2f7;
+  --chart-2: #d8a657;
+  --chart-3: #9ec98f;
+  --chart-4: #b89ce8;
+  --chart-5: #6fc3b2;
+  --chart-6: #e08a8a;
+  --tok-kw: #b89ce8;
+  --tok-type: #6fc3b2;
+  --tok-bi: #7aa2f7;
+  --tok-str: #9ec98f;
+  --tok-num: #d8a657;
+  --tok-com: #5a5a5a;
+  --ws01: #7aa2f7;
+  --ws02: #9ec98f;
+  --ws03: #d8a657;
+  --ws-accent: #7aa2f7;
+  --font-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-heading: var(--font-sans);
+}
+
+/* Light mode — same terminal design language (dot grid, mono labels, accent
+   bars), inverted palette with darker chart/accent hues for white-background
+   contrast. Toggled by data-theme="light" on <html> (☾/☀ in the top bar,
+   persisted as localStorage jacml.mode). */
+:root[data-theme="light"] {
+  --background: #fafafa;
+  --foreground: #1a1a1a;
+  --card: #ffffff;
+  --card-foreground: #1a1a1a;
+  --popover: #f2f2f0;
+  --popover-foreground: #1a1a1a;
+  --primary: #1a1a1a;
+  --primary-foreground: #fafafa;
+  --secondary: #ececea;
+  --secondary-foreground: #1a1a1a;
+  --muted: #ececea;
+  --muted-foreground: #6b6b6b;
+  --accent: #e4e4e2;
+  --accent-foreground: #1a1a1a;
+  --destructive: #c0392b;
+  --success: #3d7c3a;
+  --warning: #9c6f1f;
+  --border: #e0e0de;
+  --input: #cfcfcd;
+  --ring: #a0a0a0;
+  --label: #7a7a7a;
+  --chart-1: #3b6fd4;
+  --chart-2: #a16207;
+  --chart-3: #4d7c0f;
+  --chart-4: #7c5cd6;
+  --chart-5: #0f766e;
+  --chart-6: #b91c1c;
+  --tok-kw: #7c3aed;
+  --tok-type: #0f766e;
+  --tok-bi: #1d4ed8;
+  --tok-str: #15803d;
+  --tok-num: #a16207;
+  --tok-com: #9ca3af;
+  --ws01: #3b6fd4;
+  --ws02: #4d7c0f;
+  --ws03: #a16207;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+    /* legibility: +6% on every rem-based size (Tailwind text-xs/sm/…) */
+    font-size: 106.25%;
+  }
+}
+
+body {
+  background-color: var(--background);
+  background-image: radial-gradient(var(--muted) 1px, transparent 1px);
+  background-size: 18px 18px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Legibility: labels/captions were 9-10px with extreme tracking — the single
+   biggest "hard to read" factor. Bumped sizes + line-height, relaxed tracking;
+   section-header titles read as titles (foreground, larger). */
+.micro-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--label);
+  line-height: 1.5;
+}
+
+.section-header .micro-label:first-child {
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  color: var(--foreground);
+}
+
+.dashed-rule { border-top: 1px dashed var(--input); }
+
+.stat-line {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--label);
+  line-height: 1.55;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+  border: 2px solid var(--background);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--ring); }
+
+@keyframes mono-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.pulse { animation: mono-pulse 1.6s ease-in-out infinite; }
+
+.tok-kw { color: var(--tok-kw); font-weight: 600; }
+.tok-type { color: var(--tok-type); }
+.tok-bi { color: var(--tok-bi); }
+.tok-str { color: var(--tok-str); font-style: italic; }
+.tok-num { color: var(--tok-num); }
+.tok-com { color: var(--tok-com); }
+
+/* Per-workspace accent (nav tile dots + active-bars only; interiors stay
+   monochrome). --ws-accent is stamped by data-ws on the shell root. */
+[data-ws="01"] { --ws-accent: var(--ws01); }
+[data-ws="02"] { --ws-accent: var(--ws02); }
+[data-ws="03"] { --ws-accent: var(--ws03); }
