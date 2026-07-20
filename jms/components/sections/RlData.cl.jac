@@ -1,7 +1,7 @@
 """DATA section (workspace 02 RL/GRPO) — read-only RL training-data browser.
 
 Ports the RL half of the old blended Data section: the SFT gold / GRPO reward-task
-/ python→jac / synthetic / splits sources (02-rl-grpo/dataset/…, via
+/ python→jac / synthetic / splits sources (model-experiments/02-rl-grpo/dataset/…, via
 rl_dataset_files/rl_dataset_rows in data.sv.jac) rendered through the shared
 RowBrowser. No pipeline/add-examples here — those are 01-only.
 """
@@ -53,7 +53,7 @@ def:pub RlData -> JsxElement {
                 onOpen={pager["openFile"]} onToggle={pager["toggleRow"]}
                 onPrev={pager["prevPage"]} onNext={pager["nextPage"]}
             />
-            <div className="stat-line text-muted-foreground/70">source: 02-rl-grpo/dataset</div>
+            <div className="stat-line text-muted-foreground/70">source: model-experiments/02-rl-grpo/dataset</div>
         </div>
     </div>;
 }

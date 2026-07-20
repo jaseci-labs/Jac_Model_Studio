@@ -1,13 +1,13 @@
-"""studio - CPT corpus browser + training control (03-new attempt).
+"""studio - CPT corpus browser + training control (model-experiments/03-new attempt).
 
-Surfaces the continual-pretrain dataset built by 03-new/cpt_build/build_cpt.py:
+Surfaces the continual-pretrain dataset built by model-experiments/03-new/cpt_build/build_cpt.py:
 manifest stats (pivoted server-side into chart-ready lists) + per-source raw/packed
 row previews. Like rl.sv.jac, CPT data lives in THIS repo (jac_ml_studio), not the
 studio's data_root (which can point at the DataGeneration checkout), so paths resolve
 against the repo root from __file__ — NOT models.data_root().
 
 Training control mirrors train.sv.jac/runs.sv.jac (jobs.sv.jac for detached-process
-lifecycle, metrics.sv.jac for log parsing) but scoped to 03-new's own results/adapters
+lifecycle, metrics.sv.jac for log parsing) but scoped to model-experiments/03-new's own results/adapters
 dirs instead of models.results_dir() -- CPT is LoRA continual pretrain on raw text via
 mlx_lm.lora directly (no run_probe.sh wrapper: no quantize/base-eval/fuse stages, CPT
 has no task-based holdout to eval against yet, see workflow.md's CF-guard open item).
@@ -27,15 +27,15 @@ glob CPT_ROOT: str = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Preview-allowed CPT files: 5 raw per-source + 2 packed splits.
 glob CPT_FILES: list[list[str]] = [
-    ["03-new/dataset/cpt/docs/raw.jsonl", "docs · raw"],
-    ["03-new/dataset/cpt/code/raw.jsonl", "code · raw"],
-    ["03-new/dataset/cpt/blogs/raw.jsonl", "blogs · raw"],
-    ["03-new/dataset/cpt/osp_paper/raw.jsonl", "osp_paper · raw"],
-    ["03-new/dataset/cpt/rehearsal/raw.jsonl", "rehearsal · raw"],
-    ["03-new/dataset/cpt/packed/train.jsonl", "packed · train"],
-    ["03-new/dataset/cpt/packed/valid.jsonl", "packed · valid"]
+    ["model-experiments/03-new/dataset/cpt/docs/raw.jsonl", "docs · raw"],
+    ["model-experiments/03-new/dataset/cpt/code/raw.jsonl", "code · raw"],
+    ["model-experiments/03-new/dataset/cpt/blogs/raw.jsonl", "blogs · raw"],
+    ["model-experiments/03-new/dataset/cpt/osp_paper/raw.jsonl", "osp_paper · raw"],
+    ["model-experiments/03-new/dataset/cpt/rehearsal/raw.jsonl", "rehearsal · raw"],
+    ["model-experiments/03-new/dataset/cpt/packed/train.jsonl", "packed · train"],
+    ["model-experiments/03-new/dataset/cpt/packed/valid.jsonl", "packed · valid"]
 ];
-glob MANIFEST_REL: str = "03-new/dataset/cpt/manifest.json";
+glob MANIFEST_REL: str = "model-experiments/03-new/dataset/cpt/manifest.json";
 # Source order for the composition bar + stat tiles (largest first).
 glob SRC_ORDER: list[str] = ["docs", "code", "rehearsal", "blogs", "osp_paper"];
 # meta.type -> short kind label for the row browser.
@@ -204,7 +204,7 @@ def:pub cpt_rows(path: str, offset: int, limit: int) -> dict {
 # ---------------------------------------------------------- training control
 
 glob CPT_CONFIGS: dict = {
-    "cpt-v1": "03-new/cpt_train/config.yaml"
+    "cpt-v1": "model-experiments/03-new/cpt_train/config.yaml"
 };
 glob CPT_TOTAL_ITERS: dict = {
     "cpt-v1": 2586  # 3 epochs
@@ -213,15 +213,15 @@ glob CPT_TOTAL_ITERS: dict = {
 # CPT-v2's multi-leg epoch loop (Tasks 8-10): per-leg configs live in
 # CPT_LEG_CONFIG_DIR as config_v2_leg{N}.yaml, and CPT_LEG_CEILING caps how
 # many legs (epochs) a run name is allowed to advance through.
-glob CPT_LEG_CONFIG_DIR: str = "03-new/cpt_train";
+glob CPT_LEG_CONFIG_DIR: str = "model-experiments/03-new/cpt_train";
 glob CPT_LEG_CEILING: dict = {"cpt-v2": 12};
 
 def _cpt_results_dir(name: str) -> Path {
-    return Path(CPT_ROOT) / "03-new" / "results" / name;
+    return Path(CPT_ROOT) / "model-experiments/03-new" / "results" / name;
 }
 
 def _cpt_adapter_dir(name: str) -> Path {
-    return Path(CPT_ROOT) / "03-new" / "adapters" / name;
+    return Path(CPT_ROOT) / "model-experiments/03-new" / "adapters" / name;
 }
 
 def _cpt_job_file(name: str) -> Path {
@@ -267,7 +267,7 @@ def _cpt_resume_point(name: str) -> dict {
 
 """Like _cpt_resume_point but for the leg-based CPT-v2 flow: also resolves
 the matching optimizer-state file (run_cpt_leg.py writes both files with the
-same step prefix, see 03-new/docs/cpt-2/design.md section 4.2/Task 8)."""
+same step prefix, see model-experiments/03-new/docs/cpt-2/design.md section 4.2/Task 8)."""
 def _cpt_leg_resume_point(name: str) -> dict {
     base = _cpt_resume_point(name);
     if not base["ckpt"] {
@@ -288,7 +288,7 @@ corpus rebuilds; fixed-length runs use the CPT_TOTAL_ITERS table. 0 = corpus
 not built yet."""
 def _cpt_total_iters(name: str) -> int {
     if name in CPT_LEG_CEILING {
-        manifest_path = Path(CPT_ROOT) / "03-new" / "dataset" / name / "manifest.json";
+        manifest_path = Path(CPT_ROOT) / "model-experiments/03-new" / "dataset" / name / "manifest.json";
         try {
             m = json.loads(manifest_path.read_text());
             windows = int(str(m["packed"]["train"]));
@@ -332,7 +332,7 @@ def _cpt_build_status(name: str, message: str = "") -> dict {
 }
 
 """Start (or resume) a CPT LoRA run via mlx_lm.lora, detached. Resume-aware: if
-03-new/adapters/<name> already has checkpoints, only the REMAINING iters run,
+model-experiments/03-new/adapters/<name> already has checkpoints, only the REMAINING iters run,
 picking up from the latest via --resume-adapter-file (same convention as
 run_probe.sh). Returns the status dict."""
 def:pub start_cpt_training(name: str = "cpt-v1", config: str = "") -> dict {
@@ -430,7 +430,7 @@ def:pub start_cpt_leg(name: str = "cpt-v2", leg: int = 1) -> dict {
     resume = _cpt_leg_resume_point(name);
     done_steps = int(str(resume["done_steps"]));
 
-    manifest_path = Path(CPT_ROOT) / "03-new" / "dataset" / name / "manifest.json";
+    manifest_path = Path(CPT_ROOT) / "model-experiments/03-new" / "dataset" / name / "manifest.json";
     windows = 0;
     try {
         m = json.loads(manifest_path.read_text());
@@ -470,7 +470,7 @@ def:pub start_cpt_leg(name: str = "cpt-v2", leg: int = 1) -> dict {
     }
 
     inner = (
-        f"{venv_bin}/python3 03-new/cpt_train/run_cpt_leg.py "
+        f"{venv_bin}/python3 model-experiments/03-new/cpt_train/run_cpt_leg.py "
         f"--config {shlex.quote(config_file)} "
         f"--adapter-path {shlex.quote(str(adapter_dir))} "
         f"--iters {windows} --done-steps {done_steps}{resume_flags} "

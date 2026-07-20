@@ -71,8 +71,8 @@ def:pub CptResults(active: bool = False) -> JsxElement {
                 </div>
                 skip;
             }}
-            <Gallery prefix="03-new" />
-            <div className="stat-line text-muted-foreground/70">checkpoint verdicts + analysis live in PLAN and 03-new/docs · curves are the same train.log TRAIN reads</div>
+            <Gallery prefix="model-experiments/03-new" />
+            <div className="stat-line text-muted-foreground/70">checkpoint verdicts + analysis live in PLAN and model-experiments/03-new/docs · curves are the same train.log TRAIN reads</div>
         </div>
     </div>;
 }

@@ -7,7 +7,7 @@ import base64;
 import models;
 import from pathlib { Path }
 
-glob GALLERY_ROOTS: list[str] = ["01-sft-dpo/results", "02-rl-grpo", "03-new/results"];
+glob GALLERY_ROOTS: list[str] = ["model-experiments/01-sft-dpo/results", "model-experiments/02-rl-grpo", "model-experiments/03-new/results"];
 glob IMG_EXTS: list[str] = [".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"];
 glob MAX_IMAGES: int = 48;
 glob MAX_BYTES: int = 4_000_000;

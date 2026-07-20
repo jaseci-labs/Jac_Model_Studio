@@ -1,7 +1,7 @@
 """RESULTS section (workspace 02 RL/GRPO) — LIVE SFT/GRPO ladder + corrected
 results + weekend archive.
 
-The live block fetches get_rl_ladder() (rl.sv.jac, reads 02-rl-grpo/results/
+The live block fetches get_rl_ladder() (rl.sv.jac, reads model-experiments/02-rl-grpo/results/
 rl_ladder.jsonl as the ladder runs) and renders the holdout pass@1 curve over
 rungs + the per-cell table; get_rl_corrected() drives the corrected charts. The
 archive below is the static weekend GRPO/STaR result, kept for context. The
@@ -306,7 +306,7 @@ def:pub Results -> JsxElement {
                     <div className="stat-line mt-2 text-muted-foreground/70">gen=holdout (generalization), mem=train recall. Read pass@k, not bare pass@1 — n is small.</div>
                 </Panel>
             </div>) if has_live else (<Panel key="live-empty" label="LADDER" className="p-4 pt-5">
-                <p className="text-sm text-muted-foreground">No ladder results yet. Run <span className="font-mono text-foreground">JAC_LADDER_GO=1 jac run 02-rl-grpo/rl/run_ladder.jac</span> — cells stream into this graph as evals land.</p>
+                <p className="text-sm text-muted-foreground">No ladder results yet. Run <span className="font-mono text-foreground">JAC_LADDER_GO=1 jac run model-experiments/02-rl-grpo/rl/run_ladder.jac</span> — cells stream into this graph as evals land.</p>
             </Panel>)}
 
             {(<Panel key="sg" label="STEP 7 · SG-IDIOM HOLDOUT (sg walkers held out file-disjoint)">
@@ -401,7 +401,7 @@ def:pub Results -> JsxElement {
                     }}
                 </div>
             </Panel>
-            <Gallery prefix="02-rl-grpo" />
+            <Gallery prefix="model-experiments/02-rl-grpo" />
         </div>
     </div>;
 }

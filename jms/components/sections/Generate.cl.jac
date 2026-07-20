@@ -1,7 +1,7 @@
 """GENERATE section (workspace 02 RL/GRPO) — deployable best-of-k Jac codegen.
 
 Samples k completions from the SFT model and returns the first that compiles+runs
-(rl_generate → 02-rl-grpo/rl/generate.py). The jac compiler is the verifier; on the
+(rl_generate → model-experiments/02-rl-grpo/rl/generate.py). The jac compiler is the verifier; on the
 holdout this reaches ~78% vs ~55% greedy. Loads a 30B model per call (~1–2 min).
 """
 

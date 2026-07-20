@@ -10,7 +10,7 @@ to one cell per (model, rung, cond) and emit, per run: a flat cell list (the tab
 a rung-indexed curve (one line per model·cond, gen pass@1), and the line keys.
 
 # ponytail: reads external JSON (json.loads -> Any), so strict `jac check` can't
-# type the dict pivot — same as 02-rl-grpo/rl/eval_rl.jac / 02-rl-grpo/rl/show_ladder.jac. Bar is
+# type the dict pivot — same as model-experiments/02-rl-grpo/rl/eval_rl.jac / model-experiments/02-rl-grpo/rl/show_ladder.jac. Bar is
 # `jac check -p` (parse) + it runs; verified against the real rl_ladder.jsonl.
 """
 
@@ -95,9 +95,9 @@ def _pivot(p: str) -> dict {
 }
 
 def:pub get_rl_ladder() -> dict {
-    primary = _pivot(os.environ.get("JAC_RL_RESULTS", os.path.join(RL_REPO, "02-rl-grpo", "results", "rl_ladder.jsonl")));
-    sg = _pivot(os.path.join(RL_REPO, "02-rl-grpo", "results", "rl_ladder_sg.jsonl"));
-    v84 = _pivot(os.path.join(RL_REPO, "02-rl-grpo", "results", "rl_ladder_v84.jsonl"));
+    primary = _pivot(os.environ.get("JAC_RL_RESULTS", os.path.join(RL_REPO, "model-experiments/02-rl-grpo", "results", "rl_ladder.jsonl")));
+    sg = _pivot(os.path.join(RL_REPO, "model-experiments/02-rl-grpo", "results", "rl_ladder_sg.jsonl"));
+    v84 = _pivot(os.path.join(RL_REPO, "model-experiments/02-rl-grpo", "results", "rl_ladder_v84.jsonl"));
     return {
         "cells": primary["cells"], "curve": primary["curve"], "curve_keys": primary["curve_keys"],
         "families": primary["families"], "count": primary["count"],
@@ -106,8 +106,8 @@ def:pub get_rl_ladder() -> dict {
 }
 
 def:pub get_rl_corrected() -> dict {
-    # The corrected results (fixed eval+reward) — assembled by 02-rl-grpo/rl/make_summary.py.
-    p = os.path.join(RL_REPO, "02-rl-grpo", "resultspub", "rl", "corrected_summary.json");
+    # The corrected results (fixed eval+reward) — assembled by model-experiments/02-rl-grpo/rl/make_summary.py.
+    p = os.path.join(RL_REPO, "model-experiments/02-rl-grpo", "resultspub", "rl", "corrected_summary.json");
     # Fallback/error shapes must carry every key the client dereferences
     # (Results.cl.jac lists journey/kscale unguarded).
     empty: dict = {"ladder": [], "holdouts": [], "journey": [], "kscale": [], "headline": {}, "note": ""};
@@ -124,7 +124,7 @@ def:pub get_rl_corrected() -> dict {
 
 def:pub rl_generate(prompt: str, k: int = 8) -> dict {
     # Best-of-k Jac generation: sample k from the SFT model, return the first the jac
-    # compiler accepts (02-rl-grpo/rl/generate.py). Loads a 30B model per call (~1-2 min) — this
+    # compiler accepts (model-experiments/02-rl-grpo/rl/generate.py). Loads a 30B model per call (~1-2 min) — this
     # is the deployable artifact from RL_FINDINGS.md (~78% vs 55% greedy).
     if not os.path.exists(GEN_MODEL) {
         return {"ok": False, "verified": False, "jac": "", "note": "SFT model missing: " + GEN_MODEL};
@@ -138,7 +138,7 @@ def:pub rl_generate(prompt: str, k: int = 8) -> dict {
     env["K"] = str(k);
     try {
         p = subprocess.run(
-            [GEN_PY, os.path.join(RL_REPO, "02-rl-grpo", "rl", "generate.py"), "--prompt", prompt],
+            [GEN_PY, os.path.join(RL_REPO, "model-experiments/02-rl-grpo", "rl", "generate.py"), "--prompt", prompt],
             capture_output=True, text=True, timeout=900, cwd=RL_REPO, env=env
         );
         raw = str(p.stdout);

@@ -1,6 +1,6 @@
 """DATA section (workspace 03 CPT) — continual-pretrain corpus browser.
 
-Reads the CPT dataset built by 03-new/cpt_build/build_cpt.py via cpt.sv.jac:
+Reads the CPT dataset built by model-experiments/03-new/cpt_build/build_cpt.py via cpt.sv.jac:
 manifest stat tiles + a token-composition bar (plain divs, grayscale ramp — one
 stacked bar doesn't need recharts) + the code-gate table + a RowBrowser over the
 5 raw per-source files and the 2 packed splits.
@@ -160,7 +160,7 @@ def:pub CptData -> JsxElement {
                 onOpen={pager["openFile"]} onToggle={pager["toggleRow"]}
                 onPrev={pager["prevPage"]} onNext={pager["nextPage"]}
             />
-            <div className="stat-line text-muted-foreground/70">source: 03-new/dataset/cpt</div>
+            <div className="stat-line text-muted-foreground/70">source: model-experiments/03-new/dataset/cpt</div>
         </div>
     </div>;
 }

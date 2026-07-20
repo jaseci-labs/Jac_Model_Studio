@@ -127,7 +127,7 @@ def _start(run: EvalRun, limit: int, sim_threshold: float) -> int {
         script = "idiom_eval.jac";
     }
 
-    inner = f"{shlex.quote(str(models.jac_bin()))} run 01-sft-dpo/sft_dpo/jacgen/{script}";
+    inner = f"{shlex.quote(str(models.jac_bin()))} run model-experiments/01-sft-dpo/sft_dpo/jacgen/{script}";
     job = jobs.launch(ed / "job.json", run_log, inner, env, models.data_root(), {"eid": run.eid});
     return int(str(job.get("pid") or 0));
 }

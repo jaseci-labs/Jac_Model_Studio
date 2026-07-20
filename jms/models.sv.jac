@@ -18,8 +18,8 @@ glob MODELS: list[dict] = [
 
 # Eval holdout sets (rel to data root) + run dirs that are NOT training runs.
 glob HOLDOUTS: dict = {
-    "function": "01-sft-dpo/dataset/eval_holdout/conversion.jsonl",
-    "graph": "01-sft-dpo/dataset/eval_holdout/graph_conversion.jsonl"
+    "function": "model-experiments/01-sft-dpo/dataset/eval_holdout/conversion.jsonl",
+    "graph": "model-experiments/01-sft-dpo/dataset/eval_holdout/graph_conversion.jsonl"
 };
 glob EXCLUDED_RUN_DIRS: list[str] = ["comparison", "_builder", "_evals"];
 
@@ -55,8 +55,8 @@ def model_available(m: dict) -> bool {
 
 def results_dir() -> Path {
     # run_probe.sh / run_dpo.sh cd to the repo root and write under
-    # 01-sft-dpo/results/, so the studio must read the same tree.
-    return data_root() / "01-sft-dpo" / "results";
+    # model-experiments/01-sft-dpo/results/, so the studio must read the same tree.
+    return data_root() / "model-experiments/01-sft-dpo" / "results";
 }
 
 def jac_bin() -> Path {

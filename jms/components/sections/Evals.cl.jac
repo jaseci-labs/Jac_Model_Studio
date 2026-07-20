@@ -223,7 +223,7 @@ def:pub Evals(active: bool = False) -> JsxElement {
                     </div>
                 </Field>
                 <Field label="ADAPTER (optional)">
-                    <TextInput value={adapter} onSet={lambda v: str { adapter = v; }} placeholder="e.g. 01-sft-dpo/adapters/qwen-probe" mono={True} />
+                    <TextInput value={adapter} onSet={lambda v: str { adapter = v; }} placeholder="e.g. model-experiments/01-sft-dpo/adapters/qwen-probe" mono={True} />
                 </Field>
                 <Field label="HOLDOUT">
                     <Segmented options={["function", "graph"]} value={holdout} onSet={lambda v: str { holdout = v; }} />
@@ -458,7 +458,7 @@ def:pub Evals(active: bool = False) -> JsxElement {
                 {_history()}
                 {_compare()}
             </div>
-            <Gallery prefix="01-sft-dpo" />
+            <Gallery prefix="model-experiments/01-sft-dpo" />
         </div>
     </div>;
 }

@@ -10,9 +10,9 @@ glob TITLES: dict = {
     "03": "PLAN · CPT → SFT/DPO → GRPO"
 };
 glob SOURCES: dict = {
-    "01": "01-sft-dpo/ results + bake-off docs",
-    "02": "02-rl-grpo/ RL_FINDINGS.md + ladder design",
-    "03": "03-new/docs/cpt-1/workflow.md"
+    "01": "model-experiments/01-sft-dpo/ results + bake-off docs",
+    "02": "model-experiments/02-rl-grpo/ RL_FINDINGS.md + ladder design",
+    "03": "model-experiments/03-new/docs/cpt-1/workflow.md"
 };
 
 glob WS_PHASES: dict = {
