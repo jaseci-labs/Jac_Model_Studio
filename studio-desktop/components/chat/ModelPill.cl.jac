@@ -43,7 +43,7 @@ def:pub ModelPill(
         <div className="flex items-center gap-2">
             <div className="relative">
                 <button
-                    onClick={lambda e: MouseEvent { pickerOpen = not pickerOpen; cmpOpen = False; }}
+                    onClick={lambda (e: MouseEvent) { pickerOpen = not pickerOpen; cmpOpen = False; }}
                     className="rounded-full border border-neutral-700 bg-[#161616] px-4 py-1 text-xs text-neutral-200 hover:border-neutral-500"
                 >
                     {if loadingId {
@@ -56,13 +56,13 @@ def:pub ModelPill(
                     }}
                 </button>
                 {if pickerOpen {
-                    <div className="fixed inset-0 z-10" onClick={lambda e: MouseEvent { pickerOpen = False; }} />
+                    <div className="fixed inset-0 z-10" onClick={lambda (e: MouseEvent) { pickerOpen = False; }} />
                     <div className="absolute left-0 top-full z-20 mt-1 w-56 rounded-md border border-neutral-800 bg-[#121212] p-1">
                         {for m in models {
                             <button
                                 key={str(m.id)}
                                 disabled={not m.available}
-                                onClick={lambda e: MouseEvent { onPick(str(m.id)); pickerOpen = False; }}
+                                onClick={lambda (e: MouseEvent) { onPick(str(m.id)); pickerOpen = False; }}
                                 className="flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-xs text-neutral-300 hover:bg-[#1a1a1a] disabled:opacity-40"
                             >
                                 <span>{str(m.label)}</span>
@@ -80,20 +80,20 @@ def:pub ModelPill(
         </div>
         <div className="relative">
             <button
-                onClick={lambda e: MouseEvent { cmpOpen = not cmpOpen; pickerOpen = False; }}
+                onClick={lambda (e: MouseEvent) { cmpOpen = not cmpOpen; pickerOpen = False; }}
                 className="micro-label hover:text-neutral-300"
             >{"⇄ COMPARE" + (" ·ON" if compareId else "")}</button>
             {if cmpOpen {
-                <div className="fixed inset-0 z-10" onClick={lambda e: MouseEvent { cmpOpen = False; }} />
+                <div className="fixed inset-0 z-10" onClick={lambda (e: MouseEvent) { cmpOpen = False; }} />
                 <div className="absolute right-0 top-full z-20 mt-1 w-56 rounded-md border border-neutral-800 bg-[#121212] p-1">
                     <button
-                        onClick={lambda e: MouseEvent { onPickCompare(""); cmpOpen = False; }}
+                        onClick={lambda (e: MouseEvent) { onPickCompare(""); cmpOpen = False; }}
                         className="w-full rounded px-2 py-1.5 text-left text-xs text-neutral-400 hover:bg-[#1a1a1a]"
                     >off</button>
                     {for m in _cmp_opts(models, modelId) {
                         <button
                             key={str(m.id)}
-                            onClick={lambda e: MouseEvent { onPickCompare(str(m.id)); cmpOpen = False; }}
+                            onClick={lambda (e: MouseEvent) { onPickCompare(str(m.id)); cmpOpen = False; }}
                             className="w-full rounded px-2 py-1.5 text-left text-xs text-neutral-300 hover:bg-[#1a1a1a]"
                         >{str(m.label)}</button>
                     }}

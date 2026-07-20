@@ -139,8 +139,8 @@ def:pub CptTrain(active: bool) -> JsxElement {
                 {status is not None and status["message"] and <p className="stat-line mt-2 text-neutral-500">{str(status["message"])}</p>}
                 {status is not None and str(status["started"]) and <p className="stat-line mt-1 text-neutral-600">STARTED {str(status["started"])}{(" · PID " + str(status["pid"])) if int(str(status["pid"])) > 0 else ""}</p>}
                 <div className="mt-3 flex gap-2">
-                    <button onClick={lambda e: MouseEvent { doStart(); }} disabled={isRunning} className={btn + "text-neutral-100"}>▶ START / RESUME</button>
-                    <button onClick={lambda e: MouseEvent { doStop(); }} disabled={not isRunning} className={btn + "text-neutral-400"}>■ STOP</button>
+                    <button onClick={lambda (e: MouseEvent) { doStart(); }} disabled={isRunning} className={btn + "text-neutral-100"}>▶ START / RESUME</button>
+                    <button onClick={lambda (e: MouseEvent) { doStop(); }} disabled={not isRunning} className={btn + "text-neutral-400"}>■ STOP</button>
                 </div>
                 {error and <p className="stat-line mt-1 text-neutral-400">{error}</p>}
                 <p className="stat-line mt-2 text-neutral-600">3 epochs over 862 windows (2586 iters) · resumes from the last checkpoint if stopped and restarted</p>

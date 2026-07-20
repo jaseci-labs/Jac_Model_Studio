@@ -82,7 +82,7 @@ def:pub NavRail(
                 accent = str(wd["accent"]);
                 <button
                     key={wid}
-                    onClick={lambda e: MouseEvent { onWorkspace(wid); }}
+                    onClick={lambda (e: MouseEvent) { onWorkspace(wid); }}
                     className={"relative flex h-9 items-center gap-2.5 rounded-md px-3 transition-colors " + (
                         "bg-[#161616] text-neutral-100" if wid == workspace
                         else "text-neutral-500 hover:bg-[#121212] hover:text-neutral-300"
@@ -101,7 +101,7 @@ def:pub NavRail(
                 sid = str(sd["id"]);
                 <button
                     key={sid}
-                    onClick={lambda e: MouseEvent { onSection(sid); }}
+                    onClick={lambda (e: MouseEvent) { onSection(sid); }}
                     className={"relative flex h-9 items-center gap-3 rounded-md px-3 transition-colors " + (
                         "bg-[#161616] text-neutral-100" if sid == section
                         else "text-neutral-600 hover:bg-[#121212] hover:text-neutral-300"
@@ -115,7 +115,7 @@ def:pub NavRail(
         </div>
         <div className="flex-1" />
         <button
-            onClick={lambda e: MouseEvent { onSettings(); }}
+            onClick={lambda (e: MouseEvent) { onSettings(); }}
             className="mb-2 rounded-md px-2 py-1.5 text-left font-mono text-[10px] tracking-wider text-neutral-600 hover:bg-[#121212] hover:text-neutral-300"
         >⚙ WORKSPACES</button>
         <span className="micro-label px-2">v3</span>

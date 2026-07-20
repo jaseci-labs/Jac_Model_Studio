@@ -40,6 +40,11 @@ env var at `.jac/desktop_deps/` (appended to `sys.path` at boot). That dir is
 Versions are pinned to what `jac-scale` requires; don't let pip float them or
 the boot crashes on incompatible majors.
 
+Dev-mode (`./start.sh`) also needs `watchdog` importable by the `jac` CLI
+(HMR file watcher). It is listed under `[dependencies]` in `jac.toml`; `start.sh`
+force-installs it into `.jac/venv` if missing (plain `pip install` can no-op when
+watchdog is only present in the ephemeral `~/.cache/jac/rt/<hash>/site`).
+
 ## Layout
 
 Everything lives in this directory (`studio-desktop/`):

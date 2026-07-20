@@ -18,7 +18,7 @@ def _slider(
         <input
             type="range"
             min={str(lo)} max={str(hi)} step={str(step)} value={str(val)}
-            onChange={lambda e: ChangeEvent { onSet(float(e.target.value)); }}
+            onChange={lambda (e: ChangeEvent) { onSet(float(e.target.value)); }}
             className="w-full accent-neutral-400"
         />
     </div>;
@@ -34,20 +34,20 @@ def:pub Rail(
 
     if collapsed {
         return <button
-            onClick={lambda e: MouseEvent { onToggle(); }}
+            onClick={lambda (e: MouseEvent) { onToggle(); }}
             className="flex w-8 shrink-0 items-center justify-center border-l border-neutral-800 bg-[#0d0d0d] text-neutral-500 hover:text-neutral-200"
         >⟨</button>;
     }
     return <div className="flex w-60 shrink-0 flex-col overflow-y-auto border-l border-neutral-800 bg-[#0d0d0d]">
         <div className="flex items-center justify-between border-b border-neutral-800 px-3 py-2.5">
             <span className="micro-label">PROMPT LIBRARY</span>
-            <button onClick={lambda e: MouseEvent { onToggle(); }} className="micro-label text-neutral-600 hover:text-neutral-300">⟩</button>
+            <button onClick={lambda (e: MouseEvent) { onToggle(); }} className="micro-label text-neutral-600 hover:text-neutral-300">⟩</button>
         </div>
         <div className="p-2">
             {for cat in prompts {
                 <div key={str(cat["id"])} className="mb-1">
                     <button
-                        onClick={lambda e: MouseEvent { openCat = "" if openCat == str(cat["id"]) else str(cat["id"]); }}
+                        onClick={lambda (e: MouseEvent) { openCat = "" if openCat == str(cat["id"]) else str(cat["id"]); }}
                         className="flex w-full items-center justify-between rounded px-2 py-1 text-left font-mono text-[11px] text-neutral-300 hover:bg-[#161616]"
                     >
                         <span>{("▾ " if openCat == str(cat["id"]) else "▸ ") + str(cat["label"])}</span>
@@ -58,7 +58,7 @@ def:pub Rail(
                             {for (pi, pr) in enumerate(list(cat["prompts"])) {
                                 <button
                                     key={str(pi)}
-                                    onClick={lambda e: MouseEvent { onPick(str(pr)); }}
+                                    onClick={lambda (e: MouseEvent) { onPick(str(pr)); }}
                                     className="truncate rounded px-2 py-1 text-left stat-line hover:bg-[#161616] hover:text-neutral-300"
                                     title={str(pr)}
                                 >{_trunc(str(pr))}</button>

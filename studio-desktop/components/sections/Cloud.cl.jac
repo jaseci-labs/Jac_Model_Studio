@@ -409,8 +409,8 @@ def:pub Cloud(active: bool) -> JsxElement {
                     <TextInput value={apiKey} onSet={lambda v: str { apiKey = v; }} placeholder="paste key (never echoed back)" mono={True} />
                 </Field>
                 <div className="mt-3 flex gap-2">
-                    <button onClick={lambda e: MouseEvent { doSaveKey(); }} disabled={busy} className={btn + "text-neutral-100"}>SAVE KEY</button>
-                    <button onClick={lambda e: MouseEvent { doClearKey(); }} disabled={busy} className={btn + "text-neutral-400"}>CLEAR USER KEY</button>
+                    <button onClick={lambda (e: MouseEvent) { doSaveKey(); }} disabled={busy} className={btn + "text-neutral-100"}>SAVE KEY</button>
+                    <button onClick={lambda (e: MouseEvent) { doClearKey(); }} disabled={busy} className={btn + "text-neutral-400"}>CLEAR USER KEY</button>
                 </div>
             </div>
 
@@ -423,7 +423,7 @@ def:pub Cloud(active: bool) -> JsxElement {
                         kid = str(k["id"]);
                         <button
                             key={kid}
-                            onClick={lambda e: MouseEvent { pickSshKey(kid); }}
+                            onClick={lambda (e: MouseEvent) { pickSshKey(kid); }}
                             className={"rounded-md border px-3 py-1 text-left font-mono text-xs transition-colors " + (
                                 "border-neutral-500 bg-[#1a1a1a] text-neutral-100" if selSshKeyId == kid
                                 else "border-neutral-800 text-neutral-400 hover:border-neutral-600"
@@ -440,7 +440,7 @@ def:pub Cloud(active: bool) -> JsxElement {
                     <Field label="PUBLIC KEY">
                         <TextInput value={newKeyBody} onSet={lambda v: str { newKeyBody = v; }} placeholder="ssh-ed25519 AAAA... user@host" mono={True} />
                     </Field>
-                    <button onClick={lambda e: MouseEvent { doAddSshKey(); }} disabled={busy} className={btn + "text-neutral-100"}>ADD KEY</button>
+                    <button onClick={lambda (e: MouseEvent) { doAddSshKey(); }} disabled={busy} className={btn + "text-neutral-100"}>ADD KEY</button>
                 </div>
             </div>
             {error and <p className="stat-line text-neutral-400">{error}</p>}
@@ -459,7 +459,7 @@ def:pub Cloud(active: bool) -> JsxElement {
                         did = str(inst["id"]);
                         <button
                             key={did}
-                            onClick={lambda e: MouseEvent { pickInstance(did); }}
+                            onClick={lambda (e: MouseEvent) { pickInstance(did); }}
                             className={"rounded-md border px-3 py-2 text-left font-mono text-xs transition-colors " + (
                                 "border-neutral-500 bg-[#1a1a1a] text-neutral-100" if selInstance == did
                                 else "border-neutral-800 text-neutral-400 hover:border-neutral-600"
@@ -481,7 +481,7 @@ def:pub Cloud(active: bool) -> JsxElement {
                     {str(instDetail["ssh_addr"]) and <span className="font-mono text-[11px] text-neutral-500 break-all">ssh · {str(instDetail["ssh_addr"])}</span>}
                     {termBlocked and canTerm is not None and <span className="font-mono text-[11px] text-neutral-500">min runtime · {str(canTerm["time_remaining"])}s remaining</span>}
                     <div className="mt-2 flex flex-wrap gap-2">
-                        <button onClick={lambda e: MouseEvent { doDestroy(); }} disabled={busy or termBlocked} className={btn + "text-neutral-400"}>✕ TERMINATE</button>
+                        <button onClick={lambda (e: MouseEvent) { doDestroy(); }} disabled={busy or termBlocked} className={btn + "text-neutral-400"}>✕ TERMINATE</button>
                     </div>
                 </>}
             </div>
@@ -503,7 +503,7 @@ def:pub Cloud(active: bool) -> JsxElement {
                         <div className="flex gap-2">
                             <TextInput value={offerQuery} onSet={lambda v: str { offerQuery = v; }} placeholder="rtx-4090" mono={True} />
                             <Segmented options={["DEDICATED", "SPOT", "CLUSTER"]} value={offerType} onSet={lambda v: str { offerType = v; }} />
-                            <button onClick={lambda e: MouseEvent { _runSearch(); }} disabled={busy} className={btn + "text-neutral-100"}>SEARCH</button>
+                            <button onClick={lambda (e: MouseEvent) { _runSearch(); }} disabled={busy} className={btn + "text-neutral-100"}>SEARCH</button>
                         </div>
                     </Field>
 
@@ -513,7 +513,7 @@ def:pub Cloud(active: bool) -> JsxElement {
                                 oid = str(o["id"]);
                                 <button
                                     key={oid}
-                                    onClick={lambda e: MouseEvent { pickOffer(oid); }}
+                                    onClick={lambda (e: MouseEvent) { pickOffer(oid); }}
                                     className={"rounded-md border px-3 py-1 font-mono text-xs transition-colors " + (
                                         "border-neutral-500 bg-[#1a1a1a] text-neutral-100" if selOfferId == oid
                                         else "border-neutral-700 text-neutral-500 hover:text-neutral-300"
@@ -534,7 +534,7 @@ def:pub Cloud(active: bool) -> JsxElement {
                                 kid = str(k["id"]);
                                 <button
                                     key={kid}
-                                    onClick={lambda e: MouseEvent { pickSshKey(kid); }}
+                                    onClick={lambda (e: MouseEvent) { pickSshKey(kid); }}
                                     className={"rounded-md border px-3 py-1 font-mono text-xs transition-colors " + (
                                         "border-neutral-500 bg-[#1a1a1a] text-neutral-100" if selSshKeyId == kid
                                         else "border-neutral-700 text-neutral-500 hover:text-neutral-300"
@@ -552,7 +552,7 @@ def:pub Cloud(active: bool) -> JsxElement {
                                 bid = str(b["id"]);
                                 <button
                                     key={bid}
-                                    onClick={lambda e: MouseEvent { formBackend = bid; }}
+                                    onClick={lambda (e: MouseEvent) { formBackend = bid; }}
                                     className={"rounded-md border px-3 py-1 text-xs transition-colors " + (
                                         "border-neutral-500 bg-[#1a1a1a] text-neutral-100" if formBackend == bid
                                         else "border-neutral-700 text-neutral-500 hover:text-neutral-300"
@@ -586,8 +586,8 @@ def:pub Cloud(active: bool) -> JsxElement {
                     <p className="stat-line text-neutral-500">renders via backends.render → cloudInit.runcmd on a fresh instance</p>
 
                     <div className="flex gap-2">
-                        <button onClick={lambda e: MouseEvent { doDispatch(); }} disabled={busy or selOfferId == "" or selSshKeyId == ""} className={btn + "text-neutral-100"}>▶ DISPATCH {formMode.upper()}</button>
-                        <button onClick={lambda e: MouseEvent { doStopDispatch(); }} disabled={busy or not isRunning} className={btn + "text-neutral-400"}>■ TERMINATE DEPLOYMENT</button>
+                        <button onClick={lambda (e: MouseEvent) { doDispatch(); }} disabled={busy or selOfferId == "" or selSshKeyId == ""} className={btn + "text-neutral-100"}>▶ DISPATCH {formMode.upper()}</button>
+                        <button onClick={lambda (e: MouseEvent) { doStopDispatch(); }} disabled={busy or not isRunning} className={btn + "text-neutral-400"}>■ TERMINATE DEPLOYMENT</button>
                     </div>
                     {error and <p className="stat-line text-neutral-400">{error}</p>}
                 </div>
@@ -613,7 +613,7 @@ def:pub Cloud(active: bool) -> JsxElement {
                         did = str(d["id"]);
                         <button
                             key={did}
-                            onClick={lambda e: MouseEvent { pickDispatch(did); }}
+                            onClick={lambda (e: MouseEvent) { pickDispatch(did); }}
                             className={"rounded-md border px-3 py-1 font-mono text-[10px] transition-colors " + (
                                 "border-neutral-500 bg-[#1a1a1a] text-neutral-100" if selDispatch == did
                                 else "border-neutral-700 text-neutral-500 hover:text-neutral-300"

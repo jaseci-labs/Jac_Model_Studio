@@ -26,7 +26,7 @@ def:pub Composer(
             {for cat in categories {
                 <button
                     key={str(cat["id"])}
-                    onClick={lambda e: MouseEvent { onChip(str(cat["id"])); }}
+                    onClick={lambda (e: MouseEvent) { onChip(str(cat["id"])); }}
                     className="rounded-full border border-dashed border-neutral-600 px-2.5 py-0.5 font-mono text-[9px] text-neutral-400 hover:border-neutral-400 hover:text-neutral-200"
                 >{str(cat["id"])}</button>
             }}
@@ -34,8 +34,8 @@ def:pub Composer(
         <div className="flex items-end gap-2 rounded-xl border border-neutral-700 bg-[#121212] p-2 focus-within:border-neutral-500">
             <textarea
                 value={value}
-                onChange={lambda e: ChangeEvent { onSet(str(e.target.value)); }}
-                onKeyDown={lambda e: KeyboardEvent {
+                onChange={lambda (e: ChangeEvent) { onSet(str(e.target.value)); }}
+                onKeyDown={lambda (e: KeyboardEvent) {
                     if e.key == "Enter" and not e.shiftKey {
                         e.preventDefault();
                         onSend(value);
@@ -46,7 +46,7 @@ def:pub Composer(
                 className="max-h-48 flex-1 resize-none bg-transparent px-2 py-1 text-sm text-neutral-200 outline-none placeholder:text-neutral-600"
             />
             <button
-                onClick={lambda e: MouseEvent { if busy { onStop(); } else { onSend(value); } }}
+                onClick={lambda (e: MouseEvent) { if busy { onStop(); } else { onSend(value); } }}
                 disabled={(not busy) and not value.strip()}
                 className="rounded-lg border border-neutral-600 px-3 py-1 font-mono text-[10px] text-neutral-300 hover:border-neutral-400 disabled:opacity-30"
             >

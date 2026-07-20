@@ -32,12 +32,12 @@ def:pub Generate -> JsxElement {
                 <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">GENERATE JAC · best-of-k + compiler verifier (~78%)</span>
                 <textarea
                     className="w-full resize-y rounded-sm border border-neutral-800 bg-[#0a0a0a] p-2 font-mono text-xs text-neutral-200 outline-none focus:border-neutral-600"
-                    rows={4} value={genPrompt} onChange={lambda e: ChangeEvent { genPrompt = str(e.target.value); }}
+                    rows={4} value={genPrompt} onChange={lambda (e: ChangeEvent) { genPrompt = str(e.target.value); }}
                     placeholder="Describe the Jac function to generate…" />
                 <div className="mt-2 flex items-center gap-3">
                     <button
                         className="rounded-sm border border-neutral-700 bg-neutral-900 px-3 py-1 font-mono text-xs text-neutral-100 hover:border-neutral-500 disabled:opacity-40"
-                        disabled={genBusy} onClick={lambda e: MouseEvent { doGen(); }}>
+                        disabled={genBusy} onClick={lambda (e: MouseEvent) { doGen(); }}>
                         {"generating…" if genBusy else "▷ generate (sample 8, keep the one that compiles+runs)"}
                     </button>
                     {(<span className="stat-line text-neutral-500">{genNote}</span>) if genNote else <span></span>}

@@ -30,7 +30,10 @@ typescript = "^5.3.3"
 "@types/react" = "^18.2.0"
 "@types/react-dom" = "^18.2.0"
 
-[dev-dependencies]
+# Required for `jac start --client desktop --dev`: ensure_watchdog_common()
+# imports watchdog. Missing it used to hard-crash (upstream JacConsole.warning
+# style= bug); keep it as a regular dep so plain `jac install` always provides it.
+[dependencies]
 watchdog = ">=3.0.0"
 
 # Unit + integration tests live in `<mod>.test.jac` annexes next to each module

@@ -71,7 +71,7 @@ def:pub CodeBlock(lang: str, code: str) -> JsxElement {
             OUTPUT.{(lang.upper() if lang else "TXT")}
         </span>
         <button
-            onClick={lambda e: MouseEvent {
+            onClick={lambda (e: MouseEvent) {
                 _copy(code);
                 copied = True;
                 setTimeout(lambda -> None { copied = False; }, 1200);
@@ -111,7 +111,7 @@ def:pub Bubble(msg: dict, label: str, paired: bool, userText: str, onSave: any) 
         {msg["error"] and <div className="stat-line mt-1 border border-dashed border-neutral-600 p-2">ERROR: {str(msg["error"])}</div>}
         {msg["stats"] and <div className="stat-line mt-1.5">└─ {str(msg["stats"]["tps"])} tok/s · {str(msg["stats"]["tokens"])} tok · Δ{str(msg["stats"]["gen_s"])}s · load {str(msg["stats"]["load_s"])}s</div>}
         {(onSave is not None and not streaming and content and userText) and <button
-            onClick={lambda e: MouseEvent {
+            onClick={lambda (e: MouseEvent) {
                 onSave(userText, content);
                 saved = True;
                 setTimeout(lambda -> None { saved = False; }, 1400);

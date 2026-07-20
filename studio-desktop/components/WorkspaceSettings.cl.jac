@@ -277,13 +277,13 @@ def:pub WorkspaceSettings(
     return <div className="fixed inset-0 z-50 flex">
         <div
             className="flex-1 bg-black/60"
-            onClick={lambda e: MouseEvent { onClose(); }}
+            onClick={lambda (e: MouseEvent) { onClose(); }}
         />
         <aside className="flex h-full w-[28rem] shrink-0 flex-col border-l border-neutral-800 bg-[#0d0d0d]">
             <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-3">
                 <span className="micro-label">WORKSPACES</span>
                 <button
-                    onClick={lambda e: MouseEvent { onClose(); }}
+                    onClick={lambda (e: MouseEvent) { onClose(); }}
                     className="text-neutral-500 hover:text-neutral-200"
                 >✕</button>
             </div>
@@ -295,7 +295,7 @@ def:pub WorkspaceSettings(
                         wid = str(w["id"]);
                         <button
                             key={wid}
-                            onClick={lambda e: MouseEvent { selected = wid; }}
+                            onClick={lambda (e: MouseEvent) { selected = wid; }}
                             className={"flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left font-mono text-[10px] tracking-wider " + (
                                 "bg-[#161616] text-neutral-100" if wid == selected
                                 else "text-neutral-500 hover:bg-[#121212]"
@@ -331,7 +331,7 @@ def:pub WorkspaceSettings(
                         <Field label="DEFAULT MODEL">
                             <select
                                 value={defaultModel}
-                                onChange={lambda e: ChangeEvent { defaultModel = e.target.value; }}
+                                onChange={lambda (e: ChangeEvent) { defaultModel = e.target.value; }}
                                 className="w-full rounded-md border border-neutral-700 bg-[#121212] px-2 py-1 text-sm text-neutral-100"
                             >
                                 {for m in models {
@@ -364,7 +364,7 @@ def:pub WorkspaceSettings(
                         <TextInput value={sl} onSet={lambda v: str { setSecLabel(sid, v); }} placeholder="LABEL" mono={False} />
                         <select
                             value={sc}
-                            onChange={lambda e: ChangeEvent { setSecComponent(sid, e.target.value); }}
+                            onChange={lambda (e: ChangeEvent) { setSecComponent(sid, e.target.value); }}
                             className="w-full rounded-md border border-neutral-700 bg-[#121212] px-2 py-1 text-xs text-neutral-100"
                         >
                             {for st in secTypes {
@@ -395,7 +395,7 @@ def:pub WorkspaceSettings(
                         <TextInput value={newSecLabel} onSet={lambda v: str { newSecLabel = v; }} placeholder="LABEL (optional)" mono={False} />
                         <select
                             value={newSecComponent}
-                            onChange={lambda e: ChangeEvent { newSecComponent = e.target.value; }}
+                            onChange={lambda (e: ChangeEvent) { newSecComponent = e.target.value; }}
                             className="w-full rounded-md border border-neutral-700 bg-[#121212] px-2 py-1 text-sm text-neutral-100"
                         >
                             {for st in secTypes {

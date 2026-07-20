@@ -47,7 +47,7 @@ def:pub RowBrowser(
             {for f in files {
                 <button
                     key={str(f.path)}
-                    onClick={lambda e: MouseEvent { onOpen(str(f.path)); }}
+                    onClick={lambda (e: MouseEvent) { onOpen(str(f.path)); }}
                     className={"rounded border px-2 py-0.5 font-mono text-[10px] transition-colors " + (
                         "border-neutral-500 bg-[#1a1a1a] text-neutral-100" if str(f.path) == path
                         else "border-neutral-700 text-neutral-500 hover:text-neutral-300"
@@ -71,7 +71,7 @@ def:pub RowBrowser(
                 {for row in rows {
                     <div key={str(row["idx"])}>
                         <div
-                            onClick={lambda e: MouseEvent { onToggle(int(row["idx"])); }}
+                            onClick={lambda (e: MouseEvent) { onToggle(int(row["idx"])); }}
                             className="grid cursor-pointer grid-cols-[2rem_1fr_3rem_3rem_5rem_1fr] gap-2 rounded px-0.5 py-1 font-mono text-xs hover:bg-[#141414]"
                         >
                             <span className="text-neutral-600">{str(row["idx"])}</span>
@@ -86,9 +86,9 @@ def:pub RowBrowser(
                 }}
             </div>
             {(total > 0) and <div className="mt-3 flex items-center justify-center gap-3 stat-line">
-                <button disabled={not canPrev} onClick={lambda e: MouseEvent { onPrev(); }} className="disabled:opacity-30 hover:text-neutral-200 transition-colors">← PREV</button>
+                <button disabled={not canPrev} onClick={lambda (e: MouseEvent) { onPrev(); }} className="disabled:opacity-30 hover:text-neutral-200 transition-colors">← PREV</button>
                 <span>{str(offset + 1)} to {str(offset + len(rows))} of {str(total)}</span>
-                <button disabled={not canNext} onClick={lambda e: MouseEvent { onNext(); }} className="disabled:opacity-30 hover:text-neutral-200 transition-colors">NEXT →</button>
+                <button disabled={not canNext} onClick={lambda (e: MouseEvent) { onNext(); }} className="disabled:opacity-30 hover:text-neutral-200 transition-colors">NEXT →</button>
             </div>}
         </div>}
         {(not path) and <div className="stat-line py-6 text-center">select a file above</div>}

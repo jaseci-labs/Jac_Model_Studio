@@ -39,7 +39,7 @@ def:pub ThemeSwitcher(up: bool = True) -> JsxElement {
             {for t in THEMES {
                 <button
                     key={t}
-                    onClick={lambda e: MouseEvent { apply(t); }}
+                    onClick={lambda (e: MouseEvent) { apply(t); }}
                     className={"rounded-md border px-2 py-1 text-left font-mono text-[10px] tracking-[0.12em] uppercase transition-colors " + (
                         "border-ring bg-accent text-foreground" if t == theme
                         else "border-transparent text-muted-foreground hover:text-foreground/80"
@@ -50,7 +50,7 @@ def:pub ThemeSwitcher(up: bool = True) -> JsxElement {
             }}
         </div>}
         <button
-            onClick={lambda e: MouseEvent { open = not open; }}
+            onClick={lambda (e: MouseEvent) { open = not open; }}
             className="micro-label px-2 transition-colors hover:text-foreground/80"
         >
             THEME · {theme}

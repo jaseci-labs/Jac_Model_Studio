@@ -93,14 +93,14 @@ def:pub Login(onDone: Callable[([], None)]) -> JsxElement {
 
             <div className="mb-4 flex gap-1">
                 <button
-                    onClick={lambda e: MouseEvent { onMode("login"); }}
+                    onClick={lambda (e: MouseEvent) { onMode("login"); }}
                     className={"rounded-md border px-3 py-1 text-xs transition-colors " + (
                         "border-neutral-500 bg-[#1a1a1a] text-neutral-100" if mode == "login"
                         else "border-neutral-700 text-neutral-500 hover:text-neutral-300"
                     )}
                 >SIGN IN</button>
                 <button
-                    onClick={lambda e: MouseEvent { onMode("signup"); }}
+                    onClick={lambda (e: MouseEvent) { onMode("signup"); }}
                     className={"rounded-md border px-3 py-1 text-xs transition-colors " + (
                         "border-neutral-500 bg-[#1a1a1a] text-neutral-100" if mode == "signup"
                         else "border-neutral-700 text-neutral-500 hover:text-neutral-300"
@@ -113,7 +113,7 @@ def:pub Login(onDone: Callable[([], None)]) -> JsxElement {
                     <input
                         type="text"
                         value={email}
-                        onChange={lambda e: ChangeEvent { email = e.target.value; }}
+                        onChange={lambda (e: ChangeEvent) { email = e.target.value; }}
                         placeholder="you@example.com"
                         className={inputCls}
                     />
@@ -122,10 +122,10 @@ def:pub Login(onDone: Callable[([], None)]) -> JsxElement {
                     <input
                         type="password"
                         value={password}
-                        onChange={lambda e: ChangeEvent { password = e.target.value; }}
+                        onChange={lambda (e: ChangeEvent) { password = e.target.value; }}
                         placeholder="password"
                         className={inputCls}
-                        onKeyDown={lambda e: KeyboardEvent {
+                        onKeyDown={lambda (e: KeyboardEvent) {
                             if e.key == "Enter" { submit(); }
                         }}
                     />
@@ -135,7 +135,7 @@ def:pub Login(onDone: Callable[([], None)]) -> JsxElement {
             {error and <p className="mt-3 font-mono text-xs text-red-400">{error}</p>}
 
             <button
-                onClick={lambda e: MouseEvent { submit(); }}
+                onClick={lambda (e: MouseEvent) { submit(); }}
                 disabled={busy}
                 className={"mt-5 w-full rounded-md px-3 py-2 text-sm transition-colors " + (
                     "bg-neutral-700 text-neutral-300" if busy

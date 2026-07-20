@@ -65,4 +65,34 @@ while IFS= read -r -d '' _wv_sh; do
 done < <(find "$HOME/.cache/jac/rt" -path '*/desktop/native/webview/*.sh' -not -path '*/.tmp.*' -print0 2>/dev/null)
 unset _wv_sh
 
+# UPSTREAM BUG (jaclang 0.30.x): desktop --dev calls ensure_watchdog_common(),
+# which on ImportError does `console.warning(..., style="muted")`. JacConsole
+# .warning() only accepts (message, emoji=True) — the unexpected `style` kwarg
+# turns a soft "HMR won't refresh" warning into a hard crash, so the native
+# window never opens / never paints. Two mitigations:
+#   1) Keep watchdog importable from the project venv (jac's sitecustomize puts
+#      .jac/venv on sys.path). Force --target into the venv site-packages:
+#      plain `pip install` no-ops when watchdog already lives in the ephemeral
+#      ~/.cache/jac/rt/<hash>/site (wiped on re-extract / concurrent jac fights).
+#   2) Strip the bad `style="muted"` from any extracted client_dev_common.jac
+#      so a missing watchdog degrades to a warning instead of aborting launch.
+_VENV_PY="$_STUDIO_DIR/.jac/venv/bin/python"
+_VENV_SP="$_STUDIO_DIR/.jac/venv/lib/python3.14/site-packages"
+if [[ -x "$_VENV_PY" ]]; then
+  if [[ ! -d "$_VENV_SP/watchdog" ]]; then
+    mkdir -p "$_VENV_SP"
+    "$_VENV_PY" -m pip install --upgrade --force-reinstall --no-deps \
+      --target "$_VENV_SP" 'watchdog>=3.0.0' >/dev/null
+  fi
+fi
+unset _VENV_PY _VENV_SP
+
+while IFS= read -r -d '' _wd_jac; do
+  # Idempotent: only rewrites copies that still have the bad kwarg.
+  if grep -q 'style="muted"' "$_wd_jac" 2>/dev/null; then
+    perl -i -0pe 's/(watchdog not installed[^\n]*\n\s*"[^"]*",)\s*\n\s*style="muted"\s*\n/$1\n/s' "$_wd_jac"
+  fi
+done < <(find "$HOME/.cache/jac/rt" -name 'client_dev_common.jac' -not -path '*/.tmp.*' -print0 2>/dev/null)
+unset _wd_jac
+
 exec jac start --client desktop --dev main.jac

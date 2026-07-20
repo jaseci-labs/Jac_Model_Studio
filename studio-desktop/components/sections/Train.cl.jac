@@ -457,7 +457,7 @@ def:pub Train(active: bool) -> JsxElement {
                             bid = str(b["id"]);
                             <button
                                 key={bid}
-                                onClick={lambda e: MouseEvent { formBackend = bid; }}
+                                onClick={lambda (e: MouseEvent) { formBackend = bid; }}
                                 className={"rounded-md border px-3 py-1 text-xs transition-colors " + (
                                     "border-neutral-500 bg-[#1a1a1a] text-neutral-100" if formBackend == bid
                                     else "border-neutral-700 text-neutral-500 hover:text-neutral-300"
@@ -491,8 +491,8 @@ def:pub Train(active: bool) -> JsxElement {
                 <p className="stat-line mt-1 text-neutral-500">heavy workload · one training at a time, runs detached</p>
 
                 <div className="mt-2 flex gap-2">
-                    <button onClick={lambda e: MouseEvent { doStart(); }} disabled={isRunning} className={btn + "text-neutral-100"}>▶ START {formMode.upper()}</button>
-                    <button onClick={lambda e: MouseEvent { doStop(); }} disabled={not isRunning} className={btn + "text-neutral-400"}>■ STOP</button>
+                    <button onClick={lambda (e: MouseEvent) { doStart(); }} disabled={isRunning} className={btn + "text-neutral-100"}>▶ START {formMode.upper()}</button>
+                    <button onClick={lambda (e: MouseEvent) { doStop(); }} disabled={not isRunning} className={btn + "text-neutral-400"}>■ STOP</button>
                 </div>
 
                 {error and <p className="stat-line mt-1 text-neutral-400">{error}</p>}
@@ -542,7 +542,7 @@ def:pub Train(active: bool) -> JsxElement {
                     {for s in running {
                         <button
                             key={str(s["name"]) + "|" + str(s["mode"])}
-                            onClick={lambda e: MouseEvent { pickSession(str(s["name"]), str(s["mode"])); }}
+                            onClick={lambda (e: MouseEvent) { pickSession(str(s["name"]), str(s["mode"])); }}
                             className={"rounded-md border px-3 py-1 font-mono text-[10px] tracking-widest transition-colors " + (
                                 "border-neutral-500 bg-[#1a1a1a] text-neutral-100" if (selName == str(s["name"]) and selMode == str(s["mode"]))
                                 else "border-neutral-700 text-neutral-500 hover:text-neutral-300"
@@ -587,7 +587,7 @@ def:pub Train(active: bool) -> JsxElement {
                         {for name in mdls {
                             <button
                                 key={name}
-                                onClick={lambda e: MouseEvent { pickHistory(name, selModeH); }}
+                                onClick={lambda (e: MouseEvent) { pickHistory(name, selModeH); }}
                                 className={"rounded-md border px-4 py-1.5 font-mono text-xs transition-colors " + (
                                     "border-neutral-500 bg-[#1a1a1a] text-neutral-100" if selModel == name
                                     else "border-neutral-800 text-neutral-400 hover:border-neutral-600 hover:text-neutral-200"
@@ -606,7 +606,7 @@ def:pub Train(active: bool) -> JsxElement {
                             <button
                                 key={mode}
                                 disabled={not (_hasRun(pastSessions, selModel, mode) if selModel != "" else True)}
-                                onClick={lambda e: MouseEvent { pickHistory(selModel if selModel != "" else mdls[0], mode); }}
+                                onClick={lambda (e: MouseEvent) { pickHistory(selModel if selModel != "" else mdls[0], mode); }}
                                 className={"rounded-md border px-4 py-1.5 font-mono text-xs uppercase tracking-widest transition-colors disabled:opacity-30 " + (
                                     ("border-[#b89ce8]/50 bg-[#1a1a1a] text-[#b89ce8]" if mode == "dpo" else "border-[#7aa2f7]/50 bg-[#1a1a1a] text-[#7aa2f7]") if selModeH == mode
                                     else "border-neutral-800 text-neutral-400 hover:border-neutral-600 hover:text-neutral-200"
@@ -666,7 +666,7 @@ def:pub Train(active: bool) -> JsxElement {
             <SubTabs tabs={TABS} active={tab.upper()} onTab={onTab} />
             <div className="flex items-center gap-2">
                 <button
-                    onClick={lambda e: MouseEvent { handleUpdate(); }}
+                    onClick={lambda (e: MouseEvent) { handleUpdate(); }}
                     disabled={updateState == "updating"}
                     className={"rounded-lg border border-neutral-600 px-3 py-1 font-mono text-[10px] transition-colors hover:border-neutral-400 disabled:opacity-30 " + (
                         "text-neutral-100" if updateState == "confirm" else "text-neutral-400"

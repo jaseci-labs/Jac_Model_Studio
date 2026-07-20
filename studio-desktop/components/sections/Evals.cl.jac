@@ -204,7 +204,7 @@ def:pub Evals -> JsxElement {
                             {for m in avail {
                                 <button
                                     key={str(m.id)}
-                                    onClick={lambda e: MouseEvent { modelId = m.id; modelPath = ""; }}
+                                    onClick={lambda (e: MouseEvent) { modelId = m.id; modelPath = ""; }}
                                     className={"rounded-md border px-2 py-1 text-xs transition-colors " + (
                                         "border-neutral-500 bg-[#1a1a1a] text-neutral-100" if (modelId == m.id and not modelPath)
                                         else "border-neutral-700 text-neutral-500 hover:text-neutral-300"
@@ -235,7 +235,7 @@ def:pub Evals -> JsxElement {
                     <TextInput value={simThreshold} onSet={lambda v: str { simThreshold = v; }} placeholder="0.7" mono={True} />
                 </Field>}
                 <button
-                    onClick={lambda e: MouseEvent { start(); }}
+                    onClick={lambda (e: MouseEvent) { start(); }}
                     disabled={busy}
                     className="mt-1 w-full rounded-md border border-neutral-600 bg-[#1a1a1a] py-1.5 text-xs text-neutral-100 transition-colors hover:border-neutral-400 hover:bg-[#222] disabled:cursor-not-allowed disabled:opacity-40"
                 >
@@ -282,7 +282,7 @@ def:pub Evals -> JsxElement {
                             </span>
                         </div>
                         {str(run.status) == "running" and <button
-                            onClick={lambda e: MouseEvent { stopActive(); }}
+                            onClick={lambda (e: MouseEvent) { stopActive(); }}
                             className="shrink-0 rounded-md border border-neutral-700 px-3 py-1 text-xs text-neutral-400 transition-colors hover:border-neutral-500 hover:text-neutral-200"
                         >
                             STOP
@@ -322,7 +322,7 @@ def:pub Evals -> JsxElement {
                             {for r in history {
                                 <tr
                                     key={str(r.id)}
-                                    onClick={lambda e: MouseEvent { openEval(str(r.id)); }}
+                                    onClick={lambda (e: MouseEvent) { openEval(str(r.id)); }}
                                     className="cursor-pointer border-b border-neutral-900 text-neutral-400 transition-colors hover:bg-[#111] hover:text-neutral-200"
                                 >
                                     <td className="py-1.5 pr-3 font-mono text-neutral-500">{str(r.id)}</td>
@@ -334,7 +334,7 @@ def:pub Evals -> JsxElement {
                                     <td className="py-1.5 pr-3"><StatusGlyph status={str(r.status)} showLabel={False} /></td>
                                     <td className="py-1.5">
                                         <button
-                                            onClick={lambda e: MouseEvent { e.stopPropagation(); removeEval(str(r.id)); }}
+                                            onClick={lambda (e: MouseEvent) { e.stopPropagation(); removeEval(str(r.id)); }}
                                             className="micro-label text-neutral-600 transition-colors hover:text-neutral-300"
                                         >
                                             DEL

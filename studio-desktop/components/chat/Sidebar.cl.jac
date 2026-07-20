@@ -55,7 +55,7 @@ def:pub Sidebar(
     return <aside className="flex w-56 shrink-0 flex-col border-r border-neutral-800 bg-[#0d0d0d] p-3">
         <div className="micro-label mb-3">JAC.STUDIO · fig.1</div>
         <button
-            onClick={lambda e: MouseEvent { if not busy { onNew(); } }}
+            onClick={lambda (e: MouseEvent) { if not busy { onNew(); } }}
             disabled={busy}
             className="mb-3 rounded-md border border-dashed border-neutral-600 py-1.5 text-xs text-neutral-300 hover:border-neutral-400 disabled:opacity-40"
         >
@@ -73,7 +73,7 @@ def:pub Sidebar(
                         {for c in list(grp["chats"]) {
                             <div
                                 key={str(c.id)}
-                                onClick={lambda e: MouseEvent { if not busy { onOpen(str(c.id)); } }}
+                                onClick={lambda (e: MouseEvent) { if not busy { onOpen(str(c.id)); } }}
                                 className={"group flex cursor-pointer items-center justify-between rounded-md px-2 py-1.5 text-xs " + (
                                     "bg-[#1a1a1a] text-neutral-100" if str(c.id) == activeId
                                     else "text-neutral-400 hover:bg-[#141414]"
@@ -81,7 +81,7 @@ def:pub Sidebar(
                             >
                                 <span className="truncate" title={str(c.title)}>{c.title if c.title else "untitled"}</span>
                                 <button
-                                    onClick={lambda e: MouseEvent { e.stopPropagation(); if not busy { onDelete(str(c.id)); } }}
+                                    onClick={lambda (e: MouseEvent) { e.stopPropagation(); if not busy { onDelete(str(c.id)); } }}
                                     className="hidden font-mono text-[9px] text-neutral-600 hover:text-neutral-300 group-hover:block"
                                 >DEL</button>
                             </div>

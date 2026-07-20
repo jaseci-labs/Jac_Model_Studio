@@ -22,7 +22,7 @@ def:pub LayoutSwitcher(
             {for l in LAYOUTS {
                 <button
                     key={l}
-                    onClick={lambda e: MouseEvent { open = False; onLayout(l); }}
+                    onClick={lambda (e: MouseEvent) { open = False; onLayout(l); }}
                     className={"flex flex-col items-start rounded-md border px-2 py-1 text-left transition-colors " + (
                         "border-ring bg-accent" if l == layout else "border-transparent hover:bg-muted"
                     )}
@@ -33,7 +33,7 @@ def:pub LayoutSwitcher(
             }}
         </div>}
         <button
-            onClick={lambda e: MouseEvent { open = not open; }}
+            onClick={lambda (e: MouseEvent) { open = not open; }}
             className="micro-label px-2 transition-colors hover:text-foreground/80"
         >
             LAYOUT · {layout}

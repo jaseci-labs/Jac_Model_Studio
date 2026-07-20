@@ -206,7 +206,7 @@ def:pub Data -> JsxElement {
                         {for stage in list(group["stages"]) {
                             <div key={str(stage)}>
                                 <div
-                                    onClick={lambda e: MouseEvent { selectStage(str(stage)); }}
+                                    onClick={lambda (e: MouseEvent) { selectStage(str(stage)); }}
                                     className={"flex cursor-pointer items-center gap-2 rounded px-2 py-1 " + (
                                         "bg-[#1a1a1a]" if selectedStage == str(stage) else "hover:bg-[#141414]"
                                     )}
@@ -215,7 +215,7 @@ def:pub Data -> JsxElement {
                                     <span className="flex-1 truncate font-mono text-xs text-neutral-400">{str(stage)}</span>
                                     <button
                                         disabled={_statusOf(str(stage)) == "running"}
-                                        onClick={lambda e: MouseEvent { e.stopPropagation(); runStage(str(stage)); }}
+                                        onClick={lambda (e: MouseEvent) { e.stopPropagation(); runStage(str(stage)); }}
                                         className="micro-label rounded border border-neutral-700 px-1.5 py-0.5 text-neutral-500 transition-colors hover:border-neutral-500 hover:text-neutral-200 disabled:cursor-not-allowed disabled:opacity-30"
                                     >
                                         RUN
@@ -240,13 +240,13 @@ def:pub Data -> JsxElement {
                 <textarea
                     rows={6}
                     value={addText}
-                    onChange={lambda e: ChangeEvent { addText = e.target.value; }}
+                    onChange={lambda (e: ChangeEvent) { addText = e.target.value; }}
                     placeholder={ph}
                     className="w-full rounded-md border border-neutral-700 bg-[#121212] px-2 py-1.5 font-mono text-xs text-neutral-100 outline-none placeholder:text-neutral-600 focus:border-neutral-500 resize-none"
                 ></textarea>
                 <button
                     disabled={addBusy or (not addText.strip())}
-                    onClick={lambda e: MouseEvent { submitExamples(); }}
+                    onClick={lambda (e: MouseEvent) { submitExamples(); }}
                     className="micro-label self-start rounded border border-neutral-600 px-3 py-1.5 text-neutral-300 transition-colors hover:border-neutral-400 hover:text-neutral-100 disabled:cursor-not-allowed disabled:opacity-30"
                 >
                     {"APPENDING…" if addBusy else "APPEND"}
