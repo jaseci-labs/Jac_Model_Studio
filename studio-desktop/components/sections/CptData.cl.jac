@@ -8,6 +8,7 @@ stacked bar doesn't need recharts) + the code-gate table + a RowBrowser over the
 
 sv import from ...cpt { cpt_manifest, cpt_files, cpt_rows }
 import from ..shared.StatTile { StatTile }
+import from ..shared.Field { Segmented }
 import from ..shared.RowBrowser { RowBrowser }
 
 # Grayscale ramp for the composition bar (light→dark, ordered like SRC_ORDER).
@@ -30,6 +31,8 @@ def _k(n: int) -> str {
 
 def:pub CptData -> JsxElement {
     has man: any = None,
+        cptSource: str = "all",
+        sourceOpts: list = ["all"],
         files: list = [],
         path: str = "",
         rows: list = [],
@@ -41,6 +44,26 @@ def:pub CptData -> JsxElement {
         r = await cpt_rows(p, off, 25);
         rows = list(r["rows"]);
         total = int(r["total"]);
+    }
+
+    # `src` passed explicitly — reading cptSource right after setting it returns
+    # the stale value (React writes are async), same as RlData._loadSource.
+    async def _loadSource(src: str) -> None {
+        fs = await cpt_files(src);
+        files = fs;
+        expanded = -1;
+        offset = 0;
+        if len(list(fs)) > 0 {
+            path = str(fs[0].path);
+            await _fetch(str(fs[0].path), 0);
+        } else {
+            path = ""; rows = []; total = 0;
+        }
+    }
+
+    async def switchSource(s: str) -> None {
+        cptSource = s;
+        await _loadSource(s);
     }
 
     async def openFile(p: str) -> None {
@@ -76,20 +99,19 @@ def:pub CptData -> JsxElement {
         m = await cpt_manifest();
         # tag each source with its ramp shade up front so the render loops never
         # need an index (enumerate/.index() are awkward in the JSX .map() compile).
+        opts: list = ["all"];
         if m["ok"] {
             srcs = list(m["sources"]);
             idx = 0;
             for s in srcs {
                 s["shade"] = SHADES[idx % len(SHADES)];
+                opts.append(str(s["name"]));
                 idx += 1;
             }
         }
         man = m;
-        fs = await cpt_files();
-        files = fs;
-        if len(list(fs)) > 0 {
-            await openFile(str(fs[0].path));
-        }
+        sourceOpts = opts;
+        await _loadSource(cptSource);
     }
 
     def _tiles() -> JsxElement {
@@ -180,6 +202,10 @@ def:pub CptData -> JsxElement {
             {_tiles()}
             {_composition()}
             {_gate()}
+            <div className="flex flex-wrap items-center gap-2">
+                <span className="micro-label text-muted-foreground/80">SOURCE</span>
+                <Segmented options={sourceOpts} value={cptSource} onSet={lambda v: str { switchSource(v); }} />
+            </div>
             <RowBrowser
                 files={files} path={path} rows={rows} offset={offset}
                 total={total} expanded={expanded}

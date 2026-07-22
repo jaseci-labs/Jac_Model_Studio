@@ -154,10 +154,17 @@ def cpt_manifest() -> dict {
     };
 }
 
-"""All preview-allowed CPT files with line counts."""
-def cpt_files() -> list[FileRefView] {
+"""Preview-allowed CPT files with line counts, optionally scoped to one source.
+
+`source` "" / "all" returns the full allowlist (docs/code/blogs/osp_paper/rehearsal
+raw + the 2 packed splits) — today's default flat view. Any real source id
+(docs/code/blogs/osp_paper/rehearsal) filters down to files living under that
+`<source>/` directory, mirroring data.rl_dataset_files(source)."""
+def cpt_files(source: str = "") -> list[FileRefView] {
     out: list[FileRefView] = [];
+    seg = "/" + source + "/";
     for pair in workspace.cpt_files() {
+        if source and source != "all" and seg not in str(pair[0]) { continue; }
         out.append(FileRefView(path=pair[0], label=pair[1], count=len(_read_lines(pair[0]))));
     }
     return out;
