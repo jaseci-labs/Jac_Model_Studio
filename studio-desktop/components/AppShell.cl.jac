@@ -72,7 +72,7 @@ def _allSlots(layout: any) -> list[dict] {
     return out;
 }
 
-def:pub AppShell -> JsxElement {
+def:pub AppShell(onHub: any = None) -> JsxElement {
     has layout: any = None,
         workspace: str = "03",
         sections: dict = {},
@@ -162,6 +162,7 @@ def:pub AppShell -> JsxElement {
             workspace={workspace}
             onWorkspace={goWorkspace}
             onSettings={lambda -> None { settingsOpen = True; }}
+            onHub={onHub}
         />
 
         <div className="flex min-h-0 flex-1 overflow-hidden">

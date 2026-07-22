@@ -9,12 +9,17 @@ WORKSPACES) sits at the right, mirroring the JMS top bar's right-side action gro
 
 def:pub WorkspaceBar(
     layout: any, workspace: str,
-    onWorkspace: Callable[([str], None)], onSettings: Callable[[], None]
+    onWorkspace: Callable[([str], None)], onSettings: Callable[[], None],
+    onHub: any = None
 ) -> JsxElement {
     wsList: list = list(layout["workspaces"]);
     return <header className="exp-topbar">
         <div className="flex min-w-0 items-center gap-4">
-            <span className="micro-label shrink-0">JAC·ML STUDIO</span>
+            <button
+                className="exp-btn shrink-0"
+                title="back to hub"
+                onClick={lambda e: MouseEvent { if onHub is not None { onHub(); } }}
+            >‹ EXPERIMENTS</button>
             <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto">
                 {for ws in wsList {
                     wd = ws as dict;

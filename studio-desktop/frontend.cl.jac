@@ -94,8 +94,8 @@ def:pub app -> JsxElement {
 
     # Valid session (local auto-login OR prod login) → surface router:
     # "" = hub landing, "jms" = new product shell, "experiments" = the existing
-    # AppShell (untouched) plus a small floating hub-return button rendered
-    # here — NOT inside AppShell — so Experiments stays pixel-identical.
+    # AppShell — its WorkspaceBar's "‹ EXPERIMENTS" button calls onHub directly,
+    # so no separate overlay button is needed here anymore.
     if jacIsLoggedIn() {
         if surface == "jms" {
             return <JmsShell
@@ -105,14 +105,7 @@ def:pub app -> JsxElement {
             />;
         }
         if surface == "experiments" {
-            return <div>
-                <AppShell />
-                <button
-                    className="jms-hub-btn"
-                    title="hub"
-                    onClick={lambda e: MouseEvent { surface = ""; }}
-                >◈</button>
-            </div>;
+            return <AppShell onHub={lambda { surface = ""; }} />;
         }
         return <Landing
             onPick={lambda(s: str) { surface = s; }}

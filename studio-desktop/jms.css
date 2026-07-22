@@ -361,36 +361,6 @@
   font-size: clamp(34px, min(6vw, 12vh), 96px);
 }
 
-/* ----------------------------------------------------- hub return button ---
-   Rendered OUTSIDE .jms-scope, floating over the Experiments terminal app —
-   deliberately hardcoded to the global.css monochrome palette so it reads as
-   part of that theme. Bottom-right: NavRail owns the left edge and the ⚙
-   WORKSPACES / v3 footer sits bottom-left. */
-.jms-hub-btn {
-  position: fixed;
-  right: 10px;
-  bottom: 10px;
-  z-index: 60;
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: 'Geist Mono', ui-monospace, monospace;
-  font-size: 13px;
-  line-height: 1;
-  color: #8a8a8a;
-  background-color: rgba(13, 13, 13, 0.9);
-  border: 1px solid #262626;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: color 160ms ease, border-color 160ms ease;
-}
-.jms-hub-btn:hover {
-  color: #ededed;
-  border-color: #525252;
-}
-
 /* ====================================================== JMS project mgmt ===
    All token-consuming + theme-agnostic (no hardcoded palette): the project
    list grid, project-detail stage rail, and the sources-stage form controls.
