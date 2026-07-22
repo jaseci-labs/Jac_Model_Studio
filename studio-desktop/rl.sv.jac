@@ -17,6 +17,7 @@ a rung-indexed curve (one line per model·cond, gen pass@1), and the line keys.
 import os;
 import json;
 import subprocess;
+import jobs;
 import paths;
 import workspace;
 import from pathlib { Path }
@@ -133,6 +134,12 @@ def rl_generate(prompt: str, k: int = 8) -> dict {
     if not os.path.exists(gen_model) {
         return {"ok": False, "verified": False, "jac": "", "note": "SFT model missing: " + gen_model};
     }
+    # One heavy local job at a time (shared GPU). This is a BLOCKING subprocess,
+    # so acquire in-process (no job file) and release in the finally.
+    grab = jobs.heavy_acquire("rl_generate");
+    if not grab["ok"] {
+        return {"ok": False, "verified": False, "jac": "", "note": f"busy: {grab['busy_with']} is running"};
+    }
     ws = str(_ws());
     env = dict(os.environ);
     env["JAC_GEN_MODEL"] = gen_model;
@@ -150,5 +157,7 @@ def rl_generate(prompt: str, k: int = 8) -> dict {
         return {"ok": True, "verified": verified, "jac": jac, "note": note, "k": k};
     } except Exception as e {
         return {"ok": False, "verified": False, "jac": "", "note": str(e)};
+    } finally {
+        jobs.heavy_release("rl_generate");
     }
 }

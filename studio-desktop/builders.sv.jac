@@ -87,6 +87,11 @@ def run_builder(stage: str) -> BuilderView {
     if existing is not None and str(existing.get("status", "")) == "running" {
         return _build_status(stage, "already running");
     }
+    # One heavy local job at a time (shared GPU). Self-heals from the job file.
+    grab = jobs.heavy_acquire(f"builder:{stage}", jf, rl);
+    if not grab["ok"] {
+        return _build_status(stage, f"busy: {grab['busy_with']} is running");
+    }
     (auth.user_results_dir() / "_builder").mkdir(parents=True, exist_ok=True);
     # Erase any stale __EXIT__ marker from a prior run.
     rl.write_text("");

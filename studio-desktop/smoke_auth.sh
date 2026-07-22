@@ -17,18 +17,20 @@ if [[ "$code" != "401" ]]; then
 fi
 echo "OK ($code)"
 
+# jac-scale requires a username identity at register; email rides along.
 register() {
   local email="$1"
   curl -sf -X POST "$API/user/register" -H "Content-Type: application/json" -d "{
-    \"identities\": [{\"type\": \"email\", \"value\": \"$email\"}],
+    \"identities\": [{\"type\": \"username\", \"value\": \"${email%%@*}\"}, {\"type\": \"email\", \"value\": \"$email\"}],
     \"credential\": {\"type\": \"password\", \"password\": \"$PW\"}
   }" >/dev/null
 }
 
+# jac-scale login is username-only (email identity rejected).
 login() {
   local email="$1"
   curl -sf -X POST "$API/user/login" -H "Content-Type: application/json" -d "{
-    \"identity\": {\"type\": \"email\", \"value\": \"$email\"},
+    \"identity\": {\"type\": \"username\", \"value\": \"${email%%@*}\"},
     \"credential\": {\"type\": \"password\", \"password\": \"$PW\"}
   }" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['token'])"
 }
@@ -44,13 +46,14 @@ echo "=== alice creates chat ==="
 CHAT=$(curl -sf -X POST "$API/function/create_chat" \
   -H "Authorization: Bearer $TOK_A" -H "Content-Type: application/json" \
   -d '{"title": "alice secret", "workspace": "01"}' \
-  | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['result']['id'])")
 echo "chat_id=$CHAT"
 
 echo "=== bob cannot read alice messages ==="
 bob_msgs=$(curl -sf -X POST "$API/function/get_messages" \
   -H "Authorization: Bearer $TOK_B" -H "Content-Type: application/json" \
-  -d "{\"chat_id\": \"$CHAT\"}")
+  -d "{\"chat_id\": \"$CHAT\"}" \
+  | python3 -c "import sys,json; print(json.dumps(json.load(sys.stdin)['data']['result']))")
 if [[ "$bob_msgs" != "[]" ]]; then
   echo "FAIL: bob saw alice messages: $bob_msgs" >&2
   exit 1
@@ -60,7 +63,8 @@ echo "OK (empty)"
 echo "=== bob cannot delete alice chat ==="
 del_ok=$(curl -sf -X POST "$API/function/delete_chat" \
   -H "Authorization: Bearer $TOK_B" -H "Content-Type: application/json" \
-  -d "{\"chat_id\": \"$CHAT\"}")
+  -d "{\"chat_id\": \"$CHAT\"}" \
+  | python3 -c "import sys,json; print(json.dumps(json.load(sys.stdin)['data']['result']))")
 if [[ "$del_ok" != "false" ]]; then
   echo "FAIL: bob delete returned $del_ok" >&2
   exit 1
@@ -72,7 +76,7 @@ alice_chats=$(curl -sf -X POST "$API/function/list_chats" \
   -H "Authorization: Bearer $TOK_A" -H "Content-Type: application/json" -d '{}')
 echo "$alice_chats" | python3 -c "
 import sys,json
-chats=json.load(sys.stdin)
+chats=json.load(sys.stdin)['data']['result']
 ids=[c['id'] for c in chats]
 assert '$CHAT' in ids, chats
 print('OK')

@@ -15,6 +15,7 @@ import from ..shared.Field { Field, TextInput, Segmented }
 import from ..shared.StatusGlyph { StatusGlyph }
 import from ..shared.LogView { LogView }
 import from ..shared.StatTile { StatTile }
+import from ..shared.Gallery { Gallery }
 
 def _stripModels(m: str) -> str {
     if m.startswith("models/") { return m[7:]; }
@@ -447,6 +448,7 @@ def:pub Evals -> JsxElement {
                 {_history()}
                 {_compare()}
             </div>
+            <Gallery prefix="model-experiments/01-sft-dpo" />
         </div>
     </div>;
 }

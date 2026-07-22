@@ -17,9 +17,17 @@ import shlex;
 import time;
 import auth;
 import audit;
+import models;
 import from pathlib { Path }
 import from signal { SIGTERM }
-import from subprocess { Popen, STDOUT }
+import from subprocess { Popen, STDOUT, PIPE }
+import from threading { Lock }
+
+# Single heavy-job (training / CPT / builder / eval / RL generate) slot: this
+# box has ONE physical GPU + 48 GB, so only one heavy local job may run at a
+# time. The lock file is GLOBAL across users (models.results_dir() is the shared
+# root, not the per-user auth.user_results_dir()) because it guards one GPU.
+glob _heavy_mutex: any = Lock();
 
 """True iff *s* is safe to embed in a shell command. Allowlist [A-Za-z0-9_.-]
 (plus / when allow_slash); any `..` path segment is always rejected."""
@@ -47,6 +55,28 @@ def alive(pid: int) -> bool {
     } except Exception {
         return False;
     }
+}
+
+"""Process start-time stamp for *pid* (`ps -o lstart=`), "" if the process is
+gone. Recorded when an in-process heavy holder claims the lock; comparing it on
+later liveness checks defeats pid reuse (a recycled pid has a different start
+time)."""
+def proc_stamp(pid: int) -> str {
+    if pid <= 0 { return ""; }
+    try {
+        out: any = Popen(["ps", "-p", str(pid), "-o", "lstart="], stdout=PIPE, stderr=PIPE).communicate();
+        return str(out[0].decode()).strip();
+    } except Exception {
+        return "";
+    }
+}
+
+"""alive() plus the pid-reuse guard: when a stamp was recorded, the live process
+must carry the same start time."""
+def alive_stamped(pid: int, stamp: str) -> bool {
+    if not alive(pid) { return False; }
+    if not stamp { return True; }
+    return proc_stamp(pid) == stamp;
 }
 
 """Reap a finished direct child (non-blocking); ignore non-children / reaped pids."""
@@ -158,6 +188,69 @@ def stop(job_file: Path, runlog: Path | None = None) -> dict | None {
     job["status"] = "stopped";
     write_job(job_file, job);
     return job;
+}
+
+"""Global heavy-job lock file (shared across all users — see _heavy_mutex)."""
+def _heavy_lock_file() -> Path {
+    return models.results_dir() / ".heavy-lock.json";
+}
+
+"""True iff the recorded lock holder is still doing work: detached holders are
+resolved via live_status on their job file; in-process holders (no job file,
+e.g. rl_generate inside the server) via the recorded pid+stamp."""
+def _heavy_live(lock: dict) -> bool {
+    jf = str(lock.get("job_file", ""));
+    if jf {
+        job = live_status(Path(jf), Path(str(lock.get("runlog", ""))));
+        return job is not None and str(job.get("status", "")) == "running";
+    }
+    return alive_stamped(int(str(lock.get("pid") or 0)), str(lock.get("stamp", "")));
+}
+
+"""Claim the single heavy-job slot (training/CPT/eval/builder/RL generate all
+compete for the same GPU + 48 GB). Returns {"ok": True} or {"ok": False,
+"busy_with": holder}. Self-healing: a recorded holder that is no longer running
+is stale and is replaced. Detached holders pass their job_file/runlog (so the
+lock heals from the job file after a server restart); in-process holders pass
+neither and are tracked by server pid + start-time stamp."""
+def heavy_acquire(holder: str, job_file: Path | None = None, runlog: Path | None = None) -> dict {
+    _heavy_mutex.acquire();
+    try {
+        lf = _heavy_lock_file();
+        cur = read_job(lf);
+        if cur is not None and _heavy_live(cur) {
+            return {"ok": False, "busy_with": str(cur.get("holder", "?"))};
+        }
+        pid = int(os.getpid());
+        write_job(lf, {
+            "holder": holder,
+            "job_file": str(job_file) if job_file is not None else "",
+            "runlog": str(runlog) if runlog is not None else "",
+            "pid": pid if job_file is None else 0,
+            "stamp": proc_stamp(pid) if job_file is None else "",
+            "started": time.strftime("%Y-%m-%d %H:%M:%S")
+        });
+        return {"ok": True};
+    } finally {
+        _heavy_mutex.release();
+    }
+}
+
+"""Best-effort release: drop the lock if *holder* still owns it. (Stale locks
+also self-heal on the next heavy_acquire, so missing a release is harmless.)"""
+def heavy_release(holder: str) {
+    _heavy_mutex.acquire();
+    try {
+        lf = _heavy_lock_file();
+        cur = read_job(lf);
+        if cur is not None and str(cur.get("holder", "")) == holder {
+            try {
+                lf.unlink();
+            } except Exception {}
+        }
+    } finally {
+        _heavy_mutex.release();
+    }
 }
 
 """Append `; echo "__EXIT__ $?" >> <runlog>` (shell-quoted) to *cmd*."""

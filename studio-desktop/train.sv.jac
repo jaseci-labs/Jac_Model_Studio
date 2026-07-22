@@ -89,6 +89,12 @@ def start_training(name: str, mode: str, model_id: str = "", opts: dict = {}, ba
         return _build_status(name, mode, "already running");
     }
 
+    # One heavy local job at a time (shared GPU). Self-heals from the job file.
+    grab = jobs.heavy_acquire(f"train:{name}", jf, rl);
+    if not grab["ok"] {
+        return _build_status(name, mode, f"busy: {grab['busy_with']} is running");
+    }
+
     run_dir = auth.user_results_dir() / name;
     run_dir.mkdir(parents=True, exist_ok=True);
 

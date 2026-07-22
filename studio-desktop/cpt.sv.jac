@@ -299,6 +299,12 @@ def start_cpt_training(name: str = "cpt-v1", config: str = "") -> dict {
         return _cpt_build_status(name, f"already complete ({done_steps}/{total_iters})");
     }
 
+    # One heavy local job at a time (shared GPU). Self-heals from the job file.
+    grab = jobs.heavy_acquire(f"cpt:{name}", jf, rl);
+    if not grab["ok"] {
+        return _cpt_build_status(name, f"busy: {grab['busy_with']} is running");
+    }
+
     tl = _cpt_train_log(name);
     if done_steps == 0 {
         tl.write_text("");  # fresh start clears the learning curve

@@ -207,6 +207,12 @@ def create_eval(
     if sim_threshold > 0.0 { params["sim_threshold"] = sim_threshold; }
 
     eid = uuid4().hex[:12];
+    # One heavy local job at a time (shared GPU). Self-heals from the job file;
+    # busy → None, same shape as the validation-failure returns above.
+    ed = eval_dir(eid);
+    grab = jobs.heavy_acquire(f"eval:{eid}", ed / "job.json", ed / "run.log");
+    if not grab["ok"] { return None; }
+
     run = (root ++> EvalRun(
         eid=eid, kind=kind, model=model_rel, adapter=adapter_rel,
         holdout=holdout, params_json=json.dumps(params), status="running",
