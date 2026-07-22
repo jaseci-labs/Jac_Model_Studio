@@ -124,7 +124,7 @@ def:pub JmsProject(pid: str = "", onBack: any = None) -> JsxElement {
                 </button>
             }}
         </div>
-        <div className="flex min-w-0 flex-1 overflow-y-auto">
+        <div className="flex min-w-0 flex-1 overflow-y-auto pt-3">
             {# _panel takes a param -> compiles to a props-component; call with a
              # props dict, not positionally (same bug class fixed in JmsProjects.cl.jac).
              [_panel({"sid": str(st["id"])}) for st in STAGES]}
