@@ -455,10 +455,10 @@ def create_workspace(
     wid = _next_workspace_id();
     acc = accent if accent else _next_accent();
     dm = default_model if default_model else "qwen-dpo";
-    ws = root ++> Workspace(
+    ws = (root ++> Workspace(
         wid=wid, label=label, accent=acc, default_model=dm,
         files=list(files), sort_order=len(_all_workspaces())
-    );
+    ))[0];
     ws ++> WorkspaceSection(sid="chat", label="CHAT", component="Chat", order=0);
     return ws.to_view();
 }
@@ -503,9 +503,9 @@ def add_section(wid: str, sid: str, label: str, component: str) -> WorkspaceSect
     for sec in [ws -->][?:WorkspaceSection] {
         if sec.order > max_ord { max_ord = sec.order; }
     }
-    sec = ws ++> WorkspaceSection(
+    sec = (ws ++> WorkspaceSection(
         sid=sid, label=label, component=component, order=max_ord + 1
-    );
+    ))[0];
     return sec.to_view();
 }
 
