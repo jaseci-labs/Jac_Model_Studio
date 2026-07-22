@@ -9,10 +9,12 @@ captured from JmsProjects' onOpen(pid, name) callback."""
 import from .JmsThemeSwitcher { JmsThemeSwitcher }
 import from .JmsProjects { JmsProjects }
 import from .JmsProject { JmsProject }
+import from .ApiKeyModal { ApiKeyModal }
 
 def:pub JmsShell(onHub: any = None, theme: str = "", onTheme: any = None) -> JsxElement {
     has projectId: str = "",
-        projectName: str = "";
+        projectName: str = "",
+        keyModalOpen: bool = False;
 
     t: str = theme if theme else "electric-minimal";
 
@@ -47,12 +49,19 @@ def:pub JmsShell(onHub: any = None, theme: str = "", onTheme: any = None) -> Jsx
             <div className="flex items-center gap-4">
                 <button
                     className="jms-btn"
+                    title="provider keys"
+                    onClick={lambda e: MouseEvent { keyModalOpen = True; }}
+                >⚙ KEYS</button>
+                <button
+                    className="jms-btn"
                     title="back to hub"
                     onClick={lambda e: MouseEvent { if onHub is not None { onHub(); } }}
                 >◈ HUB</button>
                 <JmsThemeSwitcher theme={t} onTheme={onTheme} />
             </div>
         </div>
+
+        {keyModalOpen and <ApiKeyModal open={True} onClose={lambda -> None { keyModalOpen = False; }} />}
 
         {if projectId {
             <JmsProject pid={projectId} onBack={backToProjects} />

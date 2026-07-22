@@ -53,6 +53,16 @@ import from jms_projects {
     create_project, list_projects, get_project, update_project, delete_project,
     add_source, remove_source, scan_source, write_project_snapshot
 }
+# JMS LLM provider config: per-user Anthropic key storage (encrypted) + the
+# provider/model catalog + price table. Consumed by the ApiKeyModal + PLAN picker.
+import from jms_llm {
+    set_anthropic_key, clear_anthropic_key, llm_status, price_for
+}
+# JMS GENERATE stage, PLAN step: LLM-authored dataset plans (claude via byllm /
+# mlx via the resident model), edit + approve. Consumed by GenerateStage.
+import from jms_plan {
+    draft_plan, get_plans, update_plan, approve_plan, latest_approved
+}
 # Local single-user mode: `local_mode()` is the flag the client's auth gate
 # reads; `local_session()` mints an in-process JWT so the desktop client (which
 # can't reach /user/* over HTTP in webview mode) can still establish a session.

@@ -86,6 +86,23 @@ node JmsSource {
         scanned_at: str = "";
 }
 
+"""A GENERATE-stage dataset plan draft/approval, child of a JmsProject
+(`project ++> JmsGenPlan`). The plan body itself is opaque JSON in `plan_json`
+(shape: description/schema/mix/target_rows/system_prompt/grounding_notes) —
+authored + mutated by jms_plan.sv.jac, which imports this type. Kept HERE (not in
+jms_plan) so get_project can read plans without a circular import back into
+jms_plan (which imports jms_projects). `version` is monotonic per project; at
+most one plan is `approved` at a time."""
+node JmsGenPlan {
+    has version: int = 1,
+        status: str = "draft",        # draft | approved
+        provider: str = "",           # claude | mlx
+        model: str = "",
+        plan_json: str = "",
+        created: str = "",
+        approved_at: str = "";
+}
+
 # --------------------------------------------------------------- fs helpers ----
 """<workspace_root>/jms-projects/<slug> — the project's on-disk home."""
 def jms_project_dir(slug: str) -> Path {
@@ -152,6 +169,45 @@ def _find_source(project: JmsProject, sid: str) -> JmsSource | None {
 
 def _sources_of(project: JmsProject) -> list[JmsSource] {
     return [s for s in [project -->][?:JmsSource]];
+}
+
+# ------------------------------------------------------------- plan readers ---
+"""Every JmsGenPlan hanging off *project* (any order)."""
+def _gen_plans_of(project: JmsProject) -> list[JmsGenPlan] {
+    return [g for g in [project -->][?:JmsGenPlan]];
+}
+
+"""Parse one plan node into a client dict: the plan_json body merged with the
+node's version/status/provider/model/created/approved_at. Garbage JSON → the
+envelope fields only."""
+def _plan_dict(g: JmsGenPlan) -> dict {
+    parsed: dict = {};
+    if g.plan_json {
+        try { parsed = dict(json.loads(g.plan_json)); } except Exception { parsed = {}; }
+    }
+    parsed["version"] = g.version;
+    parsed["status"] = g.status;
+    parsed["provider"] = g.provider;
+    parsed["model"] = g.model;
+    parsed["created"] = g.created;
+    parsed["approved_at"] = g.approved_at;
+    return parsed;
+}
+
+"""All of *project*'s plans as dicts, newest (highest version) first."""
+def _plans_newest_first(project: JmsProject) -> list[dict] {
+    out: list[dict] = [];
+    for g in _gen_plans_of(project) { out.append(_plan_dict(g)); }
+    out.sort(key=lambda d: dict -> int { return int(str(d["version"])); }, reverse=True);
+    return out;
+}
+
+"""True when *project* has at least one approved plan (drives the GENERATE dot)."""
+def _has_approved_plan(project: JmsProject) -> bool {
+    for g in _gen_plans_of(project) {
+        if g.status == "approved" { return True; }
+    }
+    return False;
 }
 
 # ------------------------------------------------------------------- shapes ----
@@ -301,9 +357,10 @@ def get_project(pid: str) -> dict {
         "raw": _count_lines(dsdir / "raw.jsonl"),
         "curated": _count_lines(dsdir / "train.jsonl")
     };
+    plans = _plans_newest_first(p);
     stage_state: dict = {
         "sources": "done" if scanned >= 1 else "empty",
-        "generate": "empty",
+        "generate": "done" if _has_approved_plan(p) else "empty",
         "curate": "empty",
         "train": "empty",
         "eval": "empty"
@@ -312,7 +369,7 @@ def get_project(pid: str) -> dict {
         "pid": p.pid, "name": p.name, "slug": p.slug, "use_case": p.use_case,
         "created": p.created, "provider": p.provider, "model": p.model,
         "sources": srcs,
-        "plans": [], "gen_jobs": [], "train_runs": [], "evals": [],
+        "plans": plans, "gen_jobs": [], "train_runs": [], "evals": [],
         "row_stats": row_stats, "stage_state": stage_state
     };
 }
@@ -337,6 +394,7 @@ def delete_project(pid: str, purge_files: bool = False) -> bool {
     if p is None { return False; }
     slug = p.slug;
     for s in _sources_of(p) { del s; }
+    for g in _gen_plans_of(p) { del g; }
     del p;
     if purge_files {
         shutil.rmtree(str(jms_project_dir(slug)), ignore_errors=True);
