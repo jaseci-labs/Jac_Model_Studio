@@ -1,0 +1,23 @@
+# Remote GPU-training script dependencies (studio-desktop/remote)
+#
+# Pinned, mutually-compatible set (verified installable on macOS arm64 / Python 3.11,
+# CPU-only, and intended for CUDA Linux VMs).
+#
+# torch: the plain `torch==2.5.1` requirement resolves to the CUDA 12.x wheel on
+#   Linux (what the GPU VM wants) and to the CPU/MPS wheel on macOS automatically —
+#   no --index-url needed for the default CUDA build on Linux.
+#
+# bitsandbytes: Linux + CUDA only. It has NO usable macOS wheel, so it is
+#   line-commented here. The VM bootstrap script installs it by uncommenting the
+#   line (or `pip install bitsandbytes==0.44.1`). train_sft.py imports it lazily,
+#   only when --load_in_4bit is passed, so CPU/Mac test runs never touch it.
+
+torch==2.5.1
+transformers==4.46.3
+trl==0.12.2
+peft==0.13.2
+datasets==3.1.0
+accelerate==1.1.1
+
+# --- Linux/CUDA VM only: bootstrap uncomments this line ---
+# bitsandbytes==0.44.1
