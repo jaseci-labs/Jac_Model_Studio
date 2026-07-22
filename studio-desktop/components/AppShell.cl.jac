@@ -11,6 +11,7 @@ sv import from ..models { system_ram }
 sv import from ..workspace { ui_layout }
 import from ..auth_session { handleUnauthorized }
 import from .NavRail { NavRail }
+import from .WorkspaceBar { WorkspaceBar }
 import from .Offline { Offline }
 import from .SectionMount { SectionMount }
 import from .WorkspaceSettings { WorkspaceSettings }
@@ -155,31 +156,38 @@ def:pub AppShell -> JsxElement {
         return <div className="h-screen bg-background" />;
     }
 
-    return <div className="flex h-screen overflow-hidden" data-ws={workspace}>
-        <NavRail
+    return <div className="flex h-screen flex-col overflow-hidden" data-ws={workspace}>
+        <WorkspaceBar
             layout={layout}
             workspace={workspace}
-            section={str(sections[workspace])}
             onWorkspace={goWorkspace}
-            onSection={go}
             onSettings={lambda -> None { settingsOpen = True; }}
         />
 
-        {for slotInfo in _allSlots(layout) {
-            wsId = str(slotInfo["wsId"]);
-            sid = str(slotInfo["secId"]);
-            comp = str(slotInfo["component"]);
-            dm = str(slotInfo["defaultModel"]);
-            active = wsId == workspace and sid == str(sections[wsId]);
-            <div key={wsId + "|" + sid} className={slot(wsId, sid)}>
-                <SectionMount
-                    component={comp}
-                    workspace={wsId}
-                    defaultModel={dm}
-                    active={active}
-                />
-            </div>
-        }}
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+            <NavRail
+                layout={layout}
+                workspace={workspace}
+                section={str(sections[workspace])}
+                onSection={go}
+            />
+
+            {for slotInfo in _allSlots(layout) {
+                wsId = str(slotInfo["wsId"]);
+                sid = str(slotInfo["secId"]);
+                comp = str(slotInfo["component"]);
+                dm = str(slotInfo["defaultModel"]);
+                active = wsId == workspace and sid == str(sections[wsId]);
+                <div key={wsId + "|" + sid} className={slot(wsId, sid)}>
+                    <SectionMount
+                        component={comp}
+                        workspace={wsId}
+                        defaultModel={dm}
+                        active={active}
+                    />
+                </div>
+            }}
+        </div>
 
         <WorkspaceSettings
             open={settingsOpen}

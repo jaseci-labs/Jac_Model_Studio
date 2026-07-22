@@ -1,8 +1,9 @@
-"""Left navigation rail — workspace switcher (top) + active workspace's sections.
+"""Left section sidebar — the active workspace's sections (CHAT/DATA/TRAIN/…).
 
-Workspaces are read from the graph via ui_layout (root --> Workspace, SQLite-persisted).
-Accent dots use --ws01/--ws02/--ws03 CSS vars (stamped on the shell root via data-ws).
-"""
+The workspace switcher now lives in the top <WorkspaceBar/>; this rail carries only
+the section tiles for whichever workspace is active, one per row. Sections are read
+from the graph via ui_layout (root --> Workspace --> Section). The active tile marks
+itself with a --ws-accent bar (stamped on the shell root via data-ws)."""
 
 def _glyph(s: str) -> JsxElement {
     if s == "chat" {
@@ -68,33 +69,10 @@ def _sectionsFor(layout: any, workspace: str) -> list {
 
 def:pub NavRail(
     layout: any, workspace: str, section: str,
-    onWorkspace: Callable[([str], None)], onSection: Callable[([str], None)],
-    onSettings: Callable[[], None]
+    onSection: Callable[([str], None)]
 ) -> JsxElement {
-    wsList: list = list(layout["workspaces"]);
     secList: list = _sectionsFor(layout, workspace);
     return <nav className="flex w-40 shrink-0 flex-col border-r border-border bg-card px-2 py-3">
-        <span className="micro-label mb-4 px-2">JAC·ML STUDIO</span>
-        <div className="flex flex-col gap-1">
-            {for ws in wsList {
-                wd = ws as dict;
-                wid = str(wd["id"]);
-                accent = str(wd["accent"]);
-                <button
-                    key={wid}
-                    onClick={lambda e: MouseEvent { onWorkspace(wid); }}
-                    className={"exp-hoverable relative flex h-9 items-center gap-2.5 rounded-lg border px-3 " + (
-                        "border-border bg-accent/15 text-foreground" if wid == workspace
-                        else "border-transparent text-muted-foreground hover:text-foreground"
-                    )}
-                >
-                    {wid == workspace and <span className="absolute left-0 top-2 bottom-2 w-[2px]" style={{"background": "var(--ws-accent)"}} />}
-                    <span className="h-2 w-2 shrink-0 rounded-full" style={{"background": "var(--" + accent + ")", "opacity": (1.0 if wid == workspace else 0.4)}} />
-                    <span className="font-mono text-[10px] tracking-[0.12em]">{wid} {str(wd["label"])}</span>
-                </button>
-            }}
-        </div>
-        <div className="dashed-rule my-3"></div>
         <div className="flex flex-col gap-1">
             {for sec in secList {
                 sd = sec as dict;
@@ -108,16 +86,12 @@ def:pub NavRail(
                     )}
                 >
                     {sid == section and <span className="absolute left-0 top-2 bottom-2 w-[2px]" style={{"background": "var(--ws-accent)"}} />}
-                    {_glyph(sid)}
+                    {_glyph({"s": sid})}
                     <span className="font-mono text-[11px] tracking-[0.15em]">{str(sd["label"])}</span>
                 </button>
             }}
         </div>
         <div className="flex-1" />
-        <button
-            onClick={lambda e: MouseEvent { onSettings(); }}
-            className="exp-hoverable mb-2 rounded-lg border border-transparent px-2 py-1.5 text-left font-mono text-[10px] tracking-wider text-muted-foreground/80 hover:text-foreground"
-        >⚙ WORKSPACES</button>
         <span className="micro-label px-2">v3</span>
     </nav>;
 }
