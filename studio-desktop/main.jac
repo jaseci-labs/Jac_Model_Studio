@@ -63,6 +63,12 @@ import from jms_llm {
 import from jms_plan {
     draft_plan, get_plans, update_plan, approve_plan, latest_approved
 }
+# JMS GENERATE stage, SYNTHESIZE step: detached dataset-generation worker jobs
+# (cost estimate, fire/stop, live status + log tail). Consumed by GenerateStage's
+# SYNTHESIZE tab.
+import from jms_gen {
+    estimate_gen, start_gen, gen_status, stop_gen, list_gen_jobs
+}
 # Local single-user mode: `local_mode()` is the flag the client's auth gate
 # reads; `local_session()` mints an in-process JWT so the desktop client (which
 # can't reach /user/* over HTTP in webview mode) can still establish a session.

@@ -1,6 +1,6 @@
 """GenerateStage — the GENERATE stage panel of a JMS project.
 
-A PLAN | SYNTHESIZE sub-tab toggle. SYNTHESIZE is a quiet placeholder for now.
+A PLAN | SYNTHESIZE sub-tab toggle.
 
 PLAN: pick a provider (Claude / local MLX) + model, DRAFT PLAN (blocking ~30-60s,
 spinner), then edit the returned plan — description, an example-type MIX table
@@ -9,13 +9,19 @@ tint when ≠ 100), target rows, system prompt, grounding notes — and SAVE DRA
 APPROVE / REDRAFT. Prior versions list on the side; clicking one loads it (drafts
 editable, approved read-only).
 
+SYNTHESIZE: config card (provider/model, target rows defaulted from the approved
+plan, max-rows hard cap ~1.2×, batch size) → PREVIEW COST (estimate tiles) →
+FIRE (enabled only after a cap_ok preview and while no job runs). Jobs list with
+rows_done/target + status dot + STOP; selecting a job shows its live log tail.
+Polls list_gen_jobs/gen_status every 2s while mounted (the Data.cl.jac
+unconditional-poll pattern). Any input change invalidates the preview.
+
 `project` is the get_project() dict; `onRefresh` re-pulls it after a mutation.
-draft_plan/update_plan/approve_plan all return the fresh plan dict, so the editor
-loads from the RPC result directly (no dependence on the async prop refresh).
-Handlers are named draft.../save.../approve.../patchRow etc — never set<HasVar>."""
+Handlers are named draft.../save.../fire.../stopJob etc — never set<HasVar>."""
 
 sv import from ....jms_plan { draft_plan, update_plan, approve_plan }
 sv import from ....jms_llm { llm_status }
+sv import from ....jms_gen { estimate_gen, start_gen, gen_status, stop_gen, list_gen_jobs }
 
 def _g(d: any, k: str, fallback: str) -> str {
     if d and k in d { return str(d[k]); }
@@ -42,7 +48,20 @@ def:pub GenerateStage(project: any = None, onRefresh: any = None) -> JsxElement 
         activeVersion: int = 0,
         activeStatus: str = "",
         readOnly: bool = False,
-        loadedInit: bool = False;
+        loadedInit: bool = False,
+        genProvider: str = "claude",
+        genModel: str = "claude-sonnet-5",
+        targetStr: str = "",
+        maxStr: str = "",
+        batchStr: str = "8",
+        estData: any = None,
+        estBusy: bool = False,
+        genErr: str = "",
+        fireBusy: bool = False,
+        genJobs: list = [],
+        selJid: str = "",
+        selData: any = None,
+        genPollId: any = None;
 
     def _pid -> str {
         if project { return str(project["pid"]); }
@@ -95,12 +114,46 @@ def:pub GenerateStage(project: any = None, onRefresh: any = None) -> JsxElement 
         try { statusData = await llm_status(); } except Exception { statusData = None; }
     }
 
+    def _approvedPlan -> any {
+        for p in _plans() {
+            if _g(p, "status", "") == "approved" { return p; }
+        }
+        return None;
+    }
+
+    async def refreshGen -> None {
+        try {
+            jl = await list_gen_jobs(_pid());
+            genJobs = list(jl);
+            if selJid {
+                sd = await gen_status(_pid(), selJid);
+                selData = sd;
+            }
+        } except Exception {}
+    }
+
     async can with entry {
         await reloadStatus();
         if not loadedInit {
             pl = _plans();
             if len(pl) > 0 { _loadPlan(pl[0], _g(pl[0], "status", "") != "draft"); }
+            ap = _approvedPlan();
+            if ap is not None {
+                tr = _toInt(_g(ap, "target_rows", "0"));
+                if tr > 0 {
+                    targetStr = str(tr);
+                    maxStr = str(_toInt(str(tr * 1.2)));
+                }
+            }
             loadedInit = True;
+        }
+        await refreshGen();
+        genPollId = setInterval(lambda -> None { refreshGen(); }, 2000);
+    }
+
+    can with exit {
+        if genPollId is not None {
+            clearInterval(float(str(genPollId)));
         }
     }
 
@@ -221,6 +274,97 @@ def:pub GenerateStage(project: any = None, onRefresh: any = None) -> JsxElement 
         tot = 0;
         for r in mix { tot = tot + _toInt(_g(r, "share_pct", "0")); }
         return tot;
+    }
+
+    # ---------------------------------------------------- synthesize handlers ----
+    def pickGenProvider(pv: str) -> None {
+        genProvider = pv;
+        ms = _modelsFor(pv);
+        genModel = str(ms[0]) if len(ms) > 0 else "";
+        estData = None;
+        genErr = "";
+    }
+
+    # Any config change invalidates the last preview (FIRE re-locks until a new one).
+    def patchGenField(field: str, val: str) -> None {
+        if field == "target" { targetStr = val; }
+        if field == "max" { maxStr = val; }
+        if field == "batch" { batchStr = val; }
+        estData = None;
+    }
+
+    async def previewCost -> None {
+        estBusy = True;
+        genErr = "";
+        try {
+            e = await estimate_gen(_pid(), genProvider, genModel, _toInt(targetStr), _toInt(batchStr));
+            estData = e;
+        } except Exception {
+            genErr = "estimate failed";
+        }
+        estBusy = False;
+    }
+
+    def _anyRunning -> bool {
+        for j in genJobs {
+            if _g(j, "status", "") == "running" { return True; }
+        }
+        return False;
+    }
+
+    async def fireNow -> None {
+        fireBusy = True;
+        genErr = "";
+        res: any = None;
+        try {
+            res = await start_gen(_pid(), genProvider, genModel, _toInt(targetStr), _toInt(maxStr), _toInt(batchStr));
+        } except Exception {
+            genErr = "start failed";
+            fireBusy = False;
+            return;
+        }
+        if res and res["ok"] {
+            selJid = str(res["jid"]);
+            estData = None;
+            await refreshGen();
+            if onRefresh is not None { await onRefresh(); }
+        } else {
+            genErr = _g(res, "error", "start failed");
+        }
+        fireBusy = False;
+    }
+
+    async def stopJob(jid: str) -> None {
+        try { await stop_gen(_pid(), jid); } except Exception {}
+        await refreshGen();
+        if onRefresh is not None { await onRefresh(); }
+    }
+
+    def selectJob(jid: str) -> None {
+        selJid = jid;
+        selData = None;
+        refreshGen();
+    }
+
+    def _fmtCost(v: any) -> str {
+        try {
+            return "$" + str(Math.round(float(str(v)) * 10000) / 10000);
+        } except Exception {
+            return "$0";
+        }
+    }
+
+    def _elapsedOf(j: any) -> str {
+        try {
+            t0 = Date.parse(_g(j, "started", ""));
+            fin = _g(j, "finished", "");
+            t1 = Date.parse(fin) if fin else Date.now();
+            s = int((t1 - t0) / 1000);
+            if s < 0 { s = 0; }
+            return str(s // 60) + "m" + str(s % 60) + "s";
+        } except Exception {
+            return "";
+        }
     }
 
     # --------------------------------------------------------------- render ----
@@ -412,6 +556,125 @@ def:pub GenerateStage(project: any = None, onRefresh: any = None) -> JsxElement 
         </div>;
     }
 
+    def _synthConfig -> JsxElement {
+        provs = _providers();
+        hasApproved = _approvedPlan() is not None;
+        canFire = hasApproved and estData is not None and bool(estData["cap_ok"]) and not _anyRunning() and not fireBusy;
+        hint = "";
+        if not hasApproved { hint = "Approve a plan in the PLAN tab first."; }
+        elif genProvider == "claude" and not _configured() { hint = "Set an Anthropic key (⚙ KEYS, top bar) to generate with Claude."; }
+        elif genProvider == "mlx" and len(_modelsFor("mlx")) == 0 { hint = "No local MLX model available — load one in the chat app first."; }
+        return <div className="jms-section flex flex-col gap-3">
+            <span className="jms-section-label">SYNTHESIZE ROWS</span>
+            <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-1">
+                    {for p in provs {
+                        <button
+                            key={str(p["id"])}
+                            className={"jms-btn" + (" jms-btn-accent" if genProvider == str(p["id"]) else "")}
+                            onClick={lambda e: MouseEvent { pickGenProvider(str(p["id"])); }}
+                        >{str(p["label"])}</button>
+                    }}
+                </div>
+                <select
+                    className="jms-input"
+                    style={{"width": "auto", "minWidth": "180px"}}
+                    value={genModel}
+                    onChange={lambda e: any { genModel = str(e.target.value); estData = None; }}
+                >
+                    {for mid in _modelsFor(genProvider) {
+                        <option key={str(mid)} value={str(mid)}>{str(mid)}</option>
+                    }}
+                </select>
+            </div>
+            <div className="flex flex-wrap items-end gap-3">
+                <div className="flex flex-col gap-1.5">
+                    <span className="jms-label">TARGET ROWS</span>
+                    <input
+                        className="jms-input" style={{"width": "110px"}} type="number"
+                        value={targetStr}
+                        onChange={lambda e: any { patchGenField("target", str(e.target.value)); }}
+                    />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                    <span className="jms-label">MAX ROWS (CAP)</span>
+                    <input
+                        className="jms-input" style={{"width": "110px"}} type="number"
+                        value={maxStr}
+                        onChange={lambda e: any { patchGenField("max", str(e.target.value)); }}
+                    />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                    <span className="jms-label">BATCH</span>
+                    <input
+                        className="jms-input" style={{"width": "80px"}} type="number"
+                        value={batchStr}
+                        onChange={lambda e: any { patchGenField("batch", str(e.target.value)); }}
+                    />
+                </div>
+                <button
+                    className="jms-btn"
+                    disabled={estBusy}
+                    onClick={lambda e: MouseEvent { previewCost(); }}
+                >{"ESTIMATING…" if estBusy else "PREVIEW COST"}</button>
+                <button
+                    className="jms-btn jms-btn-accent"
+                    disabled={not canFire}
+                    onClick={lambda e: MouseEvent { fireNow(); }}
+                >{"FIRING…" if fireBusy else "FIRE"}</button>
+            </div>
+            {estData and <div className="flex flex-wrap items-center gap-4">
+                <span className="jms-stat">ROWS {_g(estData, "rows", "0")}</span>
+                <span className="jms-stat">BATCHES {_g(estData, "batches", "0")}</span>
+                <span className="jms-stat">~IN {_g(estData, "est_input_tokens", "0")} tok</span>
+                <span className="jms-stat">~OUT {_g(estData, "est_output_tokens", "0")} tok</span>
+                <span className="jms-stat">EST {_fmtCost(estData["est_cost_usd"])} · estimate</span>
+                {not bool(estData["cap_ok"]) and <span className="jms-stat" style={{"color": "var(--jms-danger)"}}>OVER THE 5000-ROW CAP</span>}
+            </div>}
+            {_anyRunning() and <span className="jms-mono-dim">a job is running — FIRE unlocks when it finishes</span>}
+            {hint and <span className="jms-mono-dim" style={{"color": "var(--jms-danger)"}}>{hint}</span>}
+            {genErr and <span className="jms-mono-dim" style={{"color": "var(--jms-danger)"}}>{genErr}</span>}
+        </div>;
+    }
+
+    def _synthJobs -> JsxElement {
+        if len(genJobs) == 0 { return <></>; }
+        return <div className="jms-section flex flex-col gap-2">
+            <span className="jms-section-label">GENERATION JOBS</span>
+            {for j in genJobs {
+                <div key={_g(j, "jid", "")} className="flex items-center gap-2">
+                    <button
+                        className={"jms-pill flex-1" + (" jms-pill-active" if selJid == _g(j, "jid", "") else "")}
+                        onClick={lambda e: MouseEvent { selectJob(_g(j, "jid", "")); }}
+                    >
+                        <span className={"jms-pill-dot" + (" jms-pill-dot-done" if _g(j, "status", "") == "completed" else "")} />
+                        <span>
+                            {_g(j, "jid", "")} · {_g(j, "provider", "")}/{_g(j, "model", "")} ·
+                            {" "}{_g(j, "rows_done", "0")}/{_g(j, "target_rows", "0")} rows ·
+                            {" "}{_g(j, "status", "")} · {_elapsedOf(j)} · {_fmtCost(j["est_cost_usd"])}
+                        </span>
+                    </button>
+                    {_g(j, "status", "") == "running" and <button
+                        className="jms-btn jms-btn-danger"
+                        onClick={lambda e: MouseEvent { stopJob(_g(j, "jid", "")); }}
+                    >STOP</button>}
+                </div>
+            }}
+        </div>;
+    }
+
+    def _synthLog -> JsxElement {
+        if not selJid or selData is None { return <></>; }
+        return <div className="jms-section flex flex-col gap-2">
+            <span className="jms-section-label">JOB {selJid} · {_g(selData, "status", "")}</span>
+            {_g(selData, "error", "") and <span className="jms-mono-dim" style={{"color": "var(--jms-danger)"}}>{_g(selData, "error", "")}</span>}
+            <pre
+                className="jms-mono-dim"
+                style={{"whiteSpace": "pre-wrap", "maxHeight": "260px", "overflow": "auto", "fontSize": "11px", "margin": "0"}}
+            >{_g(selData, "log_tail", "")}</pre>
+        </div>;
+    }
+
     return <div className="flex flex-col gap-5">
         <div className="flex items-center gap-1">
             <button
@@ -432,8 +695,10 @@ def:pub GenerateStage(project: any = None, onRefresh: any = None) -> JsxElement 
             </div>
         </div>}
 
-        {subtab == "synthesize" and <div className="jms-section flex items-center justify-center" style={{"minHeight": "220px"}}>
-            <span className="jms-label">SYNTHESIZE · lands in the next phase</span>
+        {subtab == "synthesize" and <div className="flex flex-col gap-5">
+            {_synthConfig()}
+            {_synthJobs()}
+            {_synthLog()}
         </div>}
     </div>;
 }

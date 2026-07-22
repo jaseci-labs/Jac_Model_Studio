@@ -103,6 +103,30 @@ node JmsGenPlan {
         approved_at: str = "";
 }
 
+"""A SYNTHESIZE-stage generation job, child of a JmsProject
+(`project ++> JmsGenJob`). Mirrors the on-disk job under
+<project>/jobs/<jid>/ (job.json / run.log / progress.json) — the FILES are the
+live source of truth (they survive server restarts); the node is the graph
+index get_project lists from, with rows_done/est_cost_usd/finished synced on
+terminal transitions by jms_gen.sv.jac gen_status. Kept HERE (not in jms_gen)
+for the same one-way-import reason as JmsGenPlan: get_project reads jobs
+without importing jms_gen (which imports jms_projects)."""
+node JmsGenJob {
+    has jid: str = "",
+        status: str = "running",      # running | completed | failed | stopped
+        provider: str = "",           # claude | mlx
+        model: str = "",
+        target_rows: int = 0,
+        max_rows: int = 0,
+        plan_version: int = 1,
+        est_cost_usd: float = 0.0,
+        rows_done: int = 0,
+        regen_of_json: str = "[]",
+        started: str = "",
+        finished: str = "",
+        error: str = "";
+}
+
 # --------------------------------------------------------------- fs helpers ----
 """<workspace_root>/jms-projects/<slug> — the project's on-disk home."""
 def jms_project_dir(slug: str) -> Path {
@@ -208,6 +232,35 @@ def _has_approved_plan(project: JmsProject) -> bool {
         if g.status == "approved" { return True; }
     }
     return False;
+}
+
+# -------------------------------------------------------- gen-job readers -----
+"""Every JmsGenJob hanging off *project* (any order)."""
+def _gen_jobs_of(project: JmsProject) -> list[JmsGenJob] {
+    return [j for j in [project -->][?:JmsGenJob]];
+}
+
+"""One gen job as get_project lists it: node fields + live rows_done read from
+the job's progress.json while running. Full live status (log tail, __EXIT__
+resolution, terminal sync) is jms_gen.sv.jac gen_status's job."""
+def _gen_job_dict(p: JmsProject, j: JmsGenJob) -> dict {
+    rows = j.rows_done;
+    if j.status == "running" {
+        pf = jms_project_dir(p.slug) / "jobs" / j.jid / "progress.json";
+        if pf.exists() {
+            try {
+                prog = dict(json.loads(pf.read_text()));
+                rows = int(str(prog.get("rows_done", rows)));
+            } except Exception {}
+        }
+    }
+    return {
+        "jid": j.jid, "status": j.status, "provider": j.provider, "model": j.model,
+        "target_rows": j.target_rows, "max_rows": j.max_rows,
+        "plan_version": j.plan_version, "rows_done": rows,
+        "est_cost_usd": j.est_cost_usd, "started": j.started,
+        "finished": j.finished, "error": j.error
+    };
 }
 
 # ------------------------------------------------------------------- shapes ----
@@ -358,10 +411,15 @@ def get_project(pid: str) -> dict {
         "curated": _count_lines(dsdir / "train.jsonl")
     };
     plans = _plans_newest_first(p);
+    gjobs: list[dict] = [];
+    for j in _gen_jobs_of(p) { gjobs.append(_gen_job_dict(p, j)); }
+    gjobs.sort(key=lambda d: dict -> str { return str(d["started"]); }, reverse=True);
     stage_state: dict = {
         "sources": "done" if scanned >= 1 else "empty",
         "generate": "done" if _has_approved_plan(p) else "empty",
-        "curate": "empty",
+        # raw rows exist → curation has material to work on. "done" lands with
+        # the curation phase itself.
+        "curate": "in-progress" if int(str(row_stats["raw"])) > 0 else "empty",
         "train": "empty",
         "eval": "empty"
     };
@@ -369,7 +427,7 @@ def get_project(pid: str) -> dict {
         "pid": p.pid, "name": p.name, "slug": p.slug, "use_case": p.use_case,
         "created": p.created, "provider": p.provider, "model": p.model,
         "sources": srcs,
-        "plans": plans, "gen_jobs": [], "train_runs": [], "evals": [],
+        "plans": plans, "gen_jobs": gjobs, "train_runs": [], "evals": [],
         "row_stats": row_stats, "stage_state": stage_state
     };
 }
@@ -395,6 +453,7 @@ def delete_project(pid: str, purge_files: bool = False) -> bool {
     slug = p.slug;
     for s in _sources_of(p) { del s; }
     for g in _gen_plans_of(p) { del g; }
+    for j in _gen_jobs_of(p) { del j; }
     del p;
     if purge_files {
         shutil.rmtree(str(jms_project_dir(slug)), ignore_errors=True);
