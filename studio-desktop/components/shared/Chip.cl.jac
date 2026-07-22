@@ -14,9 +14,8 @@ def:pub Chip(
         onClick={onClick}
         style={{"borderColor": "var(--ws-accent)"} if selected else {}}
         className={cn(
-            "rounded-md border px-3 py-1 text-xs transition-colors",
-            "bg-accent text-foreground" if selected
-                else "border-input text-muted-foreground hover:text-foreground/80",
+            "exp-chip",
+            "exp-chip-active" if selected else "",
             className
         )}
     >

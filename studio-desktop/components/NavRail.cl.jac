@@ -83,9 +83,9 @@ def:pub NavRail(
                 <button
                     key={wid}
                     onClick={lambda e: MouseEvent { onWorkspace(wid); }}
-                    className={"relative flex h-9 items-center gap-2.5 rounded-md px-3 transition-colors " + (
-                        "bg-accent/15 text-foreground" if wid == workspace
-                        else "text-muted-foreground hover:bg-secondary hover:text-foreground/80"
+                    className={"exp-hoverable relative flex h-9 items-center gap-2.5 rounded-lg border px-3 " + (
+                        "border-border bg-accent/15 text-foreground" if wid == workspace
+                        else "border-transparent text-muted-foreground hover:text-foreground"
                     )}
                 >
                     {wid == workspace and <span className="absolute left-0 top-2 bottom-2 w-[2px]" style={{"background": "var(--ws-accent)"}} />}
@@ -102,9 +102,9 @@ def:pub NavRail(
                 <button
                     key={sid}
                     onClick={lambda e: MouseEvent { onSection(sid); }}
-                    className={"relative flex h-9 items-center gap-3 rounded-md px-3 transition-colors " + (
-                        "bg-accent/15 text-foreground" if sid == section
-                        else "text-muted-foreground/80 hover:bg-secondary hover:text-foreground/80"
+                    className={"exp-hoverable relative flex h-9 items-center gap-3 rounded-lg border px-3 " + (
+                        "border-border bg-accent/15 text-foreground" if sid == section
+                        else "border-transparent text-muted-foreground/80 hover:text-foreground"
                     )}
                 >
                     {sid == section and <span className="absolute left-0 top-2 bottom-2 w-[2px]" style={{"background": "var(--ws-accent)"}} />}
@@ -116,7 +116,7 @@ def:pub NavRail(
         <div className="flex-1" />
         <button
             onClick={lambda e: MouseEvent { onSettings(); }}
-            className="mb-2 rounded-md px-2 py-1.5 text-left font-mono text-[10px] tracking-wider text-muted-foreground/80 hover:bg-secondary hover:text-foreground/80"
+            className="exp-hoverable mb-2 rounded-lg border border-transparent px-2 py-1.5 text-left font-mono text-[10px] tracking-wider text-muted-foreground/80 hover:text-foreground"
         >⚙ WORKSPACES</button>
         <span className="micro-label px-2">v3</span>
     </nav>;

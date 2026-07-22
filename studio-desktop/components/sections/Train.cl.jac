@@ -184,7 +184,7 @@ def _compareTable(headline: list) -> JsxElement {
     gsimCells: list = [m["gsim"] if m["ghas"] else "·" for m in hm];
     nullNums: list = [None for m in hm];
 
-    return <div className="relative rounded-md border border-border bg-card p-3 pt-5 overflow-x-auto">
+    return <div className="relative exp-panel p-3 pt-5 overflow-x-auto">
         <span className="micro-label absolute -top-2 left-3 bg-background px-2">COMPARISON</span>
         <table className="w-full border-collapse font-mono text-xs">
             <thead>
@@ -446,9 +446,9 @@ def:pub Train(active: bool) -> JsxElement {
         isRunning = job is not None and str(job["status"]) == "running";
         optKeys = _optKeysFor(backends, formBackend, formMode);
         availBackends = _availBackends(backends, formMode);
-        btn = "rounded-lg border border-input px-3 py-1 font-mono text-[10px] transition-colors hover:border-ring disabled:opacity-30 ";
+        btn = "exp-btn ";
         return <div className="flex items-start gap-4 p-4 pt-5">
-            <div className="relative flex min-w-0 flex-1 flex-col gap-3 rounded-md border border-border bg-card p-4 pt-5">
+            <div className="relative flex min-w-0 flex-1 flex-col gap-3 exp-panel p-4 pt-5">
                 <span className="micro-label absolute -top-2 left-3 bg-background px-2">LAUNCH.CONFIG</span>
 
                 {len(availBackends) > 0 and <Field label="BACKEND">
@@ -458,9 +458,9 @@ def:pub Train(active: bool) -> JsxElement {
                             <button
                                 key={bid}
                                 onClick={lambda e: MouseEvent { formBackend = bid; }}
-                                className={"rounded-md border px-3 py-1 text-xs transition-colors " + (
-                                    "border-accent bg-accent/15 text-foreground" if formBackend == bid
-                                    else "border-input text-muted-foreground hover:text-foreground/80"
+                                className={"exp-chip !text-xs " + (
+                                    "exp-chip-active" if formBackend == bid
+                                    else ""
                                 )}
                             >
                                 {str(b["label"])}
@@ -498,7 +498,7 @@ def:pub Train(active: bool) -> JsxElement {
                 {error and <p className="stat-line mt-1 text-muted-foreground">{error}</p>}
             </div>
 
-            <div className="relative flex min-w-0 flex-1 flex-col gap-3 rounded-md border border-border bg-card p-4 pt-5">
+            <div className="relative flex min-w-0 flex-1 flex-col gap-3 exp-panel p-4 pt-5">
                 <span className="micro-label absolute -top-2 left-3 bg-background px-2">RUN.STATUS</span>
 
                 <div className="flex flex-wrap items-center gap-3">
@@ -543,7 +543,7 @@ def:pub Train(active: bool) -> JsxElement {
                         <button
                             key={str(s["name"]) + "|" + str(s["mode"])}
                             onClick={lambda e: MouseEvent { pickSession(str(s["name"]), str(s["mode"])); }}
-                            className={"rounded-md border px-3 py-1 font-mono text-[10px] tracking-widest transition-colors " + (
+                            className={"exp-hoverable rounded-lg border px-3 py-1 font-mono text-[10px] tracking-widest transition-colors " + (
                                 "border-accent bg-accent/15 text-foreground" if (selName == str(s["name"]) and selMode == str(s["mode"]))
                                 else "border-input text-muted-foreground hover:text-foreground/80"
                             )}
@@ -588,7 +588,7 @@ def:pub Train(active: bool) -> JsxElement {
                             <button
                                 key={name}
                                 onClick={lambda e: MouseEvent { pickHistory(name, selModeH); }}
-                                className={"rounded-md border px-4 py-1.5 font-mono text-xs transition-colors " + (
+                                className={"exp-hoverable rounded-lg border px-4 py-1.5 font-mono text-xs transition-colors " + (
                                     "border-accent bg-accent/15 text-foreground" if selModel == name
                                     else "border-border text-muted-foreground hover:border-ring hover:text-foreground"
                                 )}
@@ -607,7 +607,7 @@ def:pub Train(active: bool) -> JsxElement {
                                 key={mode}
                                 disabled={not (_hasRun(pastSessions, selModel, mode) if selModel != "" else True)}
                                 onClick={lambda e: MouseEvent { pickHistory(selModel if selModel != "" else mdls[0], mode); }}
-                                className={"rounded-md border px-4 py-1.5 font-mono text-xs uppercase tracking-widest transition-colors disabled:opacity-30 " + (
+                                className={"exp-hoverable rounded-lg border px-4 py-1.5 font-mono text-xs uppercase tracking-widest transition-colors disabled:opacity-30 " + (
                                     ("border-[#b89ce8]/50 bg-secondary text-[#b89ce8]" if mode == "dpo" else "border-[#7aa2f7]/50 bg-secondary text-[#7aa2f7]") if selModeH == mode
                                     else "border-border text-muted-foreground hover:border-ring hover:text-foreground"
                                 )}
@@ -664,7 +664,7 @@ def:pub Train(active: bool) -> JsxElement {
                 <button
                     onClick={lambda e: MouseEvent { handleUpdate(); }}
                     disabled={updateState == "updating"}
-                    className={"rounded-lg border border-input px-3 py-1 font-mono text-[10px] transition-colors hover:border-ring disabled:opacity-30 " + (
+                    className={"exp-btn " + (
                         "text-foreground" if updateState == "confirm" else "text-muted-foreground"
                     )}
                 >

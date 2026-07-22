@@ -428,9 +428,9 @@ def:pub Cloud(active: bool) -> JsxElement {
         configured = cred is not None and bool(cred["configured"]);
         source = str(cred["source"]) if cred is not None else "none";
         acctOk = account is not None and bool(account["ok"]);
-        btn = "rounded-lg border border-input px-3 py-1 font-mono text-[10px] transition-colors hover:border-ring disabled:opacity-30 ";
+        btn = "exp-btn ";
         return <div className="flex flex-col gap-4 p-4">
-            <div className="relative rounded-md border border-border bg-card p-4 pt-5">
+            <div className="relative exp-panel p-4 pt-5">
                 <span className="micro-label absolute -top-2 left-3 bg-background px-2">CREDENTIALS</span>
                 <div className="flex flex-wrap items-center gap-3">
                     <StatusGlyph status={"running" if acctOk else "idle"} showLabel={True} />
@@ -443,7 +443,7 @@ def:pub Cloud(active: bool) -> JsxElement {
                 {not configured and <p className="stat-line mt-2 text-muted-foreground">set SPHERON_API_KEY in the environment or paste a per-user key below</p>}
             </div>
 
-            <div className="relative rounded-md border border-border bg-card p-4 pt-5">
+            <div className="relative exp-panel p-4 pt-5">
                 <span className="micro-label absolute -top-2 left-3 bg-background px-2">API KEY</span>
                 <Field label="SPHERON API KEY">
                     <TextInput value={apiKey} onSet={lambda v: str { apiKey = v; }} placeholder="paste key (never echoed back)" mono={True} />
@@ -454,7 +454,7 @@ def:pub Cloud(active: bool) -> JsxElement {
                 </div>
             </div>
 
-            <div className="relative rounded-md border border-border bg-card p-4 pt-5">
+            <div className="relative exp-panel p-4 pt-5">
                 <span className="micro-label absolute -top-2 left-3 bg-background px-2">SSH KEYS</span>
                 <p className="stat-line text-muted-foreground">required to deploy — add your public key once, then reuse it</p>
                 <div className="mt-2 flex flex-col gap-1">
@@ -464,7 +464,7 @@ def:pub Cloud(active: bool) -> JsxElement {
                         <button
                             key={kid}
                             onClick={lambda e: MouseEvent { pickSshKey(kid); }}
-                            className={"rounded-md border px-3 py-1 text-left font-mono text-xs transition-colors " + (
+                            className={"exp-hoverable rounded-lg border px-3 py-1 text-left font-mono text-xs transition-colors " + (
                                 "border-accent bg-accent/15 text-foreground" if selSshKeyId == kid
                                 else "border-border text-muted-foreground hover:border-input"
                             )}
@@ -488,10 +488,10 @@ def:pub Cloud(active: bool) -> JsxElement {
     }
 
     def _instances() -> JsxElement {
-        btn = "rounded-lg border border-input px-3 py-1 font-mono text-[10px] transition-colors hover:border-ring disabled:opacity-30 ";
+        btn = "exp-btn ";
         termBlocked = canTerm is not None and not bool(canTerm["can_terminate"]);
         return <div className="flex items-start gap-4 p-4 pt-5">
-            <div className="relative flex min-w-0 flex-1 flex-col gap-3 rounded-md border border-border bg-card p-4 pt-5">
+            <div className="relative flex min-w-0 flex-1 flex-col gap-3 exp-panel p-4 pt-5">
                 <span className="micro-label absolute -top-2 left-3 bg-background px-2">YOUR DEPLOYMENTS</span>
                 {len(instances) == 0 and <span className="stat-line text-muted-foreground/80">no deployments · start a run from the RUNS tab</span>}
                 <div className="flex flex-col gap-1">
@@ -500,7 +500,7 @@ def:pub Cloud(active: bool) -> JsxElement {
                         <button
                             key={did}
                             onClick={lambda e: MouseEvent { pickInstance(did); }}
-                            className={"rounded-md border px-3 py-2 text-left font-mono text-xs transition-colors " + (
+                            className={"exp-hoverable rounded-lg border px-3 py-2 text-left font-mono text-xs transition-colors " + (
                                 "border-accent bg-accent/15 text-foreground" if selInstance == did
                                 else "border-border text-muted-foreground hover:border-input"
                             )}
@@ -511,7 +511,7 @@ def:pub Cloud(active: bool) -> JsxElement {
                 </div>
             </div>
 
-            <div className="relative flex min-w-0 flex-1 flex-col gap-3 rounded-md border border-border bg-card p-4 pt-5">
+            <div className="relative flex min-w-0 flex-1 flex-col gap-3 exp-panel p-4 pt-5">
                 <span className="micro-label absolute -top-2 left-3 bg-background px-2">DEPLOYMENT DETAIL</span>
                 {selInstance == "" and <span className="stat-line text-muted-foreground/80">select a deployment</span>}
                 {selInstance != "" and instDetail is not None and <>
@@ -559,7 +559,7 @@ def:pub Cloud(active: bool) -> JsxElement {
         return <button
             key={rid}
             onClick={lambda e: MouseEvent { pickRun(rid); }}
-            className={"flex flex-col gap-1 rounded-md border px-3 py-2 text-left transition-colors " + (
+            className={"flex flex-col gap-1 exp-hoverable rounded-lg border px-3 py-2 text-left transition-colors " + (
                 "border-accent bg-accent/15" if selRunId == rid
                 else "border-border hover:border-input"
             )}
@@ -576,7 +576,7 @@ def:pub Cloud(active: bool) -> JsxElement {
     }
 
     def _runDetailPane() -> JsxElement {
-        btn = "rounded-lg border border-input px-3 py-1 font-mono text-[10px] transition-colors hover:border-ring disabled:opacity-30 ";
+        btn = "exp-btn ";
         if runDetail is None {
             return <span className="stat-line text-muted-foreground/80">select a run</span>;
         }
@@ -621,11 +621,11 @@ def:pub Cloud(active: bool) -> JsxElement {
     }
 
     def _runs() -> JsxElement {
-        btn = "rounded-lg border border-input px-3 py-1 font-mono text-[10px] transition-colors hover:border-ring disabled:opacity-30 ";
+        btn = "exp-btn ";
         selOffer = _selectedOffer();
         return <div className="flex flex-col gap-4 p-4">
             <div className="flex items-start gap-4">
-                <div className="relative flex min-w-0 flex-1 flex-col gap-3 rounded-md border border-border bg-card p-4 pt-5">
+                <div className="relative flex min-w-0 flex-1 flex-col gap-3 exp-panel p-4 pt-5">
                     <span className="micro-label absolute -top-2 left-3 bg-background px-2">RUN.CONFIG</span>
 
                     <Field label="OFFER SEARCH">
@@ -643,7 +643,7 @@ def:pub Cloud(active: bool) -> JsxElement {
                                 <button
                                     key={oid}
                                     onClick={lambda e: MouseEvent { pickOffer(oid); }}
-                                    className={"rounded-md border px-3 py-1 font-mono text-xs transition-colors " + (
+                                    className={"exp-hoverable rounded-lg border px-3 py-1 font-mono text-xs transition-colors " + (
                                         "border-accent bg-accent/15 text-foreground" if selOfferId == oid
                                         else "border-input text-muted-foreground hover:text-foreground/80"
                                     )}
@@ -663,7 +663,7 @@ def:pub Cloud(active: bool) -> JsxElement {
                                 <button
                                     key={kid}
                                     onClick={lambda e: MouseEvent { pickSshKey(kid); }}
-                                    className={"rounded-md border px-3 py-1 font-mono text-xs transition-colors " + (
+                                    className={"exp-hoverable rounded-lg border px-3 py-1 font-mono text-xs transition-colors " + (
                                         "border-accent bg-accent/15 text-foreground" if selSshKeyId == kid
                                         else "border-input text-muted-foreground hover:text-foreground/80"
                                     )}
@@ -696,7 +696,7 @@ def:pub Cloud(active: bool) -> JsxElement {
                         <Field label="AUTO-TERMINATE VM">
                             <button
                                 onClick={lambda e: MouseEvent { autoTerm = not autoTerm; }}
-                                className={"rounded-md border px-3 py-1 font-mono text-[10px] transition-colors " + (
+                                className={"exp-hoverable rounded-lg border px-3 py-1 font-mono text-[10px] transition-colors " + (
                                     "border-emerald-700 bg-[#0a1a0f] text-emerald-400" if autoTerm
                                     else "border-red-800 bg-[#1a0505] text-red-400"
                                 )}
@@ -717,13 +717,13 @@ def:pub Cloud(active: bool) -> JsxElement {
                     {error and <p className="stat-line text-muted-foreground">{error}</p>}
                 </div>
 
-                <div className="relative flex min-w-0 flex-1 flex-col gap-3 rounded-md border border-border bg-card p-4 pt-5">
+                <div className="relative flex min-w-0 flex-1 flex-col gap-3 exp-panel p-4 pt-5">
                     <span className="micro-label absolute -top-2 left-3 bg-background px-2">RUN.STATUS</span>
                     {_runDetailPane()}
                 </div>
             </div>
 
-            <div className="relative rounded-md border border-border bg-card p-4 pt-5">
+            <div className="relative exp-panel p-4 pt-5">
                 <span className="micro-label absolute -top-2 left-3 bg-background px-2">CLOUD RUNS</span>
                 {len(runs) == 0 and <span className="stat-line text-muted-foreground/80">no cloud runs yet</span>}
                 <div className="flex flex-col gap-2">

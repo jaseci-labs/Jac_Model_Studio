@@ -44,13 +44,13 @@ def:pub Gallery(prefix: str = "") -> JsxElement {
     }
 
     if len(dirs) == 0 {
-        return <div className="relative rounded-md border border-border bg-card p-3 pt-4">
+        return <div className="relative exp-panel p-3 pt-4">
             <span className="micro-label absolute -top-2 left-3 bg-background px-2">FIGURES · from repo</span>
             <EmptyState label="NO SAVED FIGURES" hint={"no image dirs under " + (prefix if prefix else "the artifact roots")} />
         </div>;
     }
 
-    return <div className="relative rounded-md border border-border bg-card p-3 pt-4">
+    return <div className="relative exp-panel p-3 pt-4">
         <span className="micro-label absolute -top-2 left-3 bg-background px-2">FIGURES · from repo · verbatim</span>
         <div className="mb-3 flex flex-wrap gap-1">
             {for g in dirs {
@@ -79,7 +79,7 @@ def:pub Gallery(prefix: str = "") -> JsxElement {
                                 alt={str(im["name"])}
                                 title={str(im["name"]) + " · click to enlarge"}
                                 onClick={lambda e: MouseEvent { zoom = im; }}
-                                className="w-full cursor-zoom-in rounded border border-border bg-white"
+                                className="exp-hoverable w-full cursor-zoom-in rounded-lg border border-border bg-white"
                             />
                             skip;
                         }}

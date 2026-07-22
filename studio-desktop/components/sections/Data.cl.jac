@@ -179,7 +179,7 @@ def:pub Data -> JsxElement {
     def _rail() -> JsxElement {
         nstages = len(builders) if len(builders) > 0 else 13;
         pct = (doneCount * 100.0) / nstages if nstages > 0 else 0.0;
-        return <div className="relative rounded-md border border-border bg-card p-3 pt-4">
+        return <div className="relative exp-panel p-3 pt-4">
             <span className="micro-label absolute -top-2 left-3 bg-background px-2">PIPELINE</span>
             <div className="mb-3 flex flex-col gap-1.5">
                 <div className="flex items-center justify-between">
@@ -202,8 +202,8 @@ def:pub Data -> JsxElement {
                             <div key={str(stage)}>
                                 <div
                                     onClick={lambda e: MouseEvent { selectStage(str(stage)); }}
-                                    className={"flex cursor-pointer items-center gap-2 rounded px-2 py-1 " + (
-                                        "bg-accent/15" if selectedStage == str(stage) else "hover:bg-secondary"
+                                    className={"exp-hoverable flex cursor-pointer items-center gap-2 rounded-lg border px-2 py-1 " + (
+                                        "border-border bg-accent/15" if selectedStage == str(stage) else "border-transparent hover:text-foreground"
                                     )}
                                 >
                                     <StatusGlyph status={_statusOf(str(stage))} showLabel={False} />
@@ -228,7 +228,7 @@ def:pub Data -> JsxElement {
     def _addExamples() -> JsxElement {
         ph = ('one JSON object per line · sft: {"messages":[...]}' if addTarget == "sft"
             else 'one JSON object per line · dpo: {"prompt","chosen","rejected"}');
-        return <div className="relative rounded-md border border-border bg-card p-3 pt-4">
+        return <div className="relative exp-panel p-3 pt-4">
             <span className="micro-label absolute -top-2 left-3 bg-background px-2">ADD.EXAMPLES</span>
             <div className="flex flex-col gap-3">
                 <Segmented options={["sft", "dpo"]} value={addTarget} onSet={lambda v: str { addTarget = v; }} />
@@ -237,7 +237,7 @@ def:pub Data -> JsxElement {
                     value={addText}
                     onChange={lambda e: ChangeEvent { addText = e.target.value; }}
                     placeholder={ph}
-                    className="w-full rounded-md border border-input bg-popover px-2 py-1.5 font-mono text-xs text-foreground outline-none placeholder:text-muted-foreground/80 focus:border-ring resize-none"
+                    className="exp-input resize-none"
                 ></textarea>
                 <button
                     disabled={addBusy or (not addText.strip())}
@@ -264,7 +264,7 @@ def:pub Data -> JsxElement {
             <div className="grid gap-4" style={{"gridTemplateColumns": "280px 1fr"}}>
                 <div className="flex flex-col gap-4">
                     {_rail()}
-                    {selectedStage and <div className="relative rounded-md border border-border bg-card p-3 pt-4">
+                    {selectedStage and <div className="relative exp-panel p-3 pt-4">
                         <span className="micro-label absolute -top-2 left-3 bg-background px-2">{selectedStage}</span>
                         <LogView text={_logOf(selectedStage)} maxH="14rem" />
                     </div>}

@@ -13,7 +13,7 @@ def:pub TextInput(value: str, onSet: Callable[([str], None)], placeholder: str, 
         value={value}
         onChange={lambda e: ChangeEvent { onSet(e.target.value); }}
         placeholder={placeholder}
-        className={"w-full rounded-md border border-input bg-popover px-2 py-1 text-sm text-foreground outline-none placeholder:text-muted-foreground/80 focus:border-ring " + (
+        className={"exp-input " + (
             "font-mono" if mono else ""
         )}
     />;
@@ -25,9 +25,8 @@ def:pub Segmented(options: list[str], value: str, onSet: Callable[([str], None)]
             <button
                 key={opt}
                 onClick={lambda e: MouseEvent { onSet(opt); }}
-                className={"rounded-md border px-3 py-1 text-xs transition-colors " + (
-                    "border-accent bg-accent/15 text-foreground" if value == opt
-                    else "border-input text-muted-foreground hover:text-foreground/80"
+                className={"exp-chip " + (
+                    "exp-chip-active" if value == opt else ""
                 )}
             >
                 {opt}

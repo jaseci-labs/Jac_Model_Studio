@@ -66,7 +66,7 @@ def _rows(messages: list) -> list[dict] {
 def:pub CodeBlock(lang: str, code: str) -> JsxElement {
     has copied: bool = False;
 
-    return <div className="relative mt-3 mb-1 rounded-lg border border-border bg-popover">
+    return <div className="relative mt-3 mb-1 exp-panel !bg-popover">
         <span className="micro-label absolute -top-2 left-3 bg-background px-2">
             OUTPUT.{(lang.upper() if lang else "TXT")}
         </span>
@@ -116,7 +116,7 @@ def:pub Bubble(msg: dict, label: str, paired: bool, userText: str, onSave: any) 
                 saved = True;
                 setTimeout(lambda -> None { saved = False; }, 1400);
             }}
-            className="micro-label mt-1.5 rounded border border-input px-1.5 py-0.5 text-muted-foreground transition-colors hover:border-ring hover:text-foreground"
+            className="exp-btn mt-1.5"
         >{"SAVED ✓ → sft.jsonl" if saved else "+ SAVE EXAMPLE"}</button>}
     </div>;
 }

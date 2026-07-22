@@ -35,14 +35,14 @@ def:pub ThemeSwitcher(up: bool = True) -> JsxElement {
     }
 
     return <div className="relative">
-        {open and <div className={"absolute left-0 z-50 flex w-36 flex-col gap-1 rounded-md border border-border bg-popover p-2 " + ("bottom-8" if up else "top-8")}>
+        {open and <div className={"absolute left-0 z-50 flex w-36 flex-col gap-1 exp-panel !bg-popover p-2 " + ("bottom-8" if up else "top-8")}>
             {for t in THEMES {
                 <button
                     key={t}
                     onClick={lambda e: MouseEvent { apply(t); }}
-                    className={"rounded-md border px-2 py-1 text-left font-mono text-[10px] tracking-[0.12em] uppercase transition-colors " + (
-                        "border-ring bg-accent text-foreground" if t == theme
-                        else "border-transparent text-muted-foreground hover:text-foreground/80"
+                    className={"exp-chip " + (
+                        "exp-chip-active" if t == theme
+                        else ""
                     )}
                 >
                     {t}

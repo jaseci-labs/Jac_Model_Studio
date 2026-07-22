@@ -181,7 +181,7 @@ def:pub Evals -> JsxElement {
         for m in models {
             if m.available { avail.append(m); }
         }
-        return <div className="relative rounded-md border border-border bg-card p-4 pt-5">
+        return <div className="relative exp-panel p-4 pt-5">
             <span className="micro-label absolute -top-2 left-3 bg-background px-2">EVAL.LAUNCH</span>
             <div className="flex flex-col gap-4">
                 <Field label="KIND">
@@ -200,9 +200,9 @@ def:pub Evals -> JsxElement {
                                 <button
                                     key={str(m.id)}
                                     onClick={lambda e: MouseEvent { modelId = m.id; modelPath = ""; }}
-                                    className={"rounded-md border px-2 py-1 text-xs transition-colors " + (
-                                        "border-accent bg-accent/15 text-foreground" if (modelId == m.id and not modelPath)
-                                        else "border-input text-muted-foreground hover:text-foreground/80"
+                                    className={"exp-chip !text-xs " + (
+                                        "exp-chip-active" if (modelId == m.id and not modelPath)
+                                        else ""
                                     )}
                                 >
                                     {m.label}
@@ -232,7 +232,7 @@ def:pub Evals -> JsxElement {
                 <button
                     onClick={lambda e: MouseEvent { start(); }}
                     disabled={busy}
-                    className="mt-1 w-full rounded-md border border-input bg-secondary py-1.5 text-xs text-foreground transition-colors hover:border-ring hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-40"
+                    className="exp-btn exp-btn-accent mt-1 w-full"
                 >
                     {"LAUNCHING…" if busy else "LAUNCH"}
                 </button>
@@ -261,7 +261,7 @@ def:pub Evals -> JsxElement {
 
     def _runView -> JsxElement {
         run: any = current;
-        return <div className="relative rounded-md border border-border bg-card p-4 pt-5">
+        return <div className="relative exp-panel p-4 pt-5">
             <span className="micro-label absolute -top-2 left-3 bg-background px-2">EVAL.RUN</span>
             {if not run {
                 <span className="micro-label text-muted-foreground/80">NO ACTIVE EVAL</span>
@@ -278,7 +278,7 @@ def:pub Evals -> JsxElement {
                         </div>
                         {str(run.status) == "running" and <button
                             onClick={lambda e: MouseEvent { stopActive(); }}
-                            className="shrink-0 rounded-md border border-input px-3 py-1 text-xs text-muted-foreground transition-colors hover:border-ring hover:text-foreground"
+                            className="exp-btn shrink-0"
                         >
                             STOP
                         </button>}
@@ -292,7 +292,7 @@ def:pub Evals -> JsxElement {
     }
 
     def _history -> JsxElement {
-        return <div className="relative rounded-md border border-border bg-card p-4 pt-5">
+        return <div className="relative exp-panel p-4 pt-5">
             <span className="micro-label absolute -top-2 left-3 bg-background px-2">EVAL.HISTORY</span>
             {if len(history) == 0 {
                 <span className="micro-label text-muted-foreground/80">no evals yet</span>
@@ -371,7 +371,7 @@ def:pub Evals -> JsxElement {
             if str(r.status) == "done" { done.append(r); }
         }
         if len(done) < 2 {
-            return <div className="relative rounded-md border border-border bg-card p-4 pt-5">
+            return <div className="relative exp-panel p-4 pt-5">
                 <span className="micro-label absolute -top-2 left-3 bg-background px-2">MODEL × HOLDOUT</span>
                 <span className="micro-label text-muted-foreground/80">need ≥2 completed evals</span>
             </div>;
@@ -410,7 +410,7 @@ def:pub Evals -> JsxElement {
             }
         }
 
-        return <div className="relative rounded-md border border-border bg-card p-4 pt-5">
+        return <div className="relative exp-panel p-4 pt-5">
             <span className="micro-label absolute -top-2 left-3 bg-background px-2">MODEL × HOLDOUT</span>
             <div className="overflow-x-auto">
                 <table className="w-full text-xs">

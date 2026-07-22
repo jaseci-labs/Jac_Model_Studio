@@ -97,7 +97,7 @@ def:pub CptTrain(active: bool) -> JsxElement {
     }
 
     isRunning = status is not None and str(status["status"]) == "running";
-    btn = "rounded-lg border border-input px-3 py-1 font-mono text-[10px] transition-colors hover:border-ring disabled:opacity-30 ";
+    btn = "exp-btn ";
 
     lastIter = int(str(status["last_iter"])) if status is not None else 0;
     totalIters = int(str(status["total_iters"])) if status is not None else 2586;
@@ -128,7 +128,7 @@ def:pub CptTrain(active: bool) -> JsxElement {
                 <StatTile label="TOK/S" value={_fix(lastTps["y"], 0) if lastTps is not None else "·"} sub="" dim={False} />
             </div>
 
-            <div className="relative rounded-md border border-border bg-card p-3 pt-4">
+            <div className="relative exp-panel p-3 pt-4">
                 <span className="micro-label absolute -top-2 left-3 bg-background px-2">RUN.CTL</span>
                 <div className="flex items-center gap-3">
                     <StatusGlyph status={str(status["status"]) if status is not None else "idle"} showLabel={True} />

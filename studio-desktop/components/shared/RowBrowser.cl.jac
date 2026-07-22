@@ -19,7 +19,7 @@ raw text block (cpt corpus rows + plain-json rows). Called with a props dict."""
 def:pub RowDetail(row: any) -> JsxElement {
     kind = str(row["kind"]);
     structured = row["prompt"] or row["python"] or row["jac"] or row["chosen"];
-    return <div className="rounded-md border border-border bg-card p-3 space-y-2">
+    return <div className="exp-panel p-3 space-y-2">
         {row["prompt"] and <div>
             <div className="micro-label mb-1 text-muted-foreground/80">PROMPT</div>
             <pre className="whitespace-pre-wrap font-mono text-xs text-muted-foreground leading-relaxed">{row["prompt"]}</pre>
@@ -40,7 +40,7 @@ def:pub RowBrowser(
 ) -> JsxElement {
     canPrev = offset > 0;
     canNext = offset + len(rows) < total;
-    return <div className="relative rounded-md border border-border bg-card p-3 pt-4">
+    return <div className="exp-panel p-3 pt-4">
         <span className="micro-label absolute -top-2 left-3 bg-background px-2">{label}</span>
         <div className="mb-3 flex flex-wrap gap-1">
             {(len(files) == 0) and <span className="stat-line">no files</span>}
@@ -48,9 +48,8 @@ def:pub RowBrowser(
                 <button
                     key={str(f.path)}
                     onClick={lambda e: MouseEvent { onOpen(str(f.path)); }}
-                    className={"rounded border px-2 py-0.5 font-mono text-[10px] transition-colors " + (
-                        "border-accent bg-accent/15 text-foreground" if str(f.path) == path
-                        else "border-input text-muted-foreground hover:text-foreground/80"
+                    className={"exp-chip !px-2.5 !py-0.5 !text-[10px] " + (
+                        "exp-chip-active" if str(f.path) == path else ""
                     )}
                 >
                     {f.label} {str(f.count)}

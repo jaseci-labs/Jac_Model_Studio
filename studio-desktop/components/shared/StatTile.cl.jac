@@ -7,7 +7,7 @@ def:pub StatTile(label: str, value: str, sub: str, dim: bool) -> JsxElement {
         <span className="absolute bottom-0 left-0 h-[10px] w-[10px] border-b border-l border-input" />
         <span className="absolute bottom-0 right-0 h-[10px] w-[10px] border-b border-r border-input" />
         <div className="micro-label mb-1">{label}</div>
-        <div className="font-mono text-xl text-foreground">{value}</div>
+        <div className="font-mono text-2xl tracking-tight text-foreground">{value}</div>
         {sub and <div className="stat-line mt-0.5">{sub}</div>}
     </div>;
 }

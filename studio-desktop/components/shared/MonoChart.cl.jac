@@ -35,7 +35,7 @@ def:pub MonoChart(
     last: any = data[len(data) - 1] if len(data) > 0 else None;
     yfmt: any = (lambda v: any { return f"{v:.0e}"; }) if expY else None;
 
-    return <div className="relative rounded-md border border-border bg-card p-3 pt-4">
+    return <div className="exp-panel p-3 pt-4">
         <span className="micro-label absolute -top-2 left-3 bg-background px-2">{title}</span>
         {if len(data) == 0 {
             <div className="micro-label flex items-center justify-center" style={{"height": 180}}>NO SIGNAL</div>

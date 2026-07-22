@@ -97,7 +97,7 @@ def _LadderTip(props: dict) -> JsxElement {
 def _ladderChart(props: dict) -> JsxElement {
     rows = props["rows"];
     keys: list = list(props["keys"]);
-    return <div className="relative rounded-md border border-border bg-card p-3 pt-4">
+    return <div className="relative exp-panel p-3 pt-4">
         <span className="micro-label absolute -top-2 left-3 bg-background px-2">HOLDOUT pass@1 % · by rung (train-N) · Y axis 0–100</span>
         <ResponsiveContainer width="100%" height={260}>
             <LineChart data={rows} margin={{"top": 10, "right": 14, "left": 0, "bottom": 0}}>
@@ -116,7 +116,7 @@ def _ladderChart(props: dict) -> JsxElement {
 }
 
 def _archiveLine(props: dict) -> JsxElement {
-    return <div className="relative rounded-md border border-border bg-card p-3 pt-4">
+    return <div className="relative exp-panel p-3 pt-4">
         <span className="micro-label absolute -top-2 left-3 bg-background px-2">{props["title"]}</span>
         <ResponsiveContainer width="100%" height={180}>
             <LineChart data={props["rows"]} margin={{"top": 10, "right": 14, "left": 0, "bottom": 0}}>
@@ -245,7 +245,7 @@ def:pub Results -> JsxElement {
 
             {(<div className="flex flex-col gap-4">
                 {_ladderChart({"rows": curve, "keys": keys})}
-                <div className="relative rounded-md border border-border bg-card p-3 pt-4">
+                <div className="relative exp-panel p-3 pt-4">
                     <span className="micro-label absolute -top-2 left-3 bg-background px-2">LADDER CELLS</span>
                     <table className="w-full font-mono text-xs">
                         <thead>
@@ -271,12 +271,12 @@ def:pub Results -> JsxElement {
                     </table>
                     <div className="stat-line mt-2 text-muted-foreground/80">gen=holdout (generalization), mem=train recall. Read pass@k, not bare pass@1 — n is small.</div>
                 </div>
-            </div>) if has_live else (<div className="relative rounded-md border border-border bg-card p-4 pt-5">
+            </div>) if has_live else (<div className="relative exp-panel p-4 pt-5">
                 <span className="micro-label absolute -top-2 left-3 bg-background px-2">LADDER</span>
                 <p className="text-sm text-muted-foreground">No ladder results yet. Run <span className="font-mono text-foreground">JAC_LADDER_GO=1 jac run 02-rl-grpo/rl/run_ladder.jac</span> — cells stream into this graph as evals land.</p>
             </div>)}
 
-            {(<div className="relative rounded-md border border-border bg-card p-3 pt-4">
+            {(<div className="relative exp-panel p-3 pt-4">
                 <span className="micro-label absolute -top-2 left-3 bg-background px-2">STEP 7 · SG-IDIOM HOLDOUT (sg walkers held out file-disjoint)</span>
                 {_ladderChart({"rows": sgcurve, "keys": sgkeys})}
                 <table className="mt-3 w-full font-mono text-xs">
@@ -302,7 +302,7 @@ def:pub Results -> JsxElement {
                 <div className="stat-line mt-2 text-muted-foreground/80">Held-out sg slice is the hard frontier (0/5 base). Fresh qwen3coder SFT at rung-all is the only cell to crack it: sg 0→1/5, overall 14.3%→28.6%.</div>
             </div>) if has_sg else <span></span>}
 
-            {(<div className="relative rounded-md border border-border bg-card p-3 pt-4">
+            {(<div className="relative exp-panel p-3 pt-4">
                 <span className="micro-label absolute -top-2 left-3 bg-background px-2">84-TASK HIGHER-POWER RE-RUN (null reproduced on a 2nd corpus)</span>
                 {_ladderChart({"rows": v84curve, "keys": v84keys})}
                 <table className="mt-3 w-full font-mono text-xs">
@@ -334,7 +334,7 @@ def:pub Results -> JsxElement {
                 <span className="micro-label text-muted-foreground">— WEEKEND ARCHIVE · GRPO + WARM-START + STaR (Jun 20–21) —</span>
             </div>
 
-            <div className="relative rounded-md border border-border bg-card p-4 pt-5">
+            <div className="relative exp-panel p-4 pt-5">
                 <span className="micro-label absolute -top-2 left-3 bg-background px-2">RESULT (archive)</span>
                 <p className="text-sm text-foreground/80">
                     Supervised levers (SFT, DPO, gold warm-start) move models here. <b>RL does not.</b> GRPO added nothing (confirmed by pass@8), STaR added a faint flicker that didn't hold, and the bigger Qwen3.6 models can't be trained on 48 GB.
@@ -346,7 +346,7 @@ def:pub Results -> JsxElement {
                 {_archiveLine({"title": "STaR · pass@4 sampled · by round", "rows": STAR4})}
             </div>
 
-            <div className="relative rounded-md border border-border bg-card p-3 pt-4">
+            <div className="relative exp-panel p-3 pt-4">
                 <span className="micro-label absolute -top-2 left-3 bg-background px-2">PHASE 1 · WARM-START LIFT · holdout pass%</span>
                 <ResponsiveContainer width="100%" height={200}>
                     <BarChart data={PHASE1} margin={{"top": 10, "right": 14, "left": 0, "bottom": 0}}>
@@ -362,7 +362,7 @@ def:pub Results -> JsxElement {
                 </ResponsiveContainer>
             </div>
 
-            <div className="relative rounded-md border border-border bg-card p-4 pt-5">
+            <div className="relative exp-panel p-4 pt-5">
                 <span className="micro-label absolute -top-2 left-3 bg-background px-2">FAILURES &amp; WHY (archive)</span>
                 <div className="flex flex-col gap-2.5">
                     {for f in FAILS {

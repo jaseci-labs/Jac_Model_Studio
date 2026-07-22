@@ -111,7 +111,7 @@ def:pub CptData -> JsxElement {
             return <span></span>;
         }
         srcs: list = list(man["sources"]);
-        return <div className="relative rounded-md border border-border bg-card p-3 pt-4">
+        return <div className="relative exp-panel p-3 pt-4">
             <span className="micro-label absolute -top-2 left-3 bg-background px-2">TOKEN.COMPOSITION</span>
             <div className="flex h-4 w-full overflow-hidden rounded-sm">
                 {for s in srcs {
@@ -141,7 +141,7 @@ def:pub CptData -> JsxElement {
         decon: list = list(man["decontam"]);
         dropped = 0;
         for d in decon { dropped += int(d["dropped"]); }
-        return <div className="relative rounded-md border border-border bg-card p-3 pt-4">
+        return <div className="relative exp-panel p-3 pt-4">
             <span className="micro-label absolute -top-2 left-3 bg-background px-2">CODE.GATE · jac check -p per repo</span>
             <div className="overflow-x-auto">
                 <table className="w-full font-mono text-xs">

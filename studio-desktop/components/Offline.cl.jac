@@ -6,9 +6,9 @@ the backend answers again."""
 
 def:pub Offline -> JsxElement {
     return <div className="flex h-screen items-center justify-center">
-        <div className="rounded-lg border border-dashed border-input bg-card p-8 text-center">
+        <div className="exp-panel !border-dashed p-8 text-center">
             <div className="micro-label mb-3">JAC.STUDIO · STATUS</div>
-            <p className="text-lg text-foreground">backend offline</p>
+            <p className="exp-display text-2xl">backend offline</p>
             <p className="mt-2 font-mono text-xs text-muted-foreground">
                 start it with: <span className="text-foreground/80">./start.sh</span>
             </p>

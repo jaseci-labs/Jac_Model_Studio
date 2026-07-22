@@ -84,27 +84,21 @@ def:pub Login(onDone: Callable[([], None)]) -> JsxElement {
         error = "";
     }
 
-    inputCls: str = "w-full rounded-md border border-input bg-popover px-2 py-1 text-sm text-foreground outline-none placeholder:text-muted-foreground/80 focus:border-ring";
+    inputCls: str = "exp-input";
 
     return <div className="flex h-screen items-center justify-center bg-background">
-        <div className="w-full max-w-sm rounded-lg border border-border bg-card p-6">
-            <div className="micro-label mb-1">JAC.STUDIO</div>
-            <h1 className="mb-4 text-lg text-foreground">{_heading(mode)}</h1>
+        <div className="w-full max-w-sm exp-panel p-7">
+            <div className="micro-label mb-2">JAC.STUDIO</div>
+            <h1 className="exp-display mb-5 text-3xl lowercase">{_heading(mode)}</h1>
 
-            <div className="mb-4 flex gap-1">
+            <div className="mb-5 flex gap-1.5">
                 <button
                     onClick={lambda e: MouseEvent { onMode("login"); }}
-                    className={"rounded-md border px-3 py-1 text-xs transition-colors " + (
-                        "border-accent bg-accent/15 text-foreground" if mode == "login"
-                        else "border-input text-muted-foreground hover:text-foreground/80"
-                    )}
+                    className={"exp-chip " + ("exp-chip-active" if mode == "login" else "")}
                 >SIGN IN</button>
                 <button
                     onClick={lambda e: MouseEvent { onMode("signup"); }}
-                    className={"rounded-md border px-3 py-1 text-xs transition-colors " + (
-                        "border-accent bg-accent/15 text-foreground" if mode == "signup"
-                        else "border-input text-muted-foreground hover:text-foreground/80"
-                    )}
+                    className={"exp-chip " + ("exp-chip-active" if mode == "signup" else "")}
                 >CREATE</button>
             </div>
 
@@ -137,10 +131,7 @@ def:pub Login(onDone: Callable[([], None)]) -> JsxElement {
             <button
                 onClick={lambda e: MouseEvent { submit(); }}
                 disabled={busy}
-                className={"mt-5 w-full rounded-md px-3 py-2 text-sm transition-colors " + (
-                    "bg-secondary text-muted-foreground" if busy
-                    else "bg-primary text-primary-foreground hover:bg-white"
-                )}
+                className="exp-btn exp-btn-accent mt-6 w-full !py-2.5 !text-[11px]"
             >
                 {_submitLabel(busy, mode)}
             </button>

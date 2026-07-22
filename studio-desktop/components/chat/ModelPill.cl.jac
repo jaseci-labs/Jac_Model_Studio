@@ -40,7 +40,7 @@ def:pub ModelPill(
             <div className="relative">
                 <button
                     onClick={lambda e: MouseEvent { pickerOpen = not pickerOpen; cmpOpen = False; }}
-                    className="rounded-full border border-input bg-secondary px-4 py-1 text-xs text-foreground hover:border-ring"
+                    className="exp-btn"
                 >
                     {if loadingId {
                         <span>{"loading " + _label(models, loadingId) + "… " + str(loadElapsed) + "s"}</span>
@@ -53,7 +53,7 @@ def:pub ModelPill(
                 </button>
                 {if pickerOpen {
                     <div className="fixed inset-0 z-10" onClick={lambda e: MouseEvent { pickerOpen = False; }} />
-                    <div className="absolute left-0 top-full z-20 mt-1 w-56 rounded-md border border-border bg-popover p-1">
+                    <div className="absolute left-0 top-full z-20 mt-1 w-56 exp-panel !bg-popover p-1">
                         {for m in models {
                             <button
                                 key={str(m.id)}
@@ -81,7 +81,7 @@ def:pub ModelPill(
             >{"⇄ COMPARE" + (" ·ON" if compareId else "")}</button>
             {if cmpOpen {
                 <div className="fixed inset-0 z-10" onClick={lambda e: MouseEvent { cmpOpen = False; }} />
-                <div className="absolute right-0 top-full z-20 mt-1 w-56 rounded-md border border-border bg-popover p-1">
+                <div className="absolute right-0 top-full z-20 mt-1 w-56 exp-panel !bg-popover p-1">
                     <button
                         onClick={lambda e: MouseEvent { onPickCompare(""); cmpOpen = False; }}
                         className="w-full rounded px-2 py-1.5 text-left text-xs text-muted-foreground hover:bg-accent/10"

@@ -5,9 +5,9 @@ outline (default chrome action), solid (the section's primary action), ghost
 import from ...lib.utils { cn }
 
 glob VARIANTS: dict = {
-    "outline": "border border-ring text-foreground hover:bg-muted",
-    "solid": "border border-ring bg-accent text-foreground hover:bg-muted",
-    "ghost": "border border-transparent text-muted-foreground hover:text-foreground"
+    "outline": "exp-btn",
+    "solid": "exp-btn exp-btn-accent",
+    "ghost": "exp-btn exp-btn-ghost"
 };
 
 def:pub Button(
@@ -21,12 +21,7 @@ def:pub Button(
     return <button
         onClick={onClick}
         disabled={disabled}
-        className={cn(
-            "rounded-md px-3 py-1 font-mono text-[10px] tracking-[0.15em] uppercase transition-colors",
-            v,
-            "cursor-not-allowed opacity-40" if disabled else "",
-            className
-        )}
+        className={cn(v, className)}
     >
         {children}
     </button>;

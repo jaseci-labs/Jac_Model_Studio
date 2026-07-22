@@ -42,7 +42,7 @@ def:pub Plan -> JsxElement {
             <span className="micro-label text-muted-foreground/80">03-new/docs/workflow.md</span>
         </div>
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
-            <div className="relative rounded-md border border-border bg-card p-3 pt-4">
+            <div className="relative exp-panel p-3 pt-4">
                 <span className="micro-label absolute -top-2 left-3 bg-background px-2">PHASES</span>
                 <div className="relative flex flex-col gap-0.5 pl-3">
                     <div className="absolute bottom-1 left-0 top-1 w-px bg-secondary"></div>
@@ -59,7 +59,7 @@ def:pub Plan -> JsxElement {
                 </div>
             </div>
 
-            <div className="relative rounded-md border border-border bg-card p-3 pt-4">
+            <div className="relative exp-panel p-3 pt-4">
                 <span className="micro-label absolute -top-2 left-3 bg-background px-2">CHECKLIST</span>
                 <div className="flex flex-col gap-1">
                     {for c in CHECKLIST {

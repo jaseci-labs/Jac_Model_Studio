@@ -124,17 +124,150 @@ body {
 .micro-label {
   font-family: var(--font-mono);
   font-size: 9px;
+  font-weight: 500;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: #6a6a6a;
+  color: var(--muted-foreground);
+  transition: color 180ms ease;
 }
 
-.dashed-rule { border-top: 1px dashed #333; }
+.dashed-rule { border-top: 1px dashed var(--border); }
 
 .stat-line {
   font-family: var(--font-mono);
   font-size: 10px;
-  color: #6a6a6a;
+  color: var(--muted-foreground);
+}
+
+/* ============================================================ electric-minimal
+   Structural layer for the Experiments surface. Mirrors jms.css's component
+   treatment (deliberate radius, hairline borders, accent-glow hover, mono
+   labels/buttons/pills) but consumes THIS app's :root tokens (--accent,
+   --border, --card, --popover, --muted-foreground, --accent-foreground) so
+   Experiments reads as the same product family as the JMS hero/shell WITHOUT
+   redefining any color token or duplicating the .jms-scope. jms.css's .jms-*
+   classes live under .jms-scope and consume --jms-* tokens that don't exist
+   here, so these .exp-* equivalents are the bridge. Layout/spacing stay in the
+   components' Tailwind utilities; these classes own only surface identity. */
+:root {
+  --exp-radius: 12px;                                        /* == --jms-radius */
+  --exp-glow: 0 0 60px -18px rgba(51, 85, 255, 0.55);       /* == --jms-hover-shadow */
+  --exp-accent-tint: rgba(51, 85, 255, 0.14);              /* accent @ 14% (was bg-accent/15) */
+  --exp-accent-ring: 0 0 0 3px rgba(51, 85, 255, 0.18);
+}
+
+/* -- labeled bordered panel — replaces the ~42 hand-rolled
+   `rounded-md border border-border bg-card` blocks. Bumps radius 8px→12px and
+   adds a hover-ready transition. Pair with the existing
+   `.micro-label absolute -top-2 left-3 bg-background px-2` floating tab. */
+.exp-panel {
+  position: relative;
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--exp-radius);
+  transition: border-color 200ms ease, box-shadow 200ms ease,
+    background-color 220ms ease, transform 200ms ease;
+}
+
+/* -- accent-glow hover — the single treatment that makes the JMS surface feel
+   alive rather than flat. Add to any clickable card / nav tile / row / chip. */
+.exp-hoverable {
+  transition: border-color 180ms ease, box-shadow 180ms ease,
+    background-color 200ms ease, color 160ms ease, transform 180ms ease;
+}
+.exp-hoverable:hover {
+  border-color: var(--accent);
+  box-shadow: var(--exp-glow);
+}
+
+/* -- button family (mirrors .jms-btn / .jms-btn-accent / danger / ghost) --- */
+.exp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--exp-radius) * 0.6);
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: color 160ms ease, border-color 160ms ease,
+    background-color 160ms ease, box-shadow 160ms ease, filter 160ms ease;
+}
+.exp-btn:hover { color: var(--foreground); border-color: var(--accent); }
+.exp-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.exp-btn:disabled:hover { color: var(--muted-foreground); border-color: var(--border); }
+.exp-btn-accent {
+  background-color: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-foreground);
+}
+.exp-btn-accent:hover {
+  color: var(--accent-foreground);
+  border-color: var(--accent);
+  filter: brightness(1.12);
+  box-shadow: var(--exp-glow);
+}
+.exp-btn-ghost { border-color: transparent; }
+.exp-btn-ghost:hover { color: var(--foreground); border-color: transparent; }
+.exp-btn-danger { color: var(--foreground); border-color: var(--border); }
+.exp-btn-danger:hover { color: var(--foreground); border-color: var(--muted-foreground); }
+
+/* -- chip / pill (segmented options, session pickers, file chips) --------- */
+.exp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--muted-foreground);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 12px;
+  cursor: pointer;
+  transition: color 160ms ease, border-color 160ms ease,
+    background-color 160ms ease, box-shadow 160ms ease;
+}
+.exp-chip:hover { color: var(--foreground); border-color: var(--accent); }
+.exp-chip-active {
+  color: var(--foreground);
+  border-color: var(--accent);
+  background-color: var(--exp-accent-tint);
+  box-shadow: var(--exp-glow);
+}
+
+/* -- text input / textarea ---------------------------------------------- */
+.exp-input {
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--foreground);
+  background-color: var(--popover);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--exp-radius) * 0.5);
+  padding: 8px 10px;
+  outline: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+.exp-input:focus { border-color: var(--accent); box-shadow: var(--exp-accent-ring); }
+.exp-input::placeholder { color: var(--muted-foreground); opacity: 0.7; }
+
+/* -- display / hero type — Geist at display weight & tight tracking, for the
+   few natural "hero" moments (auth gate heading, offline card, empty states).
+   NOT for dense data/table text — those stay at the normal mono/body scale. */
+.exp-display {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 0.98;
+  color: var(--foreground);
 }
 
 * {

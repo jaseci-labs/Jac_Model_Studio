@@ -17,7 +17,7 @@ def:pub LogView(text: str, maxH: str) -> JsxElement {
     lines = text.split(nl);
     lines.reverse();
     return <pre
-        className="flex flex-col-reverse overflow-y-auto rounded-md border border-border bg-card p-3 font-mono text-[11px] leading-relaxed"
+        className="exp-panel flex flex-col-reverse overflow-y-auto p-3 font-mono text-[11px] leading-relaxed"
         style={{"maxHeight": maxH}}
     >
         {for (i, ln) in enumerate(lines) {

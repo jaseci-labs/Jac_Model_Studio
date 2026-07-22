@@ -74,9 +74,9 @@ def:pub Sidebar(
                             <div
                                 key={str(c.id)}
                                 onClick={lambda e: MouseEvent { if not busy { onOpen(str(c.id)); } }}
-                                className={"group flex cursor-pointer items-center justify-between rounded-md px-2 py-1.5 text-xs " + (
-                                    "bg-accent/15 text-foreground" if str(c.id) == activeId
-                                    else "text-muted-foreground hover:bg-secondary"
+                                className={"exp-hoverable group flex cursor-pointer items-center justify-between rounded-lg border px-2 py-1.5 text-xs " + (
+                                    "border-border bg-accent/15 text-foreground" if str(c.id) == activeId
+                                    else "border-transparent text-muted-foreground hover:text-foreground"
                                 ) + (" opacity-50" if busy else "")}
                             >
                                 <span className="truncate" title={str(c.title)}>{c.title if c.title else "untitled"}</span>

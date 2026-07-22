@@ -97,7 +97,7 @@ def:pub CodeBlock(label: str, code: str, lang: str) -> JsxElement {
         setTimeout(lambda -> None { copied = False; }, 1200);
     }
 
-    return <div className="relative mt-3 mb-1 rounded-lg border border-border bg-popover">
+    return <div className="relative mt-3 mb-1 exp-panel !bg-popover">
         <span className="micro-label absolute -top-2 left-3 bg-background px-2">{tab}</span>
         <button
             onClick={lambda e: MouseEvent { _copy(); }}

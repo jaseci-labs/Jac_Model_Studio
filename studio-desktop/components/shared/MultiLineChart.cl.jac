@@ -15,7 +15,7 @@ def _tick2() -> dict {
 }
 
 def:pub MultiLineChart(title: str, rows: list[dict], names: list[str]) -> JsxElement {
-    return <div className="relative rounded-md border border-border bg-card p-3 pt-4">
+    return <div className="exp-panel p-3 pt-4">
         <span className="micro-label absolute -top-2 left-3 bg-background px-2">{title}</span>
         {if len(rows) == 0 {
             <div className="micro-label flex items-center justify-center" style={{"height": 180}}>NO SIGNAL</div>

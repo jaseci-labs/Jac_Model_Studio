@@ -27,7 +27,7 @@ def:pub Composer(
                 <button
                     key={str(cat["id"])}
                     onClick={lambda e: MouseEvent { onChip(str(cat["id"])); }}
-                    className="rounded-full border border-dashed border-input px-2.5 py-0.5 font-mono text-[9px] text-muted-foreground hover:border-ring hover:text-foreground"
+                    className="exp-chip"
                 >{str(cat["id"])}</button>
             }}
         </div>
@@ -48,7 +48,7 @@ def:pub Composer(
             <button
                 onClick={lambda e: MouseEvent { if busy { onStop(); } else { onSend(value); } }}
                 disabled={(not busy) and not value.strip()}
-                className="rounded-lg border border-input px-3 py-1 font-mono text-[10px] text-foreground/80 hover:border-ring disabled:opacity-30"
+                className="exp-btn"
             >
                 {"■ STOP" if busy else "⏎ SEND"}
             </button>
