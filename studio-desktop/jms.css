@@ -251,12 +251,12 @@
 .jms-hero-panel {
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: flex-start;
   gap: clamp(10px, 1.6vh, 20px);
   min-height: 0;
   min-width: 0;
-  padding: clamp(20px, 3vw, 52px);
+  padding: clamp(48px, 8vh, 96px) clamp(20px, 3vw, 52px) clamp(20px, 3vw, 52px);
   overflow: hidden;
   cursor: pointer;
   text-align: left;
@@ -272,7 +272,7 @@
   font-size: clamp(72px, min(14vw, 26vh), 200px);
 }
 .jms-hero-word-sm {
-  font-size: clamp(30px, min(4.6vw, 10vh), 78px);
+  font-size: clamp(38px, min(5vw, 11vh), 82px);
 }
 .jms-hero-sub {
   font-family: var(--jms-font-body);

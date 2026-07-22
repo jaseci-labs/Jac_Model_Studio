@@ -37,6 +37,7 @@ def:pub Landing(onPick: any = None, theme: str = "", onTheme: any = None) -> Jsx
             >
                 <span className="jms-label jms-hero-kicker">EXISTING LAB</span>
                 <span className="jms-display jms-hero-word-sm">EXPERIMENTS</span>
+                <span className="jms-hero-accent-tick" />
                 <span className="jms-hero-sub">The existing lab: chat, data, train, RL, CPT.</span>
                 <span className="jms-stat">sft/dpo · rl/grpo · cpt workspaces</span>
             </div>
