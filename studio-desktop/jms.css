@@ -1,0 +1,392 @@
+/* jms.css — JMS surface theme system.
+   Self-hosted fonts via @fontsource npm packages (offline webview — no remote
+   URLs). Vite/PostCSS inlines these bare-package @imports into real @font-face
+   rules at build time; keep them FIRST in the file.
+   Everything below is scoped under .jms-scope so the existing Experiments app
+   (global.css terminal theme) stays pixel-identical. Themes override tokens
+   only via .jms-scope[data-jms-theme="…"]; component classes consume tokens. */
+@import "@fontsource-variable/space-grotesk";
+@import "@fontsource-variable/archivo";
+@import "@fontsource-variable/instrument-sans";
+@import "@fontsource/instrument-serif";
+
+/* ---------------------------------------------------------------- scope ---
+   Base tokens = electric-minimal (the default theme), so an empty/unknown
+   data-jms-theme still renders correctly. */
+.jms-scope {
+  --jms-bg: #050507;
+  --jms-bg-raised: #0b0b10;
+  --jms-fg: #f2f2f5;
+  --jms-fg-dim: #85859a;
+  --jms-accent: #3355ff;
+  --jms-accent-2: #59f3ff;
+  --jms-accent-fg: #ffffff;
+  --jms-border: #1a1a22;
+  --jms-ok: #34d399;
+  --jms-danger: #ff4d5e;
+  --jms-font-display: 'Space Grotesk Variable', ui-sans-serif, sans-serif;
+  --jms-font-body: 'Instrument Sans Variable', ui-sans-serif, sans-serif;
+  --jms-font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --jms-radius: 12px;
+  /* secondary knobs (identity, still tokens) */
+  --jms-border-w: 1px;
+  --jms-rule-style: solid;
+  --jms-display-weight: 600;
+  --jms-display-tracking: -0.045em;
+  --jms-display-transform: none;
+  --jms-display-glow: none;
+  --jms-card-shadow: none;
+  --jms-hover-shadow: 0 0 60px -18px rgba(51, 85, 255, 0.55);
+
+  position: relative;
+  color: var(--jms-fg);
+  background-color: var(--jms-bg);
+  font-family: var(--jms-font-body);
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 220ms ease, color 220ms ease;
+}
+
+/* ------------------------------------------------------------- 5 themes --- */
+.jms-scope[data-jms-theme="electric-minimal"] {
+  /* identical to base — declared so the block provably ships in the bundle */
+  --jms-accent: #3355ff;
+  --jms-accent-2: #59f3ff;
+}
+
+.jms-scope[data-jms-theme="warm-industrial"] {
+  --jms-bg: #111008;
+  --jms-bg-raised: #18150b;
+  --jms-fg: #e8e0d0;
+  --jms-fg-dim: #9a8e6f;
+  --jms-accent: #ffb000;
+  --jms-accent-2: #e86c3a;
+  --jms-accent-fg: #111008;
+  --jms-border: #3a3220;
+  --jms-ok: #a3c94a;
+  --jms-danger: #e5533d;
+  --jms-font-display: 'Archivo Variable', ui-sans-serif, sans-serif;
+  --jms-font-body: 'Archivo Variable', ui-sans-serif, sans-serif;
+  --jms-radius: 3px;
+  --jms-border-w: 2px;
+  --jms-display-weight: 850;
+  --jms-display-tracking: -0.015em;
+  --jms-display-transform: uppercase;
+  --jms-hover-shadow: 6px 6px 0 rgba(255, 176, 0, 0.22);
+}
+
+.jms-scope[data-jms-theme="bright-lab"] {
+  --jms-bg: #f7f7f4;
+  --jms-bg-raised: #ffffff;
+  --jms-fg: #16181d;
+  --jms-fg-dim: #5c6270;
+  --jms-accent: #6620e0;
+  --jms-accent-2: #00a37a;
+  --jms-accent-fg: #ffffff;
+  --jms-border: #e4e4dc;
+  --jms-ok: #00a37a;
+  --jms-danger: #d92d20;
+  --jms-font-display: 'Instrument Sans Variable', ui-sans-serif, sans-serif;
+  --jms-font-body: 'Instrument Sans Variable', ui-sans-serif, sans-serif;
+  --jms-radius: 16px;
+  --jms-display-weight: 650;
+  --jms-display-tracking: -0.035em;
+  --jms-card-shadow: 0 1px 2px rgba(22, 24, 29, 0.05), 0 10px 30px rgba(22, 24, 29, 0.06);
+  --jms-hover-shadow: 0 2px 4px rgba(22, 24, 29, 0.06), 0 16px 44px rgba(102, 32, 224, 0.16);
+}
+
+.jms-scope[data-jms-theme="phosphor"] {
+  --jms-bg: #0a0f0a;
+  --jms-bg-raised: #0d150d;
+  --jms-fg: #d8ffd8;
+  --jms-fg-dim: #5f8f66;
+  --jms-accent: #33ff66;
+  --jms-accent-2: #7dffa8;
+  --jms-accent-fg: #06140a;
+  --jms-border: #1d331f;
+  --jms-ok: #33ff66;
+  --jms-danger: #ff6b4a;
+  --jms-font-display: var(--jms-font-mono);
+  --jms-font-body: var(--jms-font-mono);
+  --jms-radius: 2px;
+  --jms-display-weight: 700;
+  --jms-display-tracking: -0.02em;
+  --jms-display-glow: 0 0 16px rgba(51, 255, 102, 0.38), 0 0 2px rgba(51, 255, 102, 0.55);
+  --jms-hover-shadow: 0 0 28px rgba(51, 255, 102, 0.22);
+}
+/* CRT scanline film — very low opacity, non-interactive */
+.jms-scope[data-jms-theme="phosphor"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.16) 0px,
+    rgba(0, 0, 0, 0.16) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
+.jms-scope[data-jms-theme="print-shop"] {
+  --jms-bg: #f4f0e6;
+  --jms-bg-raised: #fbf8f0;
+  --jms-fg: #1a1613;
+  --jms-fg-dim: #6e6558;
+  --jms-accent: #e03e1f;
+  --jms-accent-2: #2a52a3;
+  --jms-accent-fg: #fbf8f0;
+  --jms-border: #cfc5ae;
+  --jms-ok: #3a7d44;
+  --jms-danger: #b3261e;
+  --jms-font-display: 'Instrument Serif', Georgia, serif;
+  --jms-font-body: 'Geist Mono', ui-monospace, monospace;
+  --jms-radius: 2px;
+  --jms-rule-style: dashed;
+  --jms-display-weight: 400;
+  --jms-display-tracking: -0.01em;
+  --jms-card-shadow: 3px 3px 0 rgba(26, 22, 19, 0.10);
+  --jms-hover-shadow: 4px 4px 0 rgba(224, 62, 31, 0.35);
+}
+
+/* ---------------------------------------------------------- components --- */
+.jms-label {
+  font-family: var(--jms-font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--jms-fg-dim);
+  transition: color 180ms ease;
+}
+
+.jms-stat {
+  font-family: var(--jms-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--jms-fg-dim);
+}
+
+.jms-display {
+  font-family: var(--jms-font-display);
+  font-weight: var(--jms-display-weight);
+  letter-spacing: var(--jms-display-tracking);
+  text-transform: var(--jms-display-transform);
+  line-height: 0.92;
+  text-shadow: var(--jms-display-glow);
+  color: var(--jms-fg);
+}
+
+.jms-card {
+  background-color: var(--jms-bg-raised);
+  border: var(--jms-border-w) solid var(--jms-border);
+  border-radius: var(--jms-radius);
+  box-shadow: var(--jms-card-shadow);
+  transition: border-color 200ms ease, box-shadow 200ms ease,
+    transform 200ms ease, background-color 220ms ease;
+}
+.jms-card:hover {
+  border-color: var(--jms-accent);
+  box-shadow: var(--jms-hover-shadow);
+}
+
+.jms-btn {
+  font-family: var(--jms-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--jms-fg-dim);
+  background: transparent;
+  border: 1px solid var(--jms-border);
+  border-radius: calc(var(--jms-radius) * 0.6);
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease;
+}
+.jms-btn:hover {
+  color: var(--jms-fg);
+  border-color: var(--jms-accent);
+}
+.jms-btn-accent {
+  background-color: var(--jms-accent);
+  border-color: var(--jms-accent);
+  color: var(--jms-accent-fg);
+}
+.jms-btn-accent:hover {
+  color: var(--jms-accent-fg);
+  filter: brightness(1.08);
+}
+
+/* ------------------------------------------------------- landing layout --- */
+.jms-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px clamp(16px, 2.5vw, 32px);
+  border-bottom: 1px var(--jms-rule-style) var(--jms-border);
+  flex-shrink: 0;
+}
+
+.jms-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px clamp(16px, 2.5vw, 32px);
+  border-top: 1px var(--jms-rule-style) var(--jms-border);
+  flex-shrink: 0;
+}
+
+.jms-hero-grid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1.12fr 1fr;
+  gap: clamp(12px, 1.6vw, 24px);
+  padding: clamp(14px, 2vw, 28px) clamp(16px, 2.5vw, 32px);
+  overflow: hidden;
+}
+
+.jms-hero-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: clamp(10px, 1.6vh, 20px);
+  min-height: 0;
+  min-width: 0;
+  padding: clamp(20px, 3vw, 52px);
+  overflow: hidden;
+  cursor: pointer;
+  text-align: left;
+}
+.jms-hero-panel:hover {
+  transform: translateY(-2px);
+}
+.jms-hero-panel:hover .jms-hero-kicker {
+  color: var(--jms-accent);
+}
+
+.jms-hero-word {
+  font-size: clamp(72px, min(14vw, 26vh), 200px);
+}
+.jms-hero-word-sm {
+  font-size: clamp(30px, min(4.6vw, 10vh), 78px);
+}
+.jms-hero-sub {
+  font-family: var(--jms-font-body);
+  font-size: clamp(14px, 1.15vw, 18px);
+  line-height: 1.45;
+  color: var(--jms-fg);
+  opacity: 0.85;
+  max-width: 34ch;
+}
+.jms-hero-quiet .jms-hero-sub {
+  color: var(--jms-fg-dim);
+  opacity: 1;
+}
+.jms-hero-accent-tick {
+  width: 34px;
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--jms-accent), var(--jms-accent-2));
+  transition: width 200ms ease;
+}
+.jms-hero-panel:hover .jms-hero-accent-tick {
+  width: 56px;
+}
+
+/* -------------------------------------------------------- theme switcher --- */
+.jms-switcher {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.jms-switcher-name {
+  font-family: var(--jms-font-mono);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--jms-fg-dim);
+}
+.jms-swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--jms-border);
+  padding: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+}
+.jms-swatch:hover {
+  transform: scale(1.18);
+  border-color: var(--jms-fg-dim);
+}
+.jms-swatch-active {
+  box-shadow: 0 0 0 2px var(--jms-bg), 0 0 0 4px var(--jms-accent);
+}
+/* two-tone identity dots — fixed per theme, independent of active tokens */
+.jms-swatch-electric-minimal {
+  background: linear-gradient(135deg, #050507 50%, #3355ff 50%);
+}
+.jms-swatch-warm-industrial {
+  background: linear-gradient(135deg, #111008 50%, #ffb000 50%);
+}
+.jms-swatch-bright-lab {
+  background: linear-gradient(135deg, #f7f7f4 50%, #6620e0 50%);
+}
+.jms-swatch-phosphor {
+  background: linear-gradient(135deg, #0a0f0a 50%, #33ff66 50%);
+}
+.jms-swatch-print-shop {
+  background: linear-gradient(135deg, #f4f0e6 50%, #e03e1f 50%);
+}
+
+/* ------------------------------------------------------------ JMS shell --- */
+.jms-shell-empty {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(12px, 2vh, 22px);
+  padding: clamp(16px, 3vw, 48px);
+  text-align: center;
+  overflow: hidden;
+}
+.jms-shell-word {
+  font-size: clamp(34px, min(6vw, 12vh), 96px);
+}
+
+/* ----------------------------------------------------- hub return button ---
+   Rendered OUTSIDE .jms-scope, floating over the Experiments terminal app —
+   deliberately hardcoded to the global.css monochrome palette so it reads as
+   part of that theme. Bottom-right: NavRail owns the left edge and the ⚙
+   WORKSPACES / v3 footer sits bottom-left. */
+.jms-hub-btn {
+  position: fixed;
+  right: 10px;
+  bottom: 10px;
+  z-index: 60;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Geist Mono', ui-monospace, monospace;
+  font-size: 13px;
+  line-height: 1;
+  color: #8a8a8a;
+  background-color: rgba(13, 13, 13, 0.9);
+  border: 1px solid #262626;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: color 160ms ease, border-color 160ms ease;
+}
+.jms-hub-btn:hover {
+  color: #ededed;
+  border-color: #525252;
+}

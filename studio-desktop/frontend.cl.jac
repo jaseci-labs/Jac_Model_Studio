@@ -25,15 +25,27 @@ sv import from .auth { local_mode }
 import from .auth_session { authEventName, refreshLocalSession, touchSession }
 import from .components.AppShell { AppShell }
 import from .components.Login { Login }
+import from .components.jms.Landing { Landing }
+import from .components.jms.JmsShell { JmsShell }
 
 def:pub app -> JsxElement {
     has authTick: int = 0,
-        checking: bool = True;
+        checking: bool = True,
+        surface: str = "",
+        jmsTheme: str = "";
 
     """On mount: read local_mode() once. Local desktop mints an in-process
     session token (see module docstring); prod falls through to <Login/> when
     no session is present."""
     async can with entry {
+        # Restore the persisted JMS theme before anything renders.
+        w: any = window;
+        try {
+            saved: any = w.localStorage.getItem("jms.theme");
+            jmsTheme = str(saved) if saved else "electric-minimal";
+        } except Exception {
+            jmsTheme = "electric-minimal";
+        }
         lm: bool = False;
         try {
             lm = await local_mode();
@@ -72,9 +84,41 @@ def:pub app -> JsxElement {
     if checking {
         return <div className="h-screen bg-[#0a0a0a]" />;
     }
-    # Valid session (local auto-login OR prod login) → app shell.
+    def applyJmsTheme(t: str) {
+        jmsTheme = t;
+        win: any = window;
+        try {
+            win.localStorage.setItem("jms.theme", t);
+        } except Exception { }
+    }
+
+    # Valid session (local auto-login OR prod login) → surface router:
+    # "" = hub landing, "jms" = new product shell, "experiments" = the existing
+    # AppShell (untouched) plus a small floating hub-return button rendered
+    # here — NOT inside AppShell — so Experiments stays pixel-identical.
     if jacIsLoggedIn() {
-        return <AppShell />;
+        if surface == "jms" {
+            return <JmsShell
+                onHub={lambda { surface = ""; }}
+                theme={jmsTheme}
+                onTheme={applyJmsTheme}
+            />;
+        }
+        if surface == "experiments" {
+            return <div>
+                <AppShell />
+                <button
+                    className="jms-hub-btn"
+                    title="hub"
+                    onClick={lambda e: MouseEvent { surface = ""; }}
+                >◈</button>
+            </div>;
+        }
+        return <Landing
+            onPick={lambda(s: str) { surface = s; }}
+            theme={jmsTheme}
+            onTheme={applyJmsTheme}
+        />;
     }
     # Production gate for logged-out visitors (or expired session).
     return <Login onDone={lambda { authTick = authTick + 1; }} />;
