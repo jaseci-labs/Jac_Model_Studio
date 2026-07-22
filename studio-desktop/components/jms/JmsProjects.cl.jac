@@ -165,7 +165,8 @@ def:pub JmsProjects(onOpen: any = None) -> JsxElement {
     return <div className="min-h-0 flex-1 overflow-y-auto p-6">
         <div className="jms-grid">
             {_newCard()}
-            {[_card(d) for d in rows]}
+            {# _card takes a param → compiles to a props-component; call with a props dict, not positionally
+             [_card({"d": d}) for d in rows]}
         </div>
     </div>;
 }
