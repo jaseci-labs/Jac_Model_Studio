@@ -61,8 +61,8 @@ path = "models/qwen-cpt-v1-fused-q4"
 
 # eval holdout sets (rel to data root); keys are the client-facing holdout ids
 [models.holdouts]
-function = "01-sft-dpo/dataset/eval_holdout/conversion.jsonl"
-graph = "01-sft-dpo/dataset/eval_holdout/graph_conversion.jsonl"
+function = "model-experiments/01-sft-dpo/dataset/eval_holdout/conversion.jsonl"
+graph = "model-experiments/01-sft-dpo/dataset/eval_holdout/graph_conversion.jsonl"
 
 # ---------------------------------------------------------------------------
 # SFT/DPO dataset browser (data.sv.jac) — rels resolve against data_root()
@@ -71,35 +71,35 @@ graph = "01-sft-dpo/dataset/eval_holdout/graph_conversion.jsonl"
 [data]
 # preview-allowed files as [rel, human label]
 preview_files = [
-  ["01-sft-dpo/dataset/conversion/sft.jsonl", "SFT idiomatic core"],
-  ["01-sft-dpo/dataset/conversion/sft_auto.jsonl", "SFT transpile volume"],
-  ["01-sft-dpo/dataset/conversion/dpo.jsonl", "DPO pairs"],
-  ["01-sft-dpo/dataset/mlx/train.jsonl", "MLX SFT train"],
-  ["01-sft-dpo/dataset/mlx/valid.jsonl", "MLX SFT valid"],
-  ["01-sft-dpo/dataset/mlx_dpo/train.jsonl", "MLX DPO train"],
-  ["01-sft-dpo/dataset/mlx_dpo/valid.jsonl", "MLX DPO valid"],
-  ["01-sft-dpo/dataset/eval_holdout/conversion.jsonl", "Holdout (function)"],
-  ["01-sft-dpo/dataset/eval_holdout/graph_conversion.jsonl", "Holdout (graph)"]
+  ["model-experiments/01-sft-dpo/dataset/conversion/sft.jsonl", "SFT idiomatic core"],
+  ["model-experiments/01-sft-dpo/dataset/conversion/sft_auto.jsonl", "SFT transpile volume"],
+  ["model-experiments/01-sft-dpo/dataset/conversion/dpo.jsonl", "DPO pairs"],
+  ["model-experiments/01-sft-dpo/dataset/mlx/train.jsonl", "MLX SFT train"],
+  ["model-experiments/01-sft-dpo/dataset/mlx/valid.jsonl", "MLX SFT valid"],
+  ["model-experiments/01-sft-dpo/dataset/mlx_dpo/train.jsonl", "MLX DPO train"],
+  ["model-experiments/01-sft-dpo/dataset/mlx_dpo/valid.jsonl", "MLX DPO valid"],
+  ["model-experiments/01-sft-dpo/dataset/eval_holdout/conversion.jsonl", "Holdout (function)"],
+  ["model-experiments/01-sft-dpo/dataset/eval_holdout/graph_conversion.jsonl", "Holdout (graph)"]
 ]
 # dataset_stats() SFT file list (rel -> counted into sft_files + sft_total)
 sft_stat_files = [
-  "01-sft-dpo/dataset/conversion/sft.jsonl",
-  "01-sft-dpo/dataset/conversion/sft_auto.jsonl"
+  "model-experiments/01-sft-dpo/dataset/conversion/sft.jsonl",
+  "model-experiments/01-sft-dpo/dataset/conversion/sft_auto.jsonl"
 ]
 
 # add_examples() targets (key -> rel); keys are the client-facing target ids
 [data.append_targets]
-sft = "01-sft-dpo/dataset/conversion/sft.jsonl"
-dpo = "01-sft-dpo/dataset/conversion/dpo.jsonl"
+sft = "model-experiments/01-sft-dpo/dataset/conversion/sft.jsonl"
+dpo = "model-experiments/01-sft-dpo/dataset/conversion/dpo.jsonl"
 
 # dataset_stats() named splits (client-facing key -> rel)
 [data.split_files]
-mlx_train = "01-sft-dpo/dataset/mlx/train.jsonl"
-mlx_valid = "01-sft-dpo/dataset/mlx/valid.jsonl"
-dpo_train = "01-sft-dpo/dataset/mlx_dpo/train.jsonl"
-dpo_valid = "01-sft-dpo/dataset/mlx_dpo/valid.jsonl"
-holdout = "01-sft-dpo/dataset/eval_holdout/conversion.jsonl"
-graph_holdout = "01-sft-dpo/dataset/eval_holdout/graph_conversion.jsonl"
+mlx_train = "model-experiments/01-sft-dpo/dataset/mlx/train.jsonl"
+mlx_valid = "model-experiments/01-sft-dpo/dataset/mlx/valid.jsonl"
+dpo_train = "model-experiments/01-sft-dpo/dataset/mlx_dpo/train.jsonl"
+dpo_valid = "model-experiments/01-sft-dpo/dataset/mlx_dpo/valid.jsonl"
+holdout = "model-experiments/01-sft-dpo/dataset/eval_holdout/conversion.jsonl"
+graph_holdout = "model-experiments/01-sft-dpo/dataset/eval_holdout/graph_conversion.jsonl"
 
 # ---------------------------------------------------------------------------
 # RL (rl.sv.jac / data.sv.jac) — rels resolve against workspace_root()
@@ -113,26 +113,26 @@ rung_order = ["1", "3", "5", "10", "20", "all"]
 # per-source preview files as [rel, label]
 [rl.preview_files]
 SFT = [
-  ["02-rl-grpo/dataset/rl/rft/train.jsonl", "RFT gold · train"],
-  ["02-rl-grpo/dataset/rl/rft/valid.jsonl", "RFT gold · valid"]
+  ["model-experiments/02-rl-grpo/dataset/rl/rft/train.jsonl", "RFT gold · train"],
+  ["model-experiments/02-rl-grpo/dataset/rl/rft/valid.jsonl", "RFT gold · valid"]
 ]
 GRPO = [
-  ["02-rl-grpo/dataset/rl/tasks.jsonl", "reward tasks · all"],
-  ["02-rl-grpo/dataset/rl/train.jsonl", "GRPO train pool"],
-  ["02-rl-grpo/dataset/rl/valid.jsonl", "GRPO valid"]
+  ["model-experiments/02-rl-grpo/dataset/rl/tasks.jsonl", "reward tasks · all"],
+  ["model-experiments/02-rl-grpo/dataset/rl/train.jsonl", "GRPO train pool"],
+  ["model-experiments/02-rl-grpo/dataset/rl/valid.jsonl", "GRPO valid"]
 ]
 conversion = [
-  ["02-rl-grpo/dataset/rl_conv/tasks.jsonl", "python→jac · all"],
-  ["02-rl-grpo/dataset/rl_conv/train.jsonl", "conv train"],
-  ["02-rl-grpo/dataset/rl_conv/holdout.jsonl", "conv holdout"]
+  ["model-experiments/02-rl-grpo/dataset/rl_conv/tasks.jsonl", "python→jac · all"],
+  ["model-experiments/02-rl-grpo/dataset/rl_conv/train.jsonl", "conv train"],
+  ["model-experiments/02-rl-grpo/dataset/rl_conv/holdout.jsonl", "conv holdout"]
 ]
 synthetic = [
-  ["02-rl-grpo/dataset/rl/synthetic.jsonl", "synthetic · fresh (32)"]
+  ["model-experiments/02-rl-grpo/dataset/rl/synthetic.jsonl", "synthetic · fresh (32)"]
 ]
 splits = [
-  ["02-rl-grpo/dataset/rl/holdout.jsonl", "holdout n=18"],
-  ["02-rl-grpo/dataset/rl/holdout_big.jsonl", "holdout n=32 (+syn)"],
-  ["02-rl-grpo/dataset/rl/train_big.jsonl", "train pool (+syn)"]
+  ["model-experiments/02-rl-grpo/dataset/rl/holdout.jsonl", "holdout n=18"],
+  ["model-experiments/02-rl-grpo/dataset/rl/holdout_big.jsonl", "holdout n=32 (+syn)"],
+  ["model-experiments/02-rl-grpo/dataset/rl/train_big.jsonl", "train pool (+syn)"]
 ]
 
 # ---------------------------------------------------------------------------
@@ -140,18 +140,18 @@ splits = [
 # ---------------------------------------------------------------------------
 
 [cpt]
-manifest_rel = "03-new/dataset/cpt/manifest.json"
+manifest_rel = "model-experiments/03-cpt-only/dataset/cpt/manifest.json"
 # source order for the composition bar + stat tiles (largest first)
 src_order = ["docs", "code", "rehearsal", "blogs", "osp_paper"]
 # preview-allowed CPT files as [rel, label]
 files = [
-  ["03-new/dataset/cpt/docs/raw.jsonl", "docs · raw"],
-  ["03-new/dataset/cpt/code/raw.jsonl", "code · raw"],
-  ["03-new/dataset/cpt/blogs/raw.jsonl", "blogs · raw"],
-  ["03-new/dataset/cpt/osp_paper/raw.jsonl", "osp_paper · raw"],
-  ["03-new/dataset/cpt/rehearsal/raw.jsonl", "rehearsal · raw"],
-  ["03-new/dataset/cpt/packed/train.jsonl", "packed · train"],
-  ["03-new/dataset/cpt/packed/valid.jsonl", "packed · valid"]
+  ["model-experiments/03-cpt-only/dataset/cpt/docs/raw.jsonl", "docs · raw"],
+  ["model-experiments/03-cpt-only/dataset/cpt/code/raw.jsonl", "code · raw"],
+  ["model-experiments/03-cpt-only/dataset/cpt/blogs/raw.jsonl", "blogs · raw"],
+  ["model-experiments/03-cpt-only/dataset/cpt/osp_paper/raw.jsonl", "osp_paper · raw"],
+  ["model-experiments/03-cpt-only/dataset/cpt/rehearsal/raw.jsonl", "rehearsal · raw"],
+  ["model-experiments/03-cpt-only/dataset/cpt/packed/train.jsonl", "packed · train"],
+  ["model-experiments/03-cpt-only/dataset/cpt/packed/valid.jsonl", "packed · valid"]
 ]
 
 # meta.type -> short kind label for the row browser
@@ -208,13 +208,13 @@ label = "MLX (local Mac)"
 description = "mlx_lm LoRA + run_probe/run_dpo shell wrappers in the data checkout"
 
 [backends.mlx_local.sft]
-template = "./run_probe.sh {model_id} {run_name}"
+template = "./model-experiments/01-sft-dpo/sft_dpo/run_probe.sh {model_id} {run_name}"
 cwd = "data"
 env_keys = ["EVAL_EVERY", "SUBSET", "DRY_ITERS", "SKIP_DRY", "LIVE_EVAL"]
 log_parser = "mlx"
 
 [backends.mlx_local.dpo]
-template = "./run_dpo.sh {run_name}"
+template = "./model-experiments/01-sft-dpo/sft_dpo/run_dpo.sh {run_name}"
 cwd = "data"
 env_keys = ["DPO_ITERS", "DPO_LR", "DPO_BETA", "DPO_LAYERS", "SUBSET"]
 log_parser = "mlx"
@@ -244,7 +244,7 @@ cwd = "data"
 env_keys = []
 
 # ---------------------------------------------------------------------------
-# Spheron remote paths + GPU backend (spheron.sv.jac / cloudruns.sv.jac)
+# Spheron remote paths + GPU backend (spheron.sv.jac dispatch bridge)
 # ---------------------------------------------------------------------------
 
 [spheron]
