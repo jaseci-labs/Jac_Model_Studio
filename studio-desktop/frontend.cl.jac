@@ -22,7 +22,7 @@ would otherwise leave post-await checks with a ReferenceError)."""
 import from "@jac/runtime" { jacIsLoggedIn }
 import from react { useEffect }
 sv import from .auth { local_mode }
-import from .auth_session { AUTH_EVENT, refreshLocalSession, touchSession }
+import from .auth_session { authEventName, refreshLocalSession, touchSession }
 import from .components.AppShell { AppShell }
 import from .components.Login { Login }
 
@@ -57,12 +57,13 @@ def:pub app -> JsxElement {
         iv = setInterval(lambda { touchSession(); }, 240000);
         handler = lambda(_e: any) { authTick = authTick + 1; };
         w: any = window;
-        w.addEventListener(AUTH_EVENT, handler);
+        evtName = authEventName();
+        w.addEventListener(evtName, handler);
         return lambda {
             if iv is not None {
                 clearInterval(float(str(iv)));
             }
-            w.removeEventListener(AUTH_EVENT, handler);
+            w.removeEventListener(evtName, handler);
         };
     }, [authTick]);
 

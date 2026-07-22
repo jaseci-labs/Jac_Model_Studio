@@ -9,8 +9,8 @@ them both default to the parent of studio-desktop when 01-sft-dpo exists there
 import os;
 import from pathlib { Path }
 
-glob JACGEN_REL: str = "01-sft-dpo/sft_dpo/jacgen";
-glob _WORKSPACE_MARKER: str = "01-sft-dpo";
+glob JACGEN_REL: str = "model-experiments/01-sft-dpo/sft_dpo/jacgen";
+glob _WORKSPACE_MARKER: str = "model-experiments/01-sft-dpo";
 
 def studio_root() -> Path {
     return Path(os.path.dirname(os.path.abspath(__file__)));

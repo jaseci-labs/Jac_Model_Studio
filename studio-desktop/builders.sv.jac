@@ -87,18 +87,10 @@ def run_builder(stage: str) -> BuilderView {
     if existing is not None and str(existing.get("status", "")) == "running" {
         return _build_status(stage, "already running");
     }
-<<<<<<<< HEAD:jms/builders.sv.jac
-    grab = jobs.heavy_acquire(f"builder:{stage}", jf, rl);
-    if not grab["ok"] {
-        return _build_status(stage, f"busy: {grab['busy_with']} is running");
-    }
-    target = f"model-experiments/01-sft-dpo/sft_dpo/jacgen/{shlex.quote(stage)}.jac";
-========
     (auth.user_results_dir() / "_builder").mkdir(parents=True, exist_ok=True);
     # Erase any stale __EXIT__ marker from a prior run.
     rl.write_text("");
     target = paths.jacgen_stage(stage);
->>>>>>>> origin/main:studio-desktop/builders.sv.jac
     inner_cmd = f"{shlex.quote(str(models.jac_bin()))} run {target}";
     cmd = jobs.with_exit_marker(inner_cmd, rl);
     venv_bin = str(models.data_root() / ".venv" / "bin");

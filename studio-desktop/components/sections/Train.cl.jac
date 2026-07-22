@@ -658,11 +658,7 @@ def:pub Train(active: bool) -> JsxElement {
     }
 
     return <div className="flex h-full min-w-0 flex-1 flex-col">
-<<<<<<<< HEAD:jms/components/sections/Train.cl.jac
         <div className="section-header flex items-center justify-between border-b border-border px-4 py-2.5">
-========
-        <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-2.5">
->>>>>>>> origin/main:studio-desktop/components/sections/Train.cl.jac
             <SubTabs tabs={TABS} active={tab.upper()} onTab={onTab} />
             <div className="flex items-center gap-2">
                 <button

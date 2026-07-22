@@ -5,13 +5,16 @@ otherwise 401s every call with no recovery. This module centralizes proactive
 refresh (local desktop re-mint) and reactive recovery (401 → re-mint or logout
 + `jac-auth-expired` event so the shell bounces to <Login/>)."""
 
-import from "@jac/runtime" { jacIsLoggedIn, jacLogout, jacSetToken }
+import from "@jac/runtime" { jacIsLoggedIn, jacLogout, __setLocalStorage }
 sv import from .auth { local_mode, local_session, session_alive }
 
 glob AUTH_EVENT: str = "jac-auth-expired";
 
+# glob does not cross the compiled-module boundary; expose via accessor.
+def:pub authEventName() -> str { return AUTH_EVENT; }
+
 """JSON fetch headers with the current bearer token (for raw SSE fetch)."""
-def bearerHeaders() -> dict {
+def:pub bearerHeaders() -> dict {
     tk: str = "";
     try {
         w: any = window;
@@ -25,7 +28,7 @@ def bearerHeaders() -> dict {
 }
 
 """Re-mint the implicit local-desktop JWT. No-op (returns False) in prod."""
-async def refreshLocalSession() -> bool {
+async def:pub refreshLocalSession() -> bool {
     lm: bool = False;
     try {
         lm = await local_mode();
@@ -38,7 +41,7 @@ async def refreshLocalSession() -> bool {
     try {
         tok = await local_session();
         if tok {
-            jacSetToken(tok);
+            __setLocalStorage("jac_token", tok);
             return True;
         }
     } except Exception {}
@@ -55,7 +58,7 @@ def signalExpired() {
 }
 
 """Attempt recovery after a 401. Returns True when the session was restored."""
-async def handleUnauthorized() -> bool {
+async def:pub handleUnauthorized() -> bool {
     restored: bool = False;
     restored = await refreshLocalSession();
     if restored {
@@ -66,7 +69,7 @@ async def handleUnauthorized() -> bool {
 }
 
 """Proactive keepalive — re-mint locally, ping `session_alive` in prod."""
-async def touchSession() -> bool {
+async def:pub touchSession() -> bool {
     lm: bool = False;
     try {
         lm = await local_mode();

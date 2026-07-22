@@ -134,7 +134,7 @@ def list_chats(workspace: str = "01") -> list[ChatView] {
 
 def create_chat(title: str, workspace: str = "01") -> ChatView {
     now = _now();
-    c = root ++> Chat(title=title, workspace=workspace, created_at=now, updated_at=now);
+    c = (root ++> Chat(title=title, workspace=workspace, created_at=now, updated_at=now))[0];
     return c.to_view();
 }
 
@@ -177,10 +177,10 @@ def add_message(
     if not c {
         return MsgView();
     }
-    m = c ++> Msg(
+    m = (c ++> Msg(
         role=role, content=content, model_id=model_id,
         stats_json=stats_json, pair_group=pair_group, created_at=_now()
-    );
+    ))[0];
     c.updated_at = _now();
     return m.to_view();
 }

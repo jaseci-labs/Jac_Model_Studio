@@ -186,13 +186,8 @@ def:pub Data -> JsxElement {
                     <span className="stat-line text-neutral-500">{str(doneCount)}/{str(nstages)} DONE</span>
                     {runningStage and <span className="micro-label pulse text-neutral-300">⦿ {runningStage}</span>}
                 </div>
-<<<<<<<< HEAD:jms/components/sections/Data.cl.jac
                 <div className="h-1 w-full rounded-full bg-border">
                     <div className="h-1 rounded-full transition-all" style={{"width": str(pct) + "%", "background": "var(--ws-accent)"}}></div>
-========
-                <div className="h-1 w-full rounded-full bg-neutral-800">
-                    <div className="h-1 rounded-full bg-neutral-300 transition-all" style={{"width": str(pct) + "%"}}></div>
->>>>>>>> origin/main:studio-desktop/components/sections/Data.cl.jac
                 </div>
             </div>
             <div className="relative flex flex-col gap-0.5 pl-3">
@@ -260,15 +255,9 @@ def:pub Data -> JsxElement {
     }
 
     return <div className="flex h-full min-w-0 flex-1 flex-col">
-<<<<<<<< HEAD:jms/components/sections/Data.cl.jac
         <div className="section-header flex items-center justify-between border-b border-border px-4 py-2.5">
             <span className="micro-label">DATA · SFT/DPO DATASET</span>
             {runningStage and <span key="running" className="micro-label pulse text-foreground/80">⦿ {runningStage}</span>}
-========
-        <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-2.5">
-            <span className="micro-label">DATA.PIPELINE</span>
-            <span className="micro-label text-neutral-600">DATASET.CTL</span>
->>>>>>>> origin/main:studio-desktop/components/sections/Data.cl.jac
         </div>
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
             {_tiles()}
