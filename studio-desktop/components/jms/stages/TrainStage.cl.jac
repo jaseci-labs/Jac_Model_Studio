@@ -131,7 +131,7 @@ def:pub TrainStage(project: any = None, onRefresh: any = None) -> JsxElement {
 
     def _selectedOffer -> dict {
         for o in offers {
-            if str(o["id"]) == selOfferId { return dict(o); }
+            if str(o["id"]) == selOfferId { return {**o}; }
         }
         return {};
     }
@@ -375,7 +375,7 @@ def:pub TrainStage(project: any = None, onRefresh: any = None) -> JsxElement {
     }
 
     def _detail -> JsxElement {
-        if not selRid or selData is None { return <></>; }
+        if not selRid or not selData { return <></>; }
         d = selData;
         prog: any = d["progress"] if "progress" in d else {};
         cost: any = d["cost"] if "cost" in d else {};

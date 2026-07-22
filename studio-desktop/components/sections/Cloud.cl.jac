@@ -65,7 +65,7 @@ def _phaseIdx(run: any) -> int {
 }
 
 def _costLine(run: any) -> str {
-    cost: dict = dict(run["cost"]);
+    cost: dict = {**run["cost"]};
     rate = float(str(cost["hourly_rate"])) if "hourly_rate" in cost else 0.0;
     usd = float(str(cost["elapsed_usd"])) if "elapsed_usd" in cost else 0.0;
     return f"${rate}/hr · elapsed ${usd}";
@@ -243,11 +243,15 @@ def:pub Cloud(active: bool) -> JsxElement {
     def pickOffer(oid: str) -> None { selOfferId = oid; }
     def pickSshKey(kid: str) -> None { selSshKeyId = kid; }
     def pickRun(rid: str) -> None { selRunId = rid; runDetail = None; confirmTerm = False; }
-    def updateOpt(key: str, value: str) -> None { cloudOpts = {**cloudOpts, key: value}; }
+    def updateOpt(key: str, value: str) -> None {
+        updated: dict = {**cloudOpts};
+        updated[key] = value;
+        cloudOpts = updated;
+    }
 
     def _selectedOffer() -> dict {
         for o in offers {
-            if str(o["id"]) == selOfferId { return dict(o); }
+            if str(o["id"]) == selOfferId { return {**o}; }
         }
         return {};
     }
@@ -318,7 +322,7 @@ def:pub Cloud(active: bool) -> JsxElement {
         os_options = list(offer["os_options"]) if "os_options" in offer else [];
         operating_system = str(os_options[0]) if len(os_options) > 0 else "ubuntu22.04";
         opts: dict = {};
-        for k in cloudOpts {
+        for k in cloudOpts.keys() {
             v = str(cloudOpts[k]).strip();
             if v { opts[str(k)] = v; }
         }
@@ -425,9 +429,9 @@ def:pub Cloud(active: bool) -> JsxElement {
     }
 
     def _setup() -> JsxElement {
-        configured = cred is not None and bool(cred["configured"]);
-        source = str(cred["source"]) if cred is not None else "none";
-        acctOk = account is not None and bool(account["ok"]);
+        configured = bool(cred) and bool(cred["configured"]);
+        source = str(cred["source"]) if cred else "none";
+        acctOk = bool(account) and bool(account["ok"]);
         btn = "exp-btn ";
         return <div className="flex flex-col gap-4 p-4">
             <div className="relative exp-panel p-4 pt-5">
@@ -435,7 +439,7 @@ def:pub Cloud(active: bool) -> JsxElement {
                 <div className="flex flex-wrap items-center gap-3">
                     <StatusGlyph status={"running" if acctOk else "idle"} showLabel={True} />
                     <span className="font-mono text-[11px] text-muted-foreground">source · {source}</span>
-                    {acctOk and account is not None and <span className="font-mono text-[11px] text-muted-foreground">
+                    {acctOk and bool(account) and <span className="font-mono text-[11px] text-muted-foreground">
                         balance ${str(account["balance"])} · {str(account["team_name"])}
                     </span>}
                 </div>
@@ -489,7 +493,7 @@ def:pub Cloud(active: bool) -> JsxElement {
 
     def _instances() -> JsxElement {
         btn = "exp-btn ";
-        termBlocked = canTerm is not None and not bool(canTerm["can_terminate"]);
+        termBlocked = bool(canTerm) and not bool(canTerm["can_terminate"]);
         return <div className="flex items-start gap-4 p-4 pt-5">
             <div className="relative flex min-w-0 flex-1 flex-col gap-3 exp-panel p-4 pt-5">
                 <span className="micro-label absolute -top-2 left-3 bg-background px-2">YOUR DEPLOYMENTS</span>
@@ -514,12 +518,12 @@ def:pub Cloud(active: bool) -> JsxElement {
             <div className="relative flex min-w-0 flex-1 flex-col gap-3 exp-panel p-4 pt-5">
                 <span className="micro-label absolute -top-2 left-3 bg-background px-2">DEPLOYMENT DETAIL</span>
                 {selInstance == "" and <span className="stat-line text-muted-foreground/80">select a deployment</span>}
-                {selInstance != "" and instDetail is not None and <>
+                {selInstance != "" and bool(instDetail) and <>
                     <StatusGlyph status={str(instDetail["cur_state"])} showLabel={True} />
                     <span className="font-mono text-[11px] text-muted-foreground">os · {str(instDetail["image"])}</span>
                     <span className="font-mono text-[11px] text-muted-foreground">hourly · ${str(instDetail["dph_total"])}</span>
                     {str(instDetail["ssh_addr"]) and <span className="font-mono text-[11px] text-muted-foreground break-all">ssh · {str(instDetail["ssh_addr"])}</span>}
-                    {termBlocked and canTerm is not None and <span className="font-mono text-[11px] text-muted-foreground">min runtime · {str(canTerm["time_remaining"])}s remaining</span>}
+                    {termBlocked and bool(canTerm) and <span className="font-mono text-[11px] text-muted-foreground">min runtime · {str(canTerm["time_remaining"])}s remaining</span>}
                     <div className="mt-2 flex flex-wrap gap-2">
                         <button onClick={lambda e: MouseEvent { doDestroy(); }} disabled={busy or termBlocked} className={btn + "text-muted-foreground"}>✕ TERMINATE</button>
                     </div>
@@ -548,6 +552,7 @@ def:pub Cloud(active: bool) -> JsxElement {
     }
 
     def _runRow(run: any) -> JsxElement {
+        if not run { return <></>; }
         rid = str(run["run_id"]);
         status = str(run["status"]);
         alert = bool(run["billing_alert"]);
@@ -570,26 +575,26 @@ def:pub Cloud(active: bool) -> JsxElement {
                 <span className="font-mono text-[10px] text-muted-foreground">{status}</span>
                 {alert and <span className="rounded border border-red-800 bg-[#1a0505] px-1.5 font-mono text-[9px] text-red-400">BILLING?</span>}
             </div>
-            {_phaseChips(run)}
+            {_phaseChips({"run": run})}
             <span className="font-mono text-[10px] text-muted-foreground">{_costLine(run)}</span>
         </button>;
     }
 
     def _runDetailPane() -> JsxElement {
         btn = "exp-btn ";
-        if runDetail is None {
+        if not runDetail {
             return <span className="stat-line text-muted-foreground/80">select a run</span>;
         }
         run: any = runDetail;
         status = str(run["status"]);
         detached = bool(run["detached"]);
         alert = bool(run["billing_alert"]);
-        prog: dict = dict(run["progress"]);
+        prog: dict = {**run["progress"]};
         step = str(prog["step"]) if "step" in prog else "0";
         maxSteps = str(prog["max_steps"]) if "max_steps" in prog else "0";
         loss = str(prog["loss"]) if "loss" in prog and prog["loss"] is not None else "—";
         evalLoss = str(prog["eval_loss"]) if "eval_loss" in prog and prog["eval_loss"] is not None else "—";
-        art: dict = dict(run["artifacts"]);
+        art: dict = {**run["artifacts"]};
         pulled = bool(art["pulled"]) if "pulled" in art else False;
         adapterDir = str(art["adapter_dir"]) if "adapter_dir" in art else "";
         isTerminal = status == "done" or status == "failed" or status == "stopped";
@@ -603,7 +608,7 @@ def:pub Cloud(active: bool) -> JsxElement {
                 <StatusGlyph status={"failed" if status == "detached" else status} showLabel={True} />
                 <span className="font-mono text-[11px] text-muted-foreground">{str(run["name"])} · {str(run["mode"])} · dep {str(run["deployment_id"])}</span>
             </div>
-            {_phaseChips(run)}
+            {_phaseChips({"run": run})}
             <span className="font-mono text-[11px] text-muted-foreground">{_costLine(run)}{" · vm terminated" if bool(run["vm_terminated"]) else ""}</span>
             <span className="font-mono text-[11px] text-muted-foreground">step {step}/{maxSteps} · loss {loss} · eval {evalLoss}</span>
             {str(run["message"]) and <span className="font-mono text-[11px] text-muted-foreground">{str(run["message"])}</span>}
@@ -727,7 +732,7 @@ def:pub Cloud(active: bool) -> JsxElement {
                 <span className="micro-label absolute -top-2 left-3 bg-background px-2">CLOUD RUNS</span>
                 {len(runs) == 0 and <span className="stat-line text-muted-foreground/80">no cloud runs yet</span>}
                 <div className="flex flex-col gap-2">
-                    {[_runRow(rr) for rr in runs]}
+                    {[_runRow({"run": rr}) for rr in runs if rr]}
                 </div>
             </div>
         </div>;

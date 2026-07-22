@@ -8,6 +8,11 @@ Implements the endpoints (paths/shapes copied from studio-desktop/spheron.sv.jac
   GET    /api/deployments/{id}                 -> deployment dict
   GET    /api/deployments/{id}/can-terminate   -> {canTerminate, runtime, timeRemaining, minimumRuntime}
   DELETE /api/deployments/{id}                 -> {"id":..., "status":"terminated"}
+  GET    /api/ssh-keys                         -> [{id, name, fingerprint, createdAt}, ...]
+  POST   /api/ssh-keys                         -> {id, name, fingerprint, createdAt}
+  GET    /api/balance                          -> {"teams":[{teamId, teamName, balance, isCurrentTeam}]}
+  GET    /api/teams                            -> [{id, name}, ...]
+  GET    /api/providers                        -> [str, ...]
 
 Behavior: a new deployment starts "provisioning" and flips to "running" after
 FAKE_BOOT_SECS (env, default 5) with sshCommand "ssh <current-user>@127.0.0.1".
@@ -29,6 +34,8 @@ FAKE_BOOT_SECS = float(os.environ.get("FAKE_BOOT_SECS", "5"))
 
 DEPLOYMENTS = {}   # id -> dict
 _NEXT_ID = [1]
+SSH_KEYS = {}      # id -> dict
+_NEXT_KEY_ID = [1]
 
 FAKE_OFFERS = {
     "data": [
@@ -134,6 +141,12 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/balance":
             return self._send(200, {"teams": [{"teamId": "t1", "teamName": "fake",
                                                "balance": 100.0, "isCurrentTeam": True}]})
+        if path == "/api/teams":
+            return self._send(200, [{"id": "t1", "name": "fake"}])
+        if path == "/api/providers":
+            return self._send(200, ["spheron-ai"])
+        if path == "/api/ssh-keys":
+            return self._send(200, list(SSH_KEYS.values()))
         if path == "/api/deployments":
             return self._send(200, [_dep_view(d) for d in DEPLOYMENTS.values()])
         m = re.match(r"^/api/deployments/([^/]+)/can-terminate$", path)
@@ -156,6 +169,19 @@ class Handler(BaseHTTPRequestHandler):
         if not self._auth_ok():
             return
         path = self.path.split("?")[0].rstrip("/")
+        if path == "/api/ssh-keys":
+            body = self._body()
+            kid = "fake-key-%d" % _NEXT_KEY_ID[0]
+            _NEXT_KEY_ID[0] += 1
+            k = {
+                "id": kid,
+                "name": body.get("name", ""),
+                "fingerprint": "aa:bb:cc:dd:ee:ff:00:11:22:33:44:55:66:77:88:99",
+                "createdAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            }
+            SSH_KEYS[kid] = k
+            print("[fake_spheron] added ssh key %s (%s)" % (kid, k["name"]), flush=True)
+            return self._send(200, k)
         if path == "/api/deployments":
             body = self._body()
             did = "fake-dep-%d" % _NEXT_ID[0]
