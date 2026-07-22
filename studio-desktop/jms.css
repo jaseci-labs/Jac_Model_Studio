@@ -390,3 +390,208 @@
   color: #ededed;
   border-color: #525252;
 }
+
+/* ====================================================== JMS project mgmt ===
+   All token-consuming + theme-agnostic (no hardcoded palette): the project
+   list grid, project-detail stage rail, and the sources-stage form controls.
+   Layout is done with Tailwind utilities in the components; these classes own
+   only the token-colored surfaces (borders, fills, type). */
+
+/* -- project list grid + card ------------------------------------------- */
+.jms-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: clamp(12px, 1.4vw, 20px);
+}
+.jms-pcard {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  min-height: 168px;
+  cursor: pointer;
+}
+.jms-pname {
+  font-family: var(--jms-font-display);
+  font-weight: var(--jms-display-weight);
+  letter-spacing: var(--jms-display-tracking);
+  font-size: 22px;
+  line-height: 1.05;
+  color: var(--jms-fg);
+}
+.jms-clamp2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-family: var(--jms-font-body);
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--jms-fg-dim);
+}
+
+/* -- 5 stage-progress dots ---------------------------------------------- */
+.jms-dots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.jms-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1px solid var(--jms-border);
+  background: transparent;
+  flex-shrink: 0;
+}
+.jms-dot-on {
+  background: var(--jms-accent);
+  border-color: var(--jms-accent);
+}
+
+/* new-project dashed card + inline form */
+.jms-newcard {
+  border-style: dashed !important;
+  align-items: center;
+  justify-content: center;
+  color: var(--jms-fg-dim);
+}
+.jms-newcard:hover { color: var(--jms-fg); }
+
+/* -- form controls (mono, token-colored) -------------------------------- */
+.jms-input,
+.jms-textarea {
+  width: 100%;
+  font-family: var(--jms-font-mono);
+  font-size: 12px;
+  color: var(--jms-fg);
+  background-color: var(--jms-bg);
+  border: 1px solid var(--jms-border);
+  border-radius: calc(var(--jms-radius) * 0.5);
+  padding: 8px 10px;
+  outline: none;
+  transition: border-color 160ms ease;
+}
+.jms-textarea { resize: vertical; min-height: 68px; line-height: 1.45; }
+.jms-input:focus,
+.jms-textarea:focus { border-color: var(--jms-accent); }
+.jms-input::placeholder,
+.jms-textarea::placeholder { color: var(--jms-fg-dim); opacity: 0.7; }
+
+/* kind chip + toggle */
+.jms-chip {
+  font-family: var(--jms-font-mono);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--jms-accent);
+  border: 1px solid var(--jms-border);
+  border-radius: 999px;
+  padding: 2px 8px;
+  background: transparent;
+  flex-shrink: 0;
+}
+
+/* danger variant of jms-btn (delete confirm) */
+.jms-btn-danger { color: var(--jms-danger); border-color: var(--jms-border); }
+.jms-btn-danger:hover { color: var(--jms-danger); border-color: var(--jms-danger); }
+
+/* saved flash */
+.jms-flash {
+  font-family: var(--jms-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--jms-ok);
+}
+
+/* -- project detail: stage rail ----------------------------------------- */
+.jms-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 176px;
+  flex-shrink: 0;
+  padding: 4px;
+}
+.jms-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--jms-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--jms-fg-dim);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: calc(var(--jms-radius) * 0.6);
+  padding: 9px 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease;
+}
+.jms-pill:hover { color: var(--jms-fg); }
+.jms-pill-active {
+  color: var(--jms-fg);
+  background-color: var(--jms-bg-raised);
+  border-color: var(--jms-border);
+}
+.jms-pill-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1px solid var(--jms-border);
+  background: transparent;
+  flex-shrink: 0;
+}
+.jms-pill-dot-done { background: var(--jms-accent); border-color: var(--jms-accent); }
+
+/* -- bordered section frame (like the terminal app's labeled panels) ---- */
+.jms-section {
+  position: relative;
+  border: var(--jms-border-w) solid var(--jms-border);
+  border-radius: var(--jms-radius);
+  background-color: var(--jms-bg-raised);
+  padding: 18px;
+}
+.jms-section-label {
+  position: absolute;
+  top: -8px;
+  left: 14px;
+  padding: 0 8px;
+  background-color: var(--jms-bg);
+  font-family: var(--jms-font-mono);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--jms-fg-dim);
+}
+
+/* source row */
+.jms-srow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px var(--jms-rule-style) var(--jms-border);
+}
+.jms-mono {
+  font-family: var(--jms-font-mono);
+  font-size: 11px;
+  color: var(--jms-fg);
+}
+.jms-mono-dim {
+  font-family: var(--jms-font-mono);
+  font-size: 10px;
+  color: var(--jms-fg-dim);
+}
+/* left-truncate a long path (ellipsis at the START) */
+.jms-trunc-left {
+  direction: rtl;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.jms-trunc-left > * { direction: ltr; unicode-bidi: bidi-override; }

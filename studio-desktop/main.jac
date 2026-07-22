@@ -45,6 +45,14 @@ import from spheron {
     set_spheron_key, clear_spheron_key,
     dispatch_training_job, list_spheron_dispatches, get_spheron_dispatch, stop_spheron_dispatch
 }
+# JMS product surface: per-user project management + source scanning (graph-backed,
+# root ++> JmsProject ++> JmsSource). Consumed by the JmsProjects / JmsProject /
+# SourcesStage client components via `sv import` RPC stubs.
+import from jms_projects {
+    JmsProjectView,
+    create_project, list_projects, get_project, update_project, delete_project,
+    add_source, remove_source, scan_source, write_project_snapshot
+}
 # Local single-user mode: `local_mode()` is the flag the client's auth gate
 # reads; `local_session()` mints an in-process JWT so the desktop client (which
 # can't reach /user/* over HTTP in webview mode) can still establish a session.
