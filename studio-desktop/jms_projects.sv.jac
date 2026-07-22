@@ -127,6 +127,52 @@ node JmsGenJob {
         error: str = "";
 }
 
+"""A TRAIN-stage finetuning run, child of a JmsProject (`project ++> JmsTrainRun`).
+Two backends: `local-mlx` (mlx_lm.lora LoRA under runs/<rid>/, jobs-engine
+detached, one at a time behind the GLOBAL heavy GPU lock) and `spheron` (a remote
+Spheron VM run delegated to cloudruns.sv.jac — the CloudRun node owns the VM
+lifecycle; this node just carries `cloud_run_id` to proxy status through). Kept
+HERE (not in jms_train) for the same one-way-import reason as JmsGenPlan/JmsGenJob:
+get_project reads runs without importing jms_train (which imports jms_projects).
+Live status + terminal node sync are jms_train.sv.jac train_status's job; the node
+fields are the restart-surviving graph index. `adapter_path` is the local dir
+mlx_lm writes / cloudruns pulls the adapter into. `cfg_json` snapshots the opts."""
+node JmsTrainRun {
+    has rid: str = "",
+        backend: str = "local-mlx",   # local-mlx | spheron
+        base_model: str = "",
+        status: str = "running",      # running | completed | failed | stopped
+        cfg_json: str = "",
+        adapter_path: str = "",
+        cloud_run_id: str = "",
+        started: str = "",
+        finished: str = "";
+}
+
+"""An EVAL-stage scoring run over a project's holdout, child of a JmsProject
+(`project ++> JmsEvalRun`). Scores a completed local-mlx train run's adapter on
+the materialized dataset/holdout.jsonl via a detached worker
+(scripts/jms_eval_worker.jac) — the on-disk evals/<eid>/ dir (outputs.jsonl /
+scores.jsonl / summary.json + the jobs-engine job.json/run.log) is the
+restart-surviving source of truth; the node is the graph index synced on terminal
+transitions by jms_eval.sv.jac eval_status. Kept HERE (not in jms_eval) for the
+same one-way-import reason as JmsGenJob/JmsTrainRun: get_project lists evals
+without importing jms_eval (which imports jms_projects). `metric` is judge (Claude
+LLM-as-judge, 1-5) or similarity (difflib ratio → 1-5); mean_score/pass_rate/n are
+filled from summary.json on completion."""
+node JmsEvalRun {
+    has eid: str = "",
+        run_rid: str = "",
+        metric: str = "judge",        # judge | similarity
+        status: str = "running",      # running | completed | failed | stopped
+        n: int = 0,
+        mean_score: float = 0.0,
+        pass_rate: float = 0.0,
+        started: str = "",
+        finished: str = "",
+        error: str = "";
+}
+
 # --------------------------------------------------------------- fs helpers ----
 """<workspace_root>/jms-projects/<slug> — the project's on-disk home."""
 def jms_project_dir(slug: str) -> Path {
@@ -260,6 +306,72 @@ def _gen_job_dict(p: JmsProject, j: JmsGenJob) -> dict {
         "plan_version": j.plan_version, "rows_done": rows,
         "est_cost_usd": j.est_cost_usd, "started": j.started,
         "finished": j.finished, "error": j.error
+    };
+}
+
+# ------------------------------------------------------------ train readers ---
+"""Every JmsTrainRun hanging off *project* (any order)."""
+def _train_runs_of(project: JmsProject) -> list[JmsTrainRun] {
+    return [r for r in [project -->][?:JmsTrainRun]];
+}
+
+"""True iff *adir* (an adapter dir) holds at least one *.safetensors file — the
+"a real adapter landed on disk" test both backends share (mlx_lm writes
+adapters.safetensors; cloudruns pulls adapter_model.safetensors)."""
+def _adapter_on_disk(adir: str) -> bool {
+    if not adir { return False; }
+    d = Path(adir);
+    if not d.is_dir() { return False; }
+    for f in d.glob("*.safetensors") { return True; }
+    return False;
+}
+
+"""One train run as get_project lists it: node fields + a live-ish `adapter_ready`
+disk check. Full live status (job/cloud resolution + terminal node sync) is
+jms_train.sv.jac train_status's job."""
+def _train_run_dict(r: JmsTrainRun) -> dict {
+    return {
+        "rid": r.rid, "backend": r.backend, "base_model": r.base_model,
+        "status": r.status, "adapter_path": r.adapter_path,
+        "adapter_ready": _adapter_on_disk(r.adapter_path),
+        "cloud_run_id": r.cloud_run_id,
+        "started": r.started, "finished": r.finished
+    };
+}
+
+"""A run counts as "done" for the stage dot when it completed AND its adapter is
+on disk (a completed-but-unpulled spheron run stays in-progress)."""
+def _has_done_train(project: JmsProject) -> bool {
+    for r in _train_runs_of(project) {
+        if r.status == "completed" and _adapter_on_disk(r.adapter_path) { return True; }
+    }
+    return False;
+}
+
+"""True iff a train run on *project* is still marked running (node-level; the dot
+only needs the coarse signal, train_status does the live resolution)."""
+def _any_running_train(project: JmsProject) -> bool {
+    for r in _train_runs_of(project) {
+        if r.status == "running" { return True; }
+    }
+    return False;
+}
+
+# ------------------------------------------------------------- eval readers ---
+"""Every JmsEvalRun hanging off *project* (any order)."""
+def _eval_runs_of(project: JmsProject) -> list[JmsEvalRun] {
+    return [e for e in [project -->][?:JmsEvalRun]];
+}
+
+"""One eval run as get_project lists it: the node fields (rounded floats
+client-side). Full live status (job resolution + summary.json read + terminal
+node sync) is jms_eval.sv.jac eval_status's job."""
+def _eval_run_dict(e: JmsEvalRun) -> dict {
+    return {
+        "eid": e.eid, "run_rid": e.run_rid, "metric": e.metric,
+        "status": e.status, "n": e.n, "mean_score": e.mean_score,
+        "pass_rate": e.pass_rate, "started": e.started,
+        "finished": e.finished, "error": e.error
     };
 }
 
@@ -414,6 +526,15 @@ def get_project(pid: str) -> dict {
     gjobs: list[dict] = [];
     for j in _gen_jobs_of(p) { gjobs.append(_gen_job_dict(p, j)); }
     gjobs.sort(key=lambda d: dict -> str { return str(d["started"]); }, reverse=True);
+    truns: list[dict] = [];
+    for r in _train_runs_of(p) { truns.append(_train_run_dict(r)); }
+    truns.sort(key=lambda d: dict -> str { return str(d["started"]); }, reverse=True);
+    evals: list[dict] = [];
+    for e in _eval_runs_of(p) { evals.append(_eval_run_dict(e)); }
+    evals.sort(key=lambda d: dict -> str { return str(d["started"]); }, reverse=True);
+    train_state = "empty";
+    if _has_done_train(p) { train_state = "done"; }
+    elif _any_running_train(p) { train_state = "in-progress"; }
     stage_state: dict = {
         "sources": "done" if scanned >= 1 else "empty",
         "generate": "done" if _has_approved_plan(p) else "empty",
@@ -421,14 +542,16 @@ def get_project(pid: str) -> dict {
         # no split yet → in-progress; nothing generated → empty.
         "curate": ("done" if int(str(row_stats["curated"])) > 0
                    else ("in-progress" if int(str(row_stats["raw"])) > 0 else "empty")),
-        "train": "empty",
+        # a completed run with its adapter on disk → done; a run still going →
+        # in-progress; otherwise empty.
+        "train": train_state,
         "eval": "empty"
     };
     return {
         "pid": p.pid, "name": p.name, "slug": p.slug, "use_case": p.use_case,
         "created": p.created, "provider": p.provider, "model": p.model,
         "sources": srcs,
-        "plans": plans, "gen_jobs": gjobs, "train_runs": [], "evals": [],
+        "plans": plans, "gen_jobs": gjobs, "train_runs": truns, "evals": evals,
         "row_stats": row_stats, "stage_state": stage_state
     };
 }
@@ -455,6 +578,8 @@ def delete_project(pid: str, purge_files: bool = False) -> bool {
     for s in _sources_of(p) { del s; }
     for g in _gen_plans_of(p) { del g; }
     for j in _gen_jobs_of(p) { del j; }
+    for r in _train_runs_of(p) { del r; }
+    for e in _eval_runs_of(p) { del e; }
     del p;
     if purge_files {
         shutil.rmtree(str(jms_project_dir(slug)), ignore_errors=True);

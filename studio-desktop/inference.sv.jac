@@ -25,6 +25,7 @@ import sys;
 import time;
 import threading;
 import resource;
+import importlib;
 
 glob _S: dict = {
     "model": None,
@@ -38,6 +39,27 @@ def _now() -> float { return time.monotonic(); }
 
 def _elapsed(t0: float) -> float { return time.monotonic() - t0; }
 
+"""Residency key: the plain model_id when no adapter (so the base-model chat
+residency used by Experiments Chat is untouched — empty adapter_path behaves
+exactly as before), else model_id+"+"+adapter_path so an adapter-backed JMS chat
+keys separately and switching between the two doesn't needlessly reload."""
+def _reskey(model_id: str, adapter_path: str) -> str {
+    return model_id if not adapter_path else model_id + "+" + adapter_path;
+}
+
+"""mlx_lm.load with an optional LoRA adapter (adapter_path="" → base only). Kept
+in one place so both load paths pass the adapter identically. importlib
+indirection (not `import from mlx_lm { load }` + a direct kwarg call) — the
+adapter_path kwarg crashes the 0.16.1 checker's overload resolution, exactly as
+scripts/jms_gen_worker.jac documents. Returns (model, tokenizer)."""
+def _mlx_load(path: str, adapter_path: str) -> any {
+    mod: any = importlib.import_module("mlx_lm");
+    if adapter_path {
+        return mod.load(path, adapter_path=adapter_path);
+    }
+    return mod.load(path);
+}
+
 def _unload_locked() {
     _S["model"] = None;
     _S["tokenizer"] = None;
@@ -50,24 +72,26 @@ def _unload_locked() {
 }
 
 """Blocking load. Returns seconds spent (0.0 if already resident). Unloads any
-prior model first — only one fits in 48GB. Used by the standalone warm path."""
-def load_sync(model_id: str, path: str) -> float {
+prior model first — only one fits in 48GB. Used by the standalone warm path.
+`adapter_path` (default "") loads a LoRA adapter on top of the base and keys the
+residency separately — the empty-adapter path is byte-identical to before."""
+def load_sync(model_id: str, path: str, adapter_path: str = "") -> float {
     _S["lock"].acquire();
     try {
-        if _S["current_id"] == model_id {
+        key = _reskey(model_id, adapter_path);
+        if _S["current_id"] == key {
             _S["load_seconds"] = 0.0;
             return 0.0;
         }
         if _S["current_id"] {
             _unload_locked();
         }
-        import from mlx_lm { load }
         t0 = _now();
-        loaded: any = load(path);
+        loaded: any = _mlx_load(path, adapter_path);
         _S["model"] = loaded[0];
         _S["tokenizer"] = loaded[1];
         _S["load_seconds"] = _elapsed(t0);
-        _S["current_id"] = model_id;
+        _S["current_id"] = key;
         return _S["load_seconds"] as float;
     } finally {
         _S["lock"].release();
@@ -110,21 +134,22 @@ Frames: {kind:"load",load_s,model_id} once, {kind:"token",token,text} per token,
 {kind:"done",text,tokens,tps,load_s,gen_s} last, {kind:"error",text} on failure."""
 def stream_chat(
     messages: list[dict], model_id: str, path: str,
-    temperature: float, top_p: float, max_tokens: int
+    temperature: float, top_p: float, max_tokens: int, adapter_path: str = ""
 ) -> any {
     _S["lock"].acquire();
     try {
-        import from mlx_lm { load, stream_generate }
+        import from mlx_lm { stream_generate }
         import from mlx_lm.sample_utils { make_sampler }
         load_s = 0.0;
-        if _S["current_id"] != model_id {
+        key = _reskey(model_id, adapter_path);
+        if _S["current_id"] != key {
             if _S["current_id"] { _unload_locked(); }
             t0 = _now();
-            loaded: any = load(path);
+            loaded: any = _mlx_load(path, adapter_path);
             _S["model"] = loaded[0];
             _S["tokenizer"] = loaded[1];
             load_s = _elapsed(t0);
-            _S["current_id"] = model_id;
+            _S["current_id"] = key;
             _S["load_seconds"] = load_s;
         }
         yield {"kind": "load", "load_s": load_s, "model_id": model_id};

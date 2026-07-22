@@ -81,6 +81,22 @@ import from jms_gen {
 import from jms_curate {
     curate_stats, curate_rows, decide_row, decide_page, rejected_ids, materialize
 }
+# JMS TRAIN stage: LoRA finetuning on a project's curated dataset. Two backends —
+# local-mlx (mlx_lm.lora under the heavy GPU lock) + spheron (remote VM run
+# delegated to cloudruns). Consumed by TrainStage via `sv import` RPC stubs.
+import from jms_train {
+    start_train, train_status, stop_train, list_train_runs
+}
+# JMS EVAL stage: score a completed local-mlx run's adapter on the project's
+# holdout (judge = Claude LLM-as-judge / similarity = offline difflib), via a
+# detached worker. Consumed by EvalStage's EVAL tab via `sv import` RPC stubs.
+import from jms_eval {
+    start_eval, eval_status, eval_rows, list_jms_evals, stop_eval_run
+}
+# JMS CHAT: stream a completion from a run's base model + LoRA adapter — same SSE
+# frame protocol as chat_stream, consumed by EvalStage's CHAT tab via a raw fetch
+# reader (not an `sv import` stub), so register it explicitly at the top level.
+import from jms_chat { jms_chat_stream }
 # Local single-user mode: `local_mode()` is the flag the client's auth gate
 # reads; `local_session()` mints an in-process JWT so the desktop client (which
 # can't reach /user/* over HTTP in webview mode) can still establish a session.

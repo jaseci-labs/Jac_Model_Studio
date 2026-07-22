@@ -15,6 +15,8 @@ sv import from ...jms_projects { get_project }
 import from .stages.SourcesStage { SourcesStage }
 import from .stages.GenerateStage { GenerateStage }
 import from .stages.CurateStage { CurateStage }
+import from .stages.TrainStage { TrainStage }
+import from .stages.EvalStage { EvalStage }
 
 glob STAGES: list[dict] = [
     {"id": "sources", "label": "SOURCES"},
@@ -85,10 +87,27 @@ def:pub JmsProject(pid: str = "", onBack: any = None) -> JsxElement {
                 }}
             </div>;
         }
+        if sid == "train" {
+            return <div key={sid} className={cls}>
+                {if loading {
+                    <span className="jms-label">LOADING…</span>
+                    skip;
+                }}
+                {if not loading {
+                    <TrainStage project={project} onRefresh={refresh} />
+                    skip;
+                }}
+            </div>;
+        }
         return <div key={sid} className={cls}>
-            <div className="jms-section flex items-center justify-center" style={{"minHeight": "220px"}}>
-                <span className="jms-label">{label} · lands in a later phase</span>
-            </div>
+            {if loading {
+                <span className="jms-label">LOADING…</span>
+                skip;
+            }}
+            {if not loading {
+                <EvalStage project={project} onRefresh={refresh} />
+                skip;
+            }}
         </div>;
     }
 
