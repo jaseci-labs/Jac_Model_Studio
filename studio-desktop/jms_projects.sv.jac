@@ -417,9 +417,10 @@ def get_project(pid: str) -> dict {
     stage_state: dict = {
         "sources": "done" if scanned >= 1 else "empty",
         "generate": "done" if _has_approved_plan(p) else "empty",
-        # raw rows exist → curation has material to work on. "done" lands with
-        # the curation phase itself.
-        "curate": "in-progress" if int(str(row_stats["raw"])) > 0 else "empty",
+        # train.jsonl materialized (non-empty) → curation done; raw rows exist but
+        # no split yet → in-progress; nothing generated → empty.
+        "curate": ("done" if int(str(row_stats["curated"])) > 0
+                   else ("in-progress" if int(str(row_stats["raw"])) > 0 else "empty")),
         "train": "empty",
         "eval": "empty"
     };

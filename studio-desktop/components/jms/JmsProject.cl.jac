@@ -14,6 +14,7 @@ all). `pid` is the project id; `onBack` returns to the project list."""
 sv import from ...jms_projects { get_project }
 import from .stages.SourcesStage { SourcesStage }
 import from .stages.GenerateStage { GenerateStage }
+import from .stages.CurateStage { CurateStage }
 
 glob STAGES: list[dict] = [
     {"id": "sources", "label": "SOURCES"},
@@ -68,6 +69,18 @@ def:pub JmsProject(pid: str = "", onBack: any = None) -> JsxElement {
                 }}
                 {if not loading {
                     <GenerateStage project={project} onRefresh={refresh} />
+                    skip;
+                }}
+            </div>;
+        }
+        if sid == "curate" {
+            return <div key={sid} className={cls}>
+                {if loading {
+                    <span className="jms-label">LOADING…</span>
+                    skip;
+                }}
+                {if not loading {
+                    <CurateStage project={project} onRefresh={refresh} />
                     skip;
                 }}
             </div>;

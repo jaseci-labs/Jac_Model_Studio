@@ -69,6 +69,11 @@ import from jms_plan {
 import from jms_gen {
     estimate_gen, start_gen, gen_status, stop_gen, list_gen_jobs
 }
+# JMS CURATE stage: file-based accept/reject/edit overlay over raw.jsonl +
+# deterministic train/holdout split (materialize). Consumed by CurateStage.
+import from jms_curate {
+    curate_stats, curate_rows, decide_row, decide_page, rejected_ids, materialize
+}
 # Local single-user mode: `local_mode()` is the flag the client's auth gate
 # reads; `local_session()` mints an in-process JWT so the desktop client (which
 # can't reach /user/* over HTTP in webview mode) can still establish a session.
