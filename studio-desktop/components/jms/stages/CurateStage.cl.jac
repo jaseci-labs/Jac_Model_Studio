@@ -342,8 +342,8 @@ def:pub CurateStage(project: any = None, onRefresh: any = None) -> JsxElement {
             </button>
 
             {open_ and <div className="flex flex-col gap-3" style={{"borderTop": "1px solid var(--jms-border)", "paddingTop": "12px"}}>
-                {editing and _editor(row)}
-                {not editing and _transcript(msgs)}
+                {editing and _editor({"row": row})}
+                {not editing and _transcript({"msgs": msgs})}
                 {not editing and len(chunks) > 0 and <div className="flex flex-wrap items-center gap-2">
                     <span className="jms-label">CHUNKS</span>
                     {for ci in range(len(chunks)) {
@@ -422,7 +422,7 @@ def:pub CurateStage(project: any = None, onRefresh: any = None) -> JsxElement {
         </div>}
 
         {not loading and total > 0 and <div className="flex flex-col gap-3">
-            {[_rowCard(r) for r in rows]}
+            {[_rowCard({"row": r}) for r in rows]}
         </div>}
 
         {not loading and total > 0 and _pager()}

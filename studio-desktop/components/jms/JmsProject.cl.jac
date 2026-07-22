@@ -49,7 +49,7 @@ def:pub JmsProject(pid: str = "", onBack: any = None) -> JsxElement {
         return "empty";
     }
 
-    def _panel(sid: str, label: str) -> JsxElement {
+    def _panel(sid: str) -> JsxElement {
         cls = "min-w-0 flex-1" + ("" if stage == sid else " hidden");
         if sid == "sources" {
             return <div key={sid} className={cls}>
@@ -125,7 +125,9 @@ def:pub JmsProject(pid: str = "", onBack: any = None) -> JsxElement {
             }}
         </div>
         <div className="flex min-w-0 flex-1 overflow-y-auto">
-            {[_panel(str(st["id"]), str(st["label"])) for st in STAGES]}
+            {# _panel takes a param -> compiles to a props-component; call with a
+             # props dict, not positionally (same bug class fixed in JmsProjects.cl.jac).
+             [_panel({"sid": str(st["id"])}) for st in STAGES]}
         </div>
     </div>;
 }

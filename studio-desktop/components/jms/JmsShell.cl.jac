@@ -37,11 +37,11 @@ def:pub JmsShell(onHub: any = None, theme: str = "", onTheme: any = None) -> Jsx
             <div className="flex items-center gap-4">
                 <span className="jms-label">JMS</span>
                 <div className="flex items-center gap-2">
-                    <button
-                        className="jms-label"
-                        style={{"cursor": "pointer" if projectId else "default", "background": "transparent", "border": "none", "padding": "0"}}
-                        onClick={lambda e: MouseEvent { if projectId { backToProjects(); } }}
-                    >PROJECTS</button>
+                    {projectId and <button
+                        className="jms-btn"
+                        onClick={lambda e: MouseEvent { backToProjects(); }}
+                    >‹ PROJECTS</button>}
+                    {not projectId and <span className="jms-label">PROJECTS</span>}
                     {projectId and <span className="jms-label" style={{"color": "var(--jms-fg)"}}>
                         {" / " + projectName}
                     </span>}
