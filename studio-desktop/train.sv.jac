@@ -11,6 +11,7 @@ dict values are `any` so the pid is `int(str(job.get("pid") or 0))` and status/s
 go through `str(...)`; EXCLUDED_RUN_DIRS is a list[str] membership test.
 """
 
+import json;
 import time;
 import shlex;
 import auth;
@@ -40,10 +41,41 @@ def _train_log(name: str, mode: str) -> Path {
     return auth.user_results_dir() / name / "train.log";
 }
 
+"""Cloud-run info for a run dir: {"location": "spheron"|"local", "cloud": {...}}.
+A run dir containing status.json is a supervised remote run (cloudruns.sv.jac);
+the cloud sub-dict surfaces its phase/cost/progress/billing fields."""
+def _cloud_info(name: str) -> dict {
+    sp = auth.user_results_dir() / name / "status.json";
+    if not sp.exists() { return {"location": "local", "cloud": {}}; }
+    st: dict = {};
+    try {
+        st = dict(json.loads(sp.read_text()));
+    } except Exception {
+        return {"location": "spheron", "cloud": {}};
+    }
+    cost_raw = st.get("cost");
+    prog_raw = st.get("progress");
+    art_raw = st.get("artifacts");
+    return {
+        "location": "spheron",
+        "cloud": {
+            "phase": str(st.get("phase", "")),
+            "status": str(st.get("status", "")),
+            "deployment_id": str(st.get("deployment_id", "")),
+            "cost": dict(cost_raw) if isinstance(cost_raw, dict) else {},
+            "progress": dict(prog_raw) if isinstance(prog_raw, dict) else {},
+            "artifacts": dict(art_raw) if isinstance(art_raw, dict) else {},
+            "vm_terminated": bool(st.get("vm_terminated", False)),
+            "heartbeat": str(st.get("heartbeat", ""))
+        }
+    };
+}
+
 """Build a JobStatus dict from the job file + live resolution (shape == _build_status)."""
 def _build_status(name: str, mode: str, message: str = "") -> dict {
     jf = _job_file(name, mode);
     rl = _run_log(name, mode);
+    ci = _cloud_info(name);
     job = jobs.live_status(jf, rl);
     if job is None {
         tl = _train_log(name, mode);
@@ -56,7 +88,9 @@ def _build_status(name: str, mode: str, message: str = "") -> dict {
             "started": "",
             "last_iter": metrics.last_iter(tl),
             "log_tail": metrics.tail(rl, 40),
-            "message": message
+            "message": message,
+            "location": str(ci["location"]),
+            "cloud": dict(ci["cloud"])
         };
     }
     return {
@@ -67,7 +101,9 @@ def _build_status(name: str, mode: str, message: str = "") -> dict {
         "started": str(job.get("started", "")),
         "last_iter": metrics.last_iter(_train_log(name, mode)),
         "log_tail": metrics.tail(rl, 40),
-        "message": message
+        "message": message,
+        "location": str(ci["location"]),
+        "cloud": dict(ci["cloud"])
     };
 }
 
@@ -171,13 +207,16 @@ def list_sessions() -> dict {
                 if st == "idle" { st = "finished"; }
             }
             started = str(job.get("started", "")) if job is not None else "";
+            ci = _cloud_info(nm);
             out.append({
                 "name": nm,
                 "mode": mode,
                 "status": st,
                 "last_iter": metrics.last_iter(logp),
                 "started": started,
-                "label": f"{nm} · {mode.upper()}"
+                "label": f"{nm} · {mode.upper()}",
+                "location": str(ci["location"]),
+                "cloud": dict(ci["cloud"])
             });
         }
     }

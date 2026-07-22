@@ -201,6 +201,32 @@ def _configured() -> bool {
     return bool(os.environ.get("SPHERON_API_KEY", ""));
 }
 
+"""Resolved plaintext API key for out-of-process helpers (the cloudruns
+supervisor spawn env). Same resolution as every spheron_* call: caller's
+stored key wins, else the shared SPHERON_API_KEY env."""
+def resolved_api_key() -> str {
+    return _api_key();
+}
+
+"""Resolved API base URL (SPHERON_API_URL env override honored) — passed to
+the supervisor so server + supervisor always hit the same API."""
+def api_base() -> str {
+    return _base_url();
+}
+
+"""Mark the caller's deployment record terminated (idempotent). Used by
+cloudruns when the supervisor terminated the VM out-of-process (direct API
+DELETE) — without this the budget guard's active-deployment count would keep
+counting the dead VM against SPHERON_MAX_CONCURRENT / the daily budget."""
+def mark_deployment_terminated(id: str) -> None {
+    if not id { return; }
+    for d in [root -->][?:SpheronDeployment] {
+        if d.deployment_id == id and not d.terminated_at {
+            d.terminated_at = _now();
+        }
+    }
+}
+
 """Safe dict getter: o[k] if present else default. Keeps any-typed API dicts
 from throwing on missing keys (deployment schemas vary across providers)."""
 def _f(o: any, k: str, fallback: any = None) -> any {
@@ -466,11 +492,14 @@ def create_gpu_instance(
         audit.log("spheron_create_denied", {"offer_id": offer_id, "reason": guard_err});
         return {"ok": False, "deployment_id": "", "raw": {}, "error": guard_err};
     }
-    resv = root ++> SpheronDeployment(
+    # NB: `root ++> Node()` evaluates to a list at runtime — bind the node
+    # first, then connect, so the attribute writes below hit the node itself.
+    resv = SpheronDeployment(
         deployment_id="", offer_id=offer_id, hourly_rate=hourly_rate,
         gpu_type=gpu_type, gpu_count=gpu_count, provider=provider,
         region=region, created_at=_now()
     );
+    root ++> resv;
     body: dict = {
         "provider": provider,
         "offerId": offer_id,
@@ -859,11 +888,12 @@ def dispatch_training_job(
     did = str(uuid4());
     ignored: list = list(rendered.get("ignored_opts", []));
     msg = ("ignored opts: " + ", ".join(sorted(ignored))) if ignored else "deploying";
-    d = root ++> SpheronDispatch(
+    d = SpheronDispatch(
         did=did, deployment_id=deployment_id, name=name, mode=mode,
         backend=str(rendered["backend"]), inner_cmd=str(rendered["cmd"]),
         status="running", started=_now(), message=msg
     );
+    root ++> d;
     audit.log("spheron_dispatch", {
         "dispatch_id": did, "deployment_id": deployment_id,
         "name": name, "mode": mode, "backend": bk

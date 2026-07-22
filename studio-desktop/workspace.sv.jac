@@ -220,6 +220,12 @@ def spheron_remote_config() -> dict {
     return _dict_of(_sec("spheron"));
 }
 
+"""[cloudrun] section: supervised-run dataset defaults + supervisor policy
+defaults (cloudruns.sv.jac)."""
+def cloudrun_config() -> dict {
+    return _dict_of(_sec("cloudrun"));
+}
+
 # --- UI layout (NavRail + AppShell) -----------------------------------------
 # Workspaces live on the graph (root --> Workspace --> WorkspaceSection) and
 # persist to SQLite (.jac/data/). Each Workspace owns its label, accent, default

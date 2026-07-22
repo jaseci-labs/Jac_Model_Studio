@@ -27,6 +27,7 @@ stdlib only. CLI:
 """
 
 import argparse
+import calendar
 import hashlib
 import json
 import os
@@ -287,8 +288,10 @@ class Supervisor:
         self._billing_epoch = None
         if self.st["cost"].get("started_billing"):
             try:
-                self._billing_epoch = time.mktime(time.strptime(
-                    self.st["cost"]["started_billing"], "%Y-%m-%dT%H:%M:%SZ")) - time.timezone
+                # timegm, not mktime-timezone: the stamp is UTC and mktime's
+                # timezone correction is off by an hour during DST.
+                self._billing_epoch = calendar.timegm(time.strptime(
+                    self.st["cost"]["started_billing"], "%Y-%m-%dT%H:%M:%SZ"))
             except Exception:
                 self._billing_epoch = None
 

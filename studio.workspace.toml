@@ -242,3 +242,45 @@ description = "YAML-driven fine-tuning (not wired yet)"
 template = "accelerate launch -m axolotl.cli.train {config_yaml}"
 cwd = "data"
 env_keys = []
+
+# ---------------------------------------------------------------------------
+# Spheron remote paths + GPU backend (spheron.sv.jac / cloudruns.sv.jac)
+# ---------------------------------------------------------------------------
+
+[spheron]
+remote_workspace_root = "/workspace"
+remote_data_root = "/workspace/data"
+remote_studio_root = "/workspace/studio-desktop"
+
+# Supervised cloud runs (cloudruns.sv.jac + remote/supervisor.py): dataset
+# defaults (data_root-relative), remote dir base, and supervisor policy defaults.
+[cloudrun]
+train_rel = "model-experiments/01-sft-dpo/dataset/mlx/train.jsonl"
+valid_rel = "model-experiments/01-sft-dpo/dataset/mlx/valid.jsonl"
+remote_dir = "studio-run"
+auto_terminate = "on_success"
+max_wall_clock_min = 720
+ssh_wait_timeout_s = 900
+provision_timeout_s = 1800
+stall_timeout_min = 30
+poll_interval_s = 10
+
+[backends.spheron_gpu]
+label = "Spheron GPU (remote)"
+description = "remote/train_sft.py on a Spheron GPU VM, orchestrated by remote/supervisor.py"
+
+# Runs inside <remote_dir> on the VM after bootstrap.sh built .venv and the
+# supervisor uploaded data/train.jsonl + data/valid.jsonl + train_sft.py.
+# {base_model} / {extra_flags} are filled by cloudruns.sv.jac (opts become CLI
+# flags — env vars don't cross the ssh launch, so env_keys stays empty).
+[backends.spheron_gpu.sft]
+template = ".venv/bin/python train_sft.py --model_name_or_path {base_model} --dataset data/train.jsonl --eval_dataset data/valid.jsonl --output_dir output --metrics_file metrics.jsonl{extra_flags}"
+cwd = "data"
+env_keys = []
+log_parser = "mlx"
+
+[backends.spheron_gpu.dpo]
+template = "accelerate launch train_dpo.py --output_dir results/{run_name}"
+cwd = "data"
+env_keys = ["DPO_ITERS", "DPO_LR", "DPO_BETA", "DPO_LAYERS", "SUBSET"]
+log_parser = "mlx"

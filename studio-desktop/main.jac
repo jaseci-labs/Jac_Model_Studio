@@ -45,6 +45,13 @@ import from spheron {
     set_spheron_key, clear_spheron_key,
     dispatch_training_job, list_spheron_dispatches, get_spheron_dispatch, stop_spheron_dispatch
 }
+# Supervised remote GPU runs (cloudruns.sv.jac + remote/supervisor.py): start a
+# Spheron VM run under a detached local supervisor, poll status.json, stop /
+# reattach / re-pull / panic-terminate. Consumed by the Cloud section's RUNS tab.
+import from cloudruns {
+    start_remote_run, run_status, list_cloud_runs,
+    stop_run, reattach_run, pull_artifacts, terminate_run_vm
+}
 # JMS product surface: per-user project management + source scanning (graph-backed,
 # root ++> JmsProject ++> JmsSource). Consumed by the JmsProjects / JmsProject /
 # SourcesStage client components via `sv import` RPC stubs.
