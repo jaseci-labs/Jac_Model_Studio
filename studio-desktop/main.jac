@@ -109,6 +109,7 @@ import from auth { local_mode, local_session }
 
 # Client-side UI
 cl {
+    import "./theme.css";
     import "./global.css";
     import "./jms.css";
     import from .frontend { app as ClientApp }

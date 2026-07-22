@@ -1,13 +1,8 @@
-/* Geist + Geist Mono — the defining schematic typeface. The old Next app loaded
-   these via next/font/google; we have no Next here, so pull them from Google
-   Fonts directly. ponytail: @import over an npm font dep — one line, no build
-   config; swap to @fontsource if offline builds ever matter.
-   NOTE: this remote @import must stay FIRST. Vite/PostCSS inlines the local
-   package imports below (tailwindcss, tw-animate-css) into thousands of lines
-   of CSS but leaves remote url() imports in place — so if this isn't first,
-   the inlined CSS pushes it down and breaks "@import must precede all other
-   statements". */
-@import url('https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&display=swap');
+/* Fonts + every design token this file's classes consume now live in
+   theme.css (loaded before this file — see main.jac's import order). This
+   file only defines: the Tailwind @theme inline binding (still needed here,
+   Tailwind's utility-class generation is per-CSS-file), and the .exp-*
+   component classes that consume theme.css's tokens. */
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -57,49 +52,8 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* electric-minimal — the same identity as the JMS hero/shell (jms.css), applied
-   here so Experiments and JMS read as one product family. Structure/layout is
-   unchanged; only the color tokens moved from flat monochrome gray to the
-   near-black + electric-blue palette. Fonts stay Geist/Geist Mono — chosen for
-   this UI's information density, not part of "theme" the way color is. */
-:root, .dark {
-  --background: #050507;
-  --foreground: #f2f2f5;
-  --card: #0a0a0d;
-  --card-foreground: #f2f2f5;
-  --popover: #0f0f14;
-  --popover-foreground: #f2f2f5;
-  --primary: #f2f2f5;
-  --primary-foreground: #050507;
-  --secondary: #14141a;
-  --secondary-foreground: #f2f2f5;
-  --muted: #101014;
-  --muted-foreground: #8a8a95;
-  --accent: #3355ff;
-  --accent-foreground: #f2f2f5;
-  --destructive: #d4d4d4; /* monochrome: errors are gray + typography, not red */
-  --border: #1a1a22;
-  --input: #2a2a35;
-  --ring: #3355ff;
-  --radius: 0.625rem;
-  /* chart vars: electric blue + cyan lead, grays fill out the rest */
-  --chart-1: #3355ff;
-  --chart-2: #59f3ff;
-  --chart-3: #f2f2f5;
-  --chart-4: #8a8a95;
-  --chart-5: #2a2a35;
-  /* sidebar vars mirror the base palette */
-  --sidebar: #0a0a0d;
-  --sidebar-foreground: #f2f2f5;
-  --sidebar-primary: #f2f2f5;
-  --sidebar-primary-foreground: #050507;
-  --sidebar-accent: #3355ff;
-  --sidebar-accent-foreground: #f2f2f5;
-  --sidebar-border: #1a1a22;
-  --sidebar-ring: #3355ff;
-  --font-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-}
+/* Token values (colors, radius, fonts, sidebar, chart palette) are all
+   defined once in theme.css's :root — nothing to redeclare here. */
 
 @layer base {
   * {
@@ -146,15 +100,10 @@ body {
    --border, --card, --popover, --muted-foreground, --accent-foreground) so
    Experiments reads as the same product family as the JMS hero/shell WITHOUT
    redefining any color token or duplicating the .jms-scope. jms.css's .jms-*
-   classes live under .jms-scope and consume --jms-* tokens that don't exist
-   here, so these .exp-* equivalents are the bridge. Layout/spacing stay in the
-   components' Tailwind utilities; these classes own only surface identity. */
-:root {
-  --exp-radius: 12px;                                        /* == --jms-radius */
-  --exp-glow: 0 0 60px -18px rgba(51, 85, 255, 0.55);       /* == --jms-hover-shadow */
-  --exp-accent-tint: rgba(51, 85, 255, 0.14);              /* accent @ 14% (was bg-accent/15) */
-  --exp-accent-ring: 0 0 0 3px rgba(51, 85, 255, 0.18);
-}
+   classes live under .jms-scope and consume --jms-* tokens; both --jms-* and
+   --exp-* are aliases of the same canonical tokens, declared once in
+   theme.css. Layout/spacing stay in the components' Tailwind utilities;
+   these classes own only surface identity. */
 
 /* -- labeled bordered panel — replaces the ~42 hand-rolled
    `rounded-md border border-border bg-card` blocks. Bumps radius 8px→12px and
@@ -313,11 +262,5 @@ body {
 .tok-com { color: #5a5a5a; }
 
 /* Per-workspace accent (nav tile dots + active-bars only; interiors stay
-   monochrome). --ws-accent is stamped by data-ws on the shell root. */
-:root { --ws01: #3355ff; --ws02: #9ec98f; --ws03: #d8a657; --ws04: #b89ce8; --ws05: #6fc3b2; --ws06: #e08a8a; --ws-accent: #3355ff; }
-[data-ws="01"] { --ws-accent: var(--ws01); }
-[data-ws="02"] { --ws-accent: var(--ws02); }
-[data-ws="03"] { --ws-accent: var(--ws03); }
-[data-ws="04"] { --ws-accent: var(--ws04); }
-[data-ws="05"] { --ws-accent: var(--ws05); }
-[data-ws="06"] { --ws-accent: var(--ws06); }
+   monochrome). --ws0N / --ws-accent / [data-ws] mapping all live in
+   theme.css now — this file only owns the .tok-* syntax colors above. */
