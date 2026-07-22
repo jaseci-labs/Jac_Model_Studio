@@ -73,7 +73,7 @@ def:pub NavRail(
 ) -> JsxElement {
     wsList: list = list(layout["workspaces"]);
     secList: list = _sectionsFor(layout, workspace);
-    return <nav className="flex w-40 shrink-0 flex-col border-r border-neutral-800 bg-[#0d0d0d] px-2 py-3">
+    return <nav className="flex w-40 shrink-0 flex-col border-r border-border bg-card px-2 py-3">
         <span className="micro-label mb-4 px-2">JAC·ML STUDIO</span>
         <div className="flex flex-col gap-1">
             {for ws in wsList {
@@ -84,8 +84,8 @@ def:pub NavRail(
                     key={wid}
                     onClick={lambda e: MouseEvent { onWorkspace(wid); }}
                     className={"relative flex h-9 items-center gap-2.5 rounded-md px-3 transition-colors " + (
-                        "bg-[#161616] text-neutral-100" if wid == workspace
-                        else "text-neutral-500 hover:bg-[#121212] hover:text-neutral-300"
+                        "bg-accent/15 text-foreground" if wid == workspace
+                        else "text-muted-foreground hover:bg-secondary hover:text-foreground/80"
                     )}
                 >
                     {wid == workspace and <span className="absolute left-0 top-2 bottom-2 w-[2px]" style={{"background": "var(--ws-accent)"}} />}
@@ -103,8 +103,8 @@ def:pub NavRail(
                     key={sid}
                     onClick={lambda e: MouseEvent { onSection(sid); }}
                     className={"relative flex h-9 items-center gap-3 rounded-md px-3 transition-colors " + (
-                        "bg-[#161616] text-neutral-100" if sid == section
-                        else "text-neutral-600 hover:bg-[#121212] hover:text-neutral-300"
+                        "bg-accent/15 text-foreground" if sid == section
+                        else "text-muted-foreground/80 hover:bg-secondary hover:text-foreground/80"
                     )}
                 >
                     {sid == section and <span className="absolute left-0 top-2 bottom-2 w-[2px]" style={{"background": "var(--ws-accent)"}} />}
@@ -116,7 +116,7 @@ def:pub NavRail(
         <div className="flex-1" />
         <button
             onClick={lambda e: MouseEvent { onSettings(); }}
-            className="mb-2 rounded-md px-2 py-1.5 text-left font-mono text-[10px] tracking-wider text-neutral-600 hover:bg-[#121212] hover:text-neutral-300"
+            className="mb-2 rounded-md px-2 py-1.5 text-left font-mono text-[10px] tracking-wider text-muted-foreground/80 hover:bg-secondary hover:text-foreground/80"
         >⚙ WORKSPACES</button>
         <span className="micro-label px-2">v3</span>
     </nav>;

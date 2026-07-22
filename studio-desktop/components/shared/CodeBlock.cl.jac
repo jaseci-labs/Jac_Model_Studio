@@ -97,15 +97,15 @@ def:pub CodeBlock(label: str, code: str, lang: str) -> JsxElement {
         setTimeout(lambda -> None { copied = False; }, 1200);
     }
 
-    return <div className="relative mt-3 mb-1 rounded-lg border border-neutral-800 bg-[#121212]">
-        <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">{tab}</span>
+    return <div className="relative mt-3 mb-1 rounded-lg border border-border bg-popover">
+        <span className="micro-label absolute -top-2 left-3 bg-background px-2">{tab}</span>
         <button
             onClick={lambda e: MouseEvent { _copy(); }}
-            className="absolute right-2 top-2 font-mono text-[9px] text-neutral-500 hover:text-neutral-200"
+            className="absolute right-2 top-2 font-mono text-[9px] text-muted-foreground hover:text-foreground"
         >
             {"COPIED" if copied else "COPY"}
         </button>
-        <pre className="overflow-x-auto p-3 pt-4 font-mono text-xs leading-relaxed text-neutral-200">
+        <pre className="overflow-x-auto p-3 pt-4 font-mono text-xs leading-relaxed text-foreground">
             {_highlight(code)}
         </pre>
     </div>;

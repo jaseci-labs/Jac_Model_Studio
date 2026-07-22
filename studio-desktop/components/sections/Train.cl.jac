@@ -157,11 +157,11 @@ def _cmpRow(label: str, cells: list, nums: list, best: str) -> JsxElement {
     if len(valid) > 1 {
         leader = max(valid) if best == "max" else min(valid);
     }
-    return <tr key={label} className="border-t border-neutral-800/60">
-        <td className="py-1.5 pr-4 text-neutral-500">{label}</td>
+    return <tr key={label} className="border-t border-border">
+        <td className="py-1.5 pr-4 text-muted-foreground">{label}</td>
         {for (i, c) in enumerate(cells) {
             <td key={str(i)} className={"py-1.5 px-4 text-right " + (
-                "text-neutral-100 font-semibold" if (leader is not None and nums[i] is not None and nums[i] == leader) else "text-neutral-400"
+                "text-foreground font-semibold" if (leader is not None and nums[i] is not None and nums[i] == leader) else "text-muted-foreground"
             )}>{c}</td>
         }}
     </tr>;
@@ -184,8 +184,8 @@ def _compareTable(headline: list) -> JsxElement {
     gsimCells: list = [m["gsim"] if m["ghas"] else "·" for m in hm];
     nullNums: list = [None for m in hm];
 
-    return <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-3 pt-5 overflow-x-auto">
-        <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">COMPARISON</span>
+    return <div className="relative rounded-md border border-border bg-card p-3 pt-5 overflow-x-auto">
+        <span className="micro-label absolute -top-2 left-3 bg-background px-2">COMPARISON</span>
         <table className="w-full border-collapse font-mono text-xs">
             <thead>
                 <tr>
@@ -446,10 +446,10 @@ def:pub Train(active: bool) -> JsxElement {
         isRunning = job is not None and str(job["status"]) == "running";
         optKeys = _optKeysFor(backends, formBackend, formMode);
         availBackends = _availBackends(backends, formMode);
-        btn = "rounded-lg border border-neutral-600 px-3 py-1 font-mono text-[10px] transition-colors hover:border-neutral-400 disabled:opacity-30 ";
+        btn = "rounded-lg border border-input px-3 py-1 font-mono text-[10px] transition-colors hover:border-ring disabled:opacity-30 ";
         return <div className="flex items-start gap-4 p-4 pt-5">
-            <div className="relative flex min-w-0 flex-1 flex-col gap-3 rounded-md border border-neutral-800 bg-[#0d0d0d] p-4 pt-5">
-                <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">LAUNCH.CONFIG</span>
+            <div className="relative flex min-w-0 flex-1 flex-col gap-3 rounded-md border border-border bg-card p-4 pt-5">
+                <span className="micro-label absolute -top-2 left-3 bg-background px-2">LAUNCH.CONFIG</span>
 
                 {len(availBackends) > 0 and <Field label="BACKEND">
                     <div className="flex flex-wrap gap-1">
@@ -459,15 +459,15 @@ def:pub Train(active: bool) -> JsxElement {
                                 key={bid}
                                 onClick={lambda e: MouseEvent { formBackend = bid; }}
                                 className={"rounded-md border px-3 py-1 text-xs transition-colors " + (
-                                    "border-neutral-500 bg-[#1a1a1a] text-neutral-100" if formBackend == bid
-                                    else "border-neutral-700 text-neutral-500 hover:text-neutral-300"
+                                    "border-accent bg-accent/15 text-foreground" if formBackend == bid
+                                    else "border-input text-muted-foreground hover:text-foreground/80"
                                 )}
                             >
                                 {str(b["label"])}
                             </button>
                         }}
                     </div>
-                    {formBackend and <p className="stat-line text-neutral-600">{_backendDesc(backends, formBackend)}</p>}
+                    {formBackend and <p className="stat-line text-muted-foreground/80">{_backendDesc(backends, formBackend)}</p>}
                 </Field>}
 
                 {formMode == "sft" and <Field label="BASE MODEL (HF ID)">
@@ -488,27 +488,27 @@ def:pub Train(active: bool) -> JsxElement {
                     </Field>
                 }}
 
-                <p className="stat-line mt-1 text-neutral-500">heavy workload · one training at a time, runs detached</p>
+                <p className="stat-line mt-1 text-muted-foreground">heavy workload · one training at a time, runs detached</p>
 
                 <div className="mt-2 flex gap-2">
-                    <button onClick={lambda e: MouseEvent { doStart(); }} disabled={isRunning} className={btn + "text-neutral-100"}>▶ START {formMode.upper()}</button>
-                    <button onClick={lambda e: MouseEvent { doStop(); }} disabled={not isRunning} className={btn + "text-neutral-400"}>■ STOP</button>
+                    <button onClick={lambda e: MouseEvent { doStart(); }} disabled={isRunning} className={btn + "text-foreground"}>▶ START {formMode.upper()}</button>
+                    <button onClick={lambda e: MouseEvent { doStop(); }} disabled={not isRunning} className={btn + "text-muted-foreground"}>■ STOP</button>
                 </div>
 
-                {error and <p className="stat-line mt-1 text-neutral-400">{error}</p>}
+                {error and <p className="stat-line mt-1 text-muted-foreground">{error}</p>}
             </div>
 
-            <div className="relative flex min-w-0 flex-1 flex-col gap-3 rounded-md border border-neutral-800 bg-[#0d0d0d] p-4 pt-5">
-                <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">RUN.STATUS</span>
+            <div className="relative flex min-w-0 flex-1 flex-col gap-3 rounded-md border border-border bg-card p-4 pt-5">
+                <span className="micro-label absolute -top-2 left-3 bg-background px-2">RUN.STATUS</span>
 
                 <div className="flex flex-wrap items-center gap-3">
                     <StatusGlyph status={str(job["status"]) if job is not None else "idle"} showLabel={True} />
                 </div>
 
                 {job is not None and <div className="flex flex-col gap-1">
-                    {int(str(job["pid"])) > 0 and <span className="font-mono text-[11px] text-neutral-500">PID {str(job["pid"])}</span>}
-                    {str(job["started"]) and <span className="font-mono text-[11px] text-neutral-500">STARTED {str(job["started"])}</span>}
-                    {int(str(job["last_iter"])) > 0 and <span className="font-mono text-[11px] text-neutral-500">LAST ITER {str(job["last_iter"])}</span>}
+                    {int(str(job["pid"])) > 0 and <span className="font-mono text-[11px] text-muted-foreground">PID {str(job["pid"])}</span>}
+                    {str(job["started"]) and <span className="font-mono text-[11px] text-muted-foreground">STARTED {str(job["started"])}</span>}
+                    {int(str(job["last_iter"])) > 0 and <span className="font-mono text-[11px] text-muted-foreground">LAST ITER {str(job["last_iter"])}</span>}
                 </div>}
 
                 <LogView text={str(job["log_tail"]) if job is not None else ""} maxH="24rem" />
@@ -519,12 +519,12 @@ def:pub Train(active: bool) -> JsxElement {
     # ---- MONITOR tab ----
     def _feedChip() -> JsxElement {
         if feed == "live" {
-            return <span className="font-mono text-[10px] tracking-widest text-neutral-100">⦿ LIVE</span>;
+            return <span className="font-mono text-[10px] tracking-widest text-accent">⦿ LIVE</span>;
         }
         if feed == "stalled" {
-            return <span className="font-mono text-[10px] tracking-widest text-neutral-400">⦿ STALLED {str(stalledFor)}s</span>;
+            return <span className="font-mono text-[10px] tracking-widest text-muted-foreground">⦿ STALLED {str(stalledFor)}s</span>;
         }
-        return <span className="font-mono text-[10px] tracking-widest text-neutral-600">○ NO FEED</span>;
+        return <span className="font-mono text-[10px] tracking-widest text-muted-foreground/80">○ NO FEED</span>;
     }
 
     def _monitor() -> JsxElement {
@@ -532,7 +532,7 @@ def:pub Train(active: bool) -> JsxElement {
         if len(running) == 0 {
             return <div className="flex h-full flex-1 flex-col items-center justify-center gap-1 p-4">
                 <span className="micro-label">NO LIVE RUNS</span>
-                <span className="stat-line text-neutral-600">launch from the LAUNCH tab · finished runs live in HISTORY</span>
+                <span className="stat-line text-muted-foreground/80">launch from the LAUNCH tab · finished runs live in HISTORY</span>
             </div>;
         }
         found = metrics is not None and bool(metrics["found"]);
@@ -544,8 +544,8 @@ def:pub Train(active: bool) -> JsxElement {
                             key={str(s["name"]) + "|" + str(s["mode"])}
                             onClick={lambda e: MouseEvent { pickSession(str(s["name"]), str(s["mode"])); }}
                             className={"rounded-md border px-3 py-1 font-mono text-[10px] tracking-widest transition-colors " + (
-                                "border-neutral-500 bg-[#1a1a1a] text-neutral-100" if (selName == str(s["name"]) and selMode == str(s["mode"]))
-                                else "border-neutral-700 text-neutral-500 hover:text-neutral-300"
+                                "border-accent bg-accent/15 text-foreground" if (selName == str(s["name"]) and selMode == str(s["mode"]))
+                                else "border-input text-muted-foreground hover:text-foreground/80"
                             )}
                         >
                             {str(s["label"]) if "label" in s else (str(s["name"]) + "·" + str(s["mode"]))}
@@ -589,8 +589,8 @@ def:pub Train(active: bool) -> JsxElement {
                                 key={name}
                                 onClick={lambda e: MouseEvent { pickHistory(name, selModeH); }}
                                 className={"rounded-md border px-4 py-1.5 font-mono text-xs transition-colors " + (
-                                    "border-neutral-500 bg-[#1a1a1a] text-neutral-100" if selModel == name
-                                    else "border-neutral-800 text-neutral-400 hover:border-neutral-600 hover:text-neutral-200"
+                                    "border-accent bg-accent/15 text-foreground" if selModel == name
+                                    else "border-border text-muted-foreground hover:border-ring hover:text-foreground"
                                 )}
                             >
                                 {name}
@@ -608,8 +608,8 @@ def:pub Train(active: bool) -> JsxElement {
                                 disabled={not (_hasRun(pastSessions, selModel, mode) if selModel != "" else True)}
                                 onClick={lambda e: MouseEvent { pickHistory(selModel if selModel != "" else mdls[0], mode); }}
                                 className={"rounded-md border px-4 py-1.5 font-mono text-xs uppercase tracking-widest transition-colors disabled:opacity-30 " + (
-                                    ("border-[#b89ce8]/50 bg-[#1a1a1a] text-[#b89ce8]" if mode == "dpo" else "border-[#7aa2f7]/50 bg-[#1a1a1a] text-[#7aa2f7]") if selModeH == mode
-                                    else "border-neutral-800 text-neutral-400 hover:border-neutral-600 hover:text-neutral-200"
+                                    ("border-[#b89ce8]/50 bg-secondary text-[#b89ce8]" if mode == "dpo" else "border-[#7aa2f7]/50 bg-secondary text-[#7aa2f7]") if selModeH == mode
+                                    else "border-border text-muted-foreground hover:border-ring hover:text-foreground"
                                 )}
                             >
                                 {mode}
@@ -618,7 +618,7 @@ def:pub Train(active: bool) -> JsxElement {
                     </div>
                 </div>
 
-                <span className="stat-line pb-1.5 text-neutral-600">{str(MODE_DESC[selModeH]) if selModeH in MODE_DESC else ""}</span>
+                <span className="stat-line pb-1.5 text-muted-foreground/80">{str(MODE_DESC[selModeH]) if selModeH in MODE_DESC else ""}</span>
             </div>
 
             {histName == "" and <div className="flex flex-1 items-center justify-center"><span className="micro-label">SELECT A MODEL ABOVE</span></div>}
@@ -650,7 +650,7 @@ def:pub Train(active: bool) -> JsxElement {
         return <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto p-4">
             <div className="flex flex-wrap items-center gap-3">
                 <Segmented options={["runs", "compare"]} value={historyView} onSet={lambda v: str { historyView = v; }} />
-                <span className="stat-line text-neutral-600">{"inspect one finished run in detail" if historyView == "runs" else "overlay every run of one stage"}</span>
+                <span className="stat-line text-muted-foreground/80">{"inspect one finished run in detail" if historyView == "runs" else "overlay every run of one stage"}</span>
             </div>
             {historyView == "runs" and _historyRuns({"pastSessions": pastSessions})}
             {historyView == "compare" and _historyCompare()}
@@ -664,18 +664,18 @@ def:pub Train(active: bool) -> JsxElement {
                 <button
                     onClick={lambda e: MouseEvent { handleUpdate(); }}
                     disabled={updateState == "updating"}
-                    className={"rounded-lg border border-neutral-600 px-3 py-1 font-mono text-[10px] transition-colors hover:border-neutral-400 disabled:opacity-30 " + (
-                        "text-neutral-100" if updateState == "confirm" else "text-neutral-400"
+                    className={"rounded-lg border border-input px-3 py-1 font-mono text-[10px] transition-colors hover:border-ring disabled:opacity-30 " + (
+                        "text-foreground" if updateState == "confirm" else "text-muted-foreground"
                     )}
                 >
                     {_updateLabel()}
                 </button>
-                <span className="micro-label text-neutral-600">TRAIN.CTL</span>
+                <span className="micro-label text-muted-foreground/80">TRAIN.CTL</span>
             </div>
         </div>
 
-        {updateState == "updating" and <div className="border-b border-neutral-800 px-4 py-1">
-            <span className="stat-line text-neutral-500">restarting · page reloads in ~20s</span>
+        {updateState == "updating" and <div className="border-b border-border px-4 py-1">
+            <span className="stat-line text-muted-foreground">restarting · page reloads in ~20s</span>
         </div>}
 
         <div className="min-h-0 flex-1 overflow-y-auto">

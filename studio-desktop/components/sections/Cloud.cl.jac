@@ -428,45 +428,45 @@ def:pub Cloud(active: bool) -> JsxElement {
         configured = cred is not None and bool(cred["configured"]);
         source = str(cred["source"]) if cred is not None else "none";
         acctOk = account is not None and bool(account["ok"]);
-        btn = "rounded-lg border border-neutral-600 px-3 py-1 font-mono text-[10px] transition-colors hover:border-neutral-400 disabled:opacity-30 ";
+        btn = "rounded-lg border border-input px-3 py-1 font-mono text-[10px] transition-colors hover:border-ring disabled:opacity-30 ";
         return <div className="flex flex-col gap-4 p-4">
-            <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-4 pt-5">
-                <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">CREDENTIALS</span>
+            <div className="relative rounded-md border border-border bg-card p-4 pt-5">
+                <span className="micro-label absolute -top-2 left-3 bg-background px-2">CREDENTIALS</span>
                 <div className="flex flex-wrap items-center gap-3">
                     <StatusGlyph status={"running" if acctOk else "idle"} showLabel={True} />
-                    <span className="font-mono text-[11px] text-neutral-500">source · {source}</span>
-                    {acctOk and account is not None and <span className="font-mono text-[11px] text-neutral-500">
+                    <span className="font-mono text-[11px] text-muted-foreground">source · {source}</span>
+                    {acctOk and account is not None and <span className="font-mono text-[11px] text-muted-foreground">
                         balance ${str(account["balance"])} · {str(account["team_name"])}
                     </span>}
                 </div>
-                {len(providers) > 0 and <p className="stat-line mt-2 text-neutral-500">providers · {", ".join([str(p) for p in providers])}</p>}
-                {not configured and <p className="stat-line mt-2 text-neutral-500">set SPHERON_API_KEY in the environment or paste a per-user key below</p>}
+                {len(providers) > 0 and <p className="stat-line mt-2 text-muted-foreground">providers · {", ".join([str(p) for p in providers])}</p>}
+                {not configured and <p className="stat-line mt-2 text-muted-foreground">set SPHERON_API_KEY in the environment or paste a per-user key below</p>}
             </div>
 
-            <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-4 pt-5">
-                <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">API KEY</span>
+            <div className="relative rounded-md border border-border bg-card p-4 pt-5">
+                <span className="micro-label absolute -top-2 left-3 bg-background px-2">API KEY</span>
                 <Field label="SPHERON API KEY">
                     <TextInput value={apiKey} onSet={lambda v: str { apiKey = v; }} placeholder="paste key (never echoed back)" mono={True} />
                 </Field>
                 <div className="mt-3 flex gap-2">
-                    <button onClick={lambda e: MouseEvent { doSaveKey(); }} disabled={busy} className={btn + "text-neutral-100"}>SAVE KEY</button>
-                    <button onClick={lambda e: MouseEvent { doClearKey(); }} disabled={busy} className={btn + "text-neutral-400"}>CLEAR USER KEY</button>
+                    <button onClick={lambda e: MouseEvent { doSaveKey(); }} disabled={busy} className={btn + "text-foreground"}>SAVE KEY</button>
+                    <button onClick={lambda e: MouseEvent { doClearKey(); }} disabled={busy} className={btn + "text-muted-foreground"}>CLEAR USER KEY</button>
                 </div>
             </div>
 
-            <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-4 pt-5">
-                <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">SSH KEYS</span>
-                <p className="stat-line text-neutral-500">required to deploy — add your public key once, then reuse it</p>
+            <div className="relative rounded-md border border-border bg-card p-4 pt-5">
+                <span className="micro-label absolute -top-2 left-3 bg-background px-2">SSH KEYS</span>
+                <p className="stat-line text-muted-foreground">required to deploy — add your public key once, then reuse it</p>
                 <div className="mt-2 flex flex-col gap-1">
-                    {len(sshKeys) == 0 and <span className="stat-line text-neutral-600">no keys uploaded</span>}
+                    {len(sshKeys) == 0 and <span className="stat-line text-muted-foreground/80">no keys uploaded</span>}
                     {for k in sshKeys {
                         kid = str(k["id"]);
                         <button
                             key={kid}
                             onClick={lambda e: MouseEvent { pickSshKey(kid); }}
                             className={"rounded-md border px-3 py-1 text-left font-mono text-xs transition-colors " + (
-                                "border-neutral-500 bg-[#1a1a1a] text-neutral-100" if selSshKeyId == kid
-                                else "border-neutral-800 text-neutral-400 hover:border-neutral-600"
+                                "border-accent bg-accent/15 text-foreground" if selSshKeyId == kid
+                                else "border-border text-muted-foreground hover:border-input"
                             )}
                         >
                             {str(k["name"])} · {str(k["fingerprint"])}
@@ -480,20 +480,20 @@ def:pub Cloud(active: bool) -> JsxElement {
                     <Field label="PUBLIC KEY">
                         <TextInput value={newKeyBody} onSet={lambda v: str { newKeyBody = v; }} placeholder="ssh-ed25519 AAAA... user@host" mono={True} />
                     </Field>
-                    <button onClick={lambda e: MouseEvent { doAddSshKey(); }} disabled={busy} className={btn + "text-neutral-100"}>ADD KEY</button>
+                    <button onClick={lambda e: MouseEvent { doAddSshKey(); }} disabled={busy} className={btn + "text-foreground"}>ADD KEY</button>
                 </div>
             </div>
-            {error and <p className="stat-line text-neutral-400">{error}</p>}
+            {error and <p className="stat-line text-muted-foreground">{error}</p>}
         </div>;
     }
 
     def _instances() -> JsxElement {
-        btn = "rounded-lg border border-neutral-600 px-3 py-1 font-mono text-[10px] transition-colors hover:border-neutral-400 disabled:opacity-30 ";
+        btn = "rounded-lg border border-input px-3 py-1 font-mono text-[10px] transition-colors hover:border-ring disabled:opacity-30 ";
         termBlocked = canTerm is not None and not bool(canTerm["can_terminate"]);
         return <div className="flex items-start gap-4 p-4 pt-5">
-            <div className="relative flex min-w-0 flex-1 flex-col gap-3 rounded-md border border-neutral-800 bg-[#0d0d0d] p-4 pt-5">
-                <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">YOUR DEPLOYMENTS</span>
-                {len(instances) == 0 and <span className="stat-line text-neutral-600">no deployments · start a run from the RUNS tab</span>}
+            <div className="relative flex min-w-0 flex-1 flex-col gap-3 rounded-md border border-border bg-card p-4 pt-5">
+                <span className="micro-label absolute -top-2 left-3 bg-background px-2">YOUR DEPLOYMENTS</span>
+                {len(instances) == 0 and <span className="stat-line text-muted-foreground/80">no deployments · start a run from the RUNS tab</span>}
                 <div className="flex flex-col gap-1">
                     {for inst in instances {
                         did = str(inst["id"]);
@@ -501,8 +501,8 @@ def:pub Cloud(active: bool) -> JsxElement {
                             key={did}
                             onClick={lambda e: MouseEvent { pickInstance(did); }}
                             className={"rounded-md border px-3 py-2 text-left font-mono text-xs transition-colors " + (
-                                "border-neutral-500 bg-[#1a1a1a] text-neutral-100" if selInstance == did
-                                else "border-neutral-800 text-neutral-400 hover:border-neutral-600"
+                                "border-accent bg-accent/15 text-foreground" if selInstance == did
+                                else "border-border text-muted-foreground hover:border-input"
                             )}
                         >
                             {_instLabel(inst)}
@@ -511,17 +511,17 @@ def:pub Cloud(active: bool) -> JsxElement {
                 </div>
             </div>
 
-            <div className="relative flex min-w-0 flex-1 flex-col gap-3 rounded-md border border-neutral-800 bg-[#0d0d0d] p-4 pt-5">
-                <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">DEPLOYMENT DETAIL</span>
-                {selInstance == "" and <span className="stat-line text-neutral-600">select a deployment</span>}
+            <div className="relative flex min-w-0 flex-1 flex-col gap-3 rounded-md border border-border bg-card p-4 pt-5">
+                <span className="micro-label absolute -top-2 left-3 bg-background px-2">DEPLOYMENT DETAIL</span>
+                {selInstance == "" and <span className="stat-line text-muted-foreground/80">select a deployment</span>}
                 {selInstance != "" and instDetail is not None and <>
                     <StatusGlyph status={str(instDetail["cur_state"])} showLabel={True} />
-                    <span className="font-mono text-[11px] text-neutral-500">os · {str(instDetail["image"])}</span>
-                    <span className="font-mono text-[11px] text-neutral-500">hourly · ${str(instDetail["dph_total"])}</span>
-                    {str(instDetail["ssh_addr"]) and <span className="font-mono text-[11px] text-neutral-500 break-all">ssh · {str(instDetail["ssh_addr"])}</span>}
-                    {termBlocked and canTerm is not None and <span className="font-mono text-[11px] text-neutral-500">min runtime · {str(canTerm["time_remaining"])}s remaining</span>}
+                    <span className="font-mono text-[11px] text-muted-foreground">os · {str(instDetail["image"])}</span>
+                    <span className="font-mono text-[11px] text-muted-foreground">hourly · ${str(instDetail["dph_total"])}</span>
+                    {str(instDetail["ssh_addr"]) and <span className="font-mono text-[11px] text-muted-foreground break-all">ssh · {str(instDetail["ssh_addr"])}</span>}
+                    {termBlocked and canTerm is not None and <span className="font-mono text-[11px] text-muted-foreground">min runtime · {str(canTerm["time_remaining"])}s remaining</span>}
                     <div className="mt-2 flex flex-wrap gap-2">
-                        <button onClick={lambda e: MouseEvent { doDestroy(); }} disabled={busy or termBlocked} className={btn + "text-neutral-400"}>✕ TERMINATE</button>
+                        <button onClick={lambda e: MouseEvent { doDestroy(); }} disabled={busy or termBlocked} className={btn + "text-muted-foreground"}>✕ TERMINATE</button>
                     </div>
                 </>}
             </div>
@@ -535,12 +535,12 @@ def:pub Cloud(active: bool) -> JsxElement {
             {for (i, lbl) in enumerate(PHASE_LABELS) {
                 cls = "rounded border px-1.5 py-0.5 font-mono text-[9px] ";
                 if i < cur {
-                    cls += "border-neutral-700 bg-[#1a1a1a] text-neutral-500";
+                    cls += "border-input bg-secondary text-muted-foreground";
                 } elif i == cur {
                     cls += "border-red-800 bg-[#1a0505] text-red-400" if failed
-                        else "border-neutral-400 bg-[#222] text-neutral-100";
+                        else "border-accent bg-accent/15 text-foreground";
                 } else {
-                    cls += "border-neutral-800 text-neutral-700";
+                    cls += "border-border text-muted-foreground/60";
                 }
                 <span key={str(lbl)} className={cls}>{str(lbl)}</span>
             }}
@@ -553,32 +553,32 @@ def:pub Cloud(active: bool) -> JsxElement {
         alert = bool(run["billing_alert"]);
         dotCls = "inline-block h-2 w-2 rounded-full ";
         if status == "running" { dotCls += "bg-emerald-500"; }
-        elif status == "done" { dotCls += "bg-neutral-300"; }
+        elif status == "done" { dotCls += "bg-foreground"; }
         elif status == "detached" or status == "failed" { dotCls += "bg-red-500"; }
-        else { dotCls += "bg-neutral-600"; }
+        else { dotCls += "bg-muted-foreground"; }
         return <button
             key={rid}
             onClick={lambda e: MouseEvent { pickRun(rid); }}
             className={"flex flex-col gap-1 rounded-md border px-3 py-2 text-left transition-colors " + (
-                "border-neutral-500 bg-[#1a1a1a]" if selRunId == rid
-                else "border-neutral-800 hover:border-neutral-600"
+                "border-accent bg-accent/15" if selRunId == rid
+                else "border-border hover:border-input"
             )}
         >
             <div className="flex items-center gap-2">
                 <span className={dotCls}></span>
-                <span className="font-mono text-xs text-neutral-200">{str(run["name"])}</span>
-                <span className="font-mono text-[10px] text-neutral-500">{status}</span>
+                <span className="font-mono text-xs text-foreground">{str(run["name"])}</span>
+                <span className="font-mono text-[10px] text-muted-foreground">{status}</span>
                 {alert and <span className="rounded border border-red-800 bg-[#1a0505] px-1.5 font-mono text-[9px] text-red-400">BILLING?</span>}
             </div>
             {_phaseChips(run)}
-            <span className="font-mono text-[10px] text-neutral-500">{_costLine(run)}</span>
+            <span className="font-mono text-[10px] text-muted-foreground">{_costLine(run)}</span>
         </button>;
     }
 
     def _runDetailPane() -> JsxElement {
-        btn = "rounded-lg border border-neutral-600 px-3 py-1 font-mono text-[10px] transition-colors hover:border-neutral-400 disabled:opacity-30 ";
+        btn = "rounded-lg border border-input px-3 py-1 font-mono text-[10px] transition-colors hover:border-ring disabled:opacity-30 ";
         if runDetail is None {
-            return <span className="stat-line text-neutral-600">select a run</span>;
+            return <span className="stat-line text-muted-foreground/80">select a run</span>;
         }
         run: any = runDetail;
         status = str(run["status"]);
@@ -601,38 +601,38 @@ def:pub Cloud(active: bool) -> JsxElement {
             </div>}
             <div className="flex items-center gap-3">
                 <StatusGlyph status={"failed" if status == "detached" else status} showLabel={True} />
-                <span className="font-mono text-[11px] text-neutral-500">{str(run["name"])} · {str(run["mode"])} · dep {str(run["deployment_id"])}</span>
+                <span className="font-mono text-[11px] text-muted-foreground">{str(run["name"])} · {str(run["mode"])} · dep {str(run["deployment_id"])}</span>
             </div>
             {_phaseChips(run)}
-            <span className="font-mono text-[11px] text-neutral-500">{_costLine(run)}{" · vm terminated" if bool(run["vm_terminated"]) else ""}</span>
-            <span className="font-mono text-[11px] text-neutral-400">step {step}/{maxSteps} · loss {loss} · eval {evalLoss}</span>
-            {str(run["message"]) and <span className="font-mono text-[11px] text-neutral-500">{str(run["message"])}</span>}
+            <span className="font-mono text-[11px] text-muted-foreground">{_costLine(run)}{" · vm terminated" if bool(run["vm_terminated"]) else ""}</span>
+            <span className="font-mono text-[11px] text-muted-foreground">step {step}/{maxSteps} · loss {loss} · eval {evalLoss}</span>
+            {str(run["message"]) and <span className="font-mono text-[11px] text-muted-foreground">{str(run["message"])}</span>}
             {str(run["error"]) and <span className="font-mono text-[11px] text-red-400">{str(run["error"])}</span>}
             <LogView text={str(run["log_tail"]) or "no train.log yet"} maxH="14rem" />
             <div className="flex flex-wrap gap-2">
-                <button onClick={lambda e: MouseEvent { doStopRun(); }} disabled={busy or isTerminal or detached} className={btn + "text-neutral-400"}>■ STOP</button>
-                <button onClick={lambda e: MouseEvent { doTerminateVm(); }} disabled={busy or bool(run["vm_terminated"])} className={btn + ("border-red-800 text-red-300" if confirmTerm else "text-neutral-400")}>
+                <button onClick={lambda e: MouseEvent { doStopRun(); }} disabled={busy or isTerminal or detached} className={btn + "text-muted-foreground"}>■ STOP</button>
+                <button onClick={lambda e: MouseEvent { doTerminateVm(); }} disabled={busy or bool(run["vm_terminated"])} className={btn + ("border-red-800 text-red-300" if confirmTerm else "text-muted-foreground")}>
                     {"⚠ CONFIRM TERMINATE VM?" if confirmTerm else "✕ TERMINATE VM"}
                 </button>
-                {isTerminal and not pulled and <button onClick={lambda e: MouseEvent { doPull(); }} disabled={busy} className={btn + "text-neutral-100"}>⇩ PULL ARTIFACTS</button>}
+                {isTerminal and not pulled and <button onClick={lambda e: MouseEvent { doPull(); }} disabled={busy} className={btn + "text-foreground"}>⇩ PULL ARTIFACTS</button>}
             </div>
-            {pulled and adapterDir and <span className="font-mono text-[11px] text-neutral-400 break-all">adapter · {adapterDir}</span>}
+            {pulled and adapterDir and <span className="font-mono text-[11px] text-muted-foreground break-all">adapter · {adapterDir}</span>}
         </>;
     }
 
     def _runs() -> JsxElement {
-        btn = "rounded-lg border border-neutral-600 px-3 py-1 font-mono text-[10px] transition-colors hover:border-neutral-400 disabled:opacity-30 ";
+        btn = "rounded-lg border border-input px-3 py-1 font-mono text-[10px] transition-colors hover:border-ring disabled:opacity-30 ";
         selOffer = _selectedOffer();
         return <div className="flex flex-col gap-4 p-4">
             <div className="flex items-start gap-4">
-                <div className="relative flex min-w-0 flex-1 flex-col gap-3 rounded-md border border-neutral-800 bg-[#0d0d0d] p-4 pt-5">
-                    <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">RUN.CONFIG</span>
+                <div className="relative flex min-w-0 flex-1 flex-col gap-3 rounded-md border border-border bg-card p-4 pt-5">
+                    <span className="micro-label absolute -top-2 left-3 bg-background px-2">RUN.CONFIG</span>
 
                     <Field label="OFFER SEARCH">
                         <div className="flex gap-2">
                             <TextInput value={offerQuery} onSet={lambda v: str { offerQuery = v; }} placeholder="rtx-4090" mono={True} />
                             <Segmented options={["DEDICATED", "SPOT", "CLUSTER"]} value={offerType} onSet={lambda v: str { offerType = v; }} />
-                            <button onClick={lambda e: MouseEvent { _runSearch(); }} disabled={busy} className={btn + "text-neutral-100"}>SEARCH</button>
+                            <button onClick={lambda e: MouseEvent { _runSearch(); }} disabled={busy} className={btn + "text-foreground"}>SEARCH</button>
                         </div>
                     </Field>
 
@@ -644,8 +644,8 @@ def:pub Cloud(active: bool) -> JsxElement {
                                     key={oid}
                                     onClick={lambda e: MouseEvent { pickOffer(oid); }}
                                     className={"rounded-md border px-3 py-1 font-mono text-xs transition-colors " + (
-                                        "border-neutral-500 bg-[#1a1a1a] text-neutral-100" if selOfferId == oid
-                                        else "border-neutral-700 text-neutral-500 hover:text-neutral-300"
+                                        "border-accent bg-accent/15 text-foreground" if selOfferId == oid
+                                        else "border-input text-muted-foreground hover:text-foreground/80"
                                     )}
                                 >
                                     {_offerLabel(o)}
@@ -653,19 +653,19 @@ def:pub Cloud(active: bool) -> JsxElement {
                             }}
                         </div>
                     </Field>}
-                    {len(offers) == 0 and <p className="stat-line text-neutral-600">search to load offers, then pick one</p>}
+                    {len(offers) == 0 and <p className="stat-line text-muted-foreground/80">search to load offers, then pick one</p>}
 
                     <Field label="SSH KEY">
                         <div className="flex flex-col gap-1">
-                            {len(sshKeys) == 0 and <span className="stat-line text-neutral-600">no keys — add one in SETUP</span>}
+                            {len(sshKeys) == 0 and <span className="stat-line text-muted-foreground/80">no keys — add one in SETUP</span>}
                             {for k in sshKeys {
                                 kid = str(k["id"]);
                                 <button
                                     key={kid}
                                     onClick={lambda e: MouseEvent { pickSshKey(kid); }}
                                     className={"rounded-md border px-3 py-1 font-mono text-xs transition-colors " + (
-                                        "border-neutral-500 bg-[#1a1a1a] text-neutral-100" if selSshKeyId == kid
-                                        else "border-neutral-700 text-neutral-500 hover:text-neutral-300"
+                                        "border-accent bg-accent/15 text-foreground" if selSshKeyId == kid
+                                        else "border-input text-muted-foreground hover:text-foreground/80"
                                     )}
                                 >
                                     {str(k["name"])}
@@ -682,7 +682,7 @@ def:pub Cloud(active: bool) -> JsxElement {
                         <TextInput value={formModelId} onSet={lambda v: str { formModelId = v; }} placeholder="org/model" mono={True} />
                     </Field>
 
-                    <p className="stat-line text-neutral-500">dataset · mlx train/valid splits from [cloudrun] workspace config (uploaded to the VM as data/*.jsonl)</p>
+                    <p className="stat-line text-muted-foreground">dataset · mlx train/valid splits from [cloudrun] workspace config (uploaded to the VM as data/*.jsonl)</p>
 
                     <div className="grid grid-cols-3 gap-2">
                         {for key in ["lora_r", "lora_alpha", "lora_dropout", "max_steps", "lr", "per_device_batch_size", "grad_accum", "max_seq_len", "eval_every"] {
@@ -709,23 +709,23 @@ def:pub Cloud(active: bool) -> JsxElement {
                         </Field>
                     </div>
 
-                    {len(selOffer) > 0 and <p className="stat-line text-neutral-500">deploys {_offerLabel(selOffer)} · supervisor uploads data + train_sft.py, monitors, pulls adapter</p>}
+                    {len(selOffer) > 0 and <p className="stat-line text-muted-foreground">deploys {_offerLabel(selOffer)} · supervisor uploads data + train_sft.py, monitors, pulls adapter</p>}
 
                     <div className="flex gap-2">
-                        <button onClick={lambda e: MouseEvent { doStartRun(); }} disabled={busy or selOfferId == "" or selSshKeyId == ""} className={btn + "text-neutral-100"}>▶ START REMOTE SFT</button>
+                        <button onClick={lambda e: MouseEvent { doStartRun(); }} disabled={busy or selOfferId == "" or selSshKeyId == ""} className={btn + "text-foreground"}>▶ START REMOTE SFT</button>
                     </div>
-                    {error and <p className="stat-line text-neutral-400">{error}</p>}
+                    {error and <p className="stat-line text-muted-foreground">{error}</p>}
                 </div>
 
-                <div className="relative flex min-w-0 flex-1 flex-col gap-3 rounded-md border border-neutral-800 bg-[#0d0d0d] p-4 pt-5">
-                    <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">RUN.STATUS</span>
+                <div className="relative flex min-w-0 flex-1 flex-col gap-3 rounded-md border border-border bg-card p-4 pt-5">
+                    <span className="micro-label absolute -top-2 left-3 bg-background px-2">RUN.STATUS</span>
                     {_runDetailPane()}
                 </div>
             </div>
 
-            <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-4 pt-5">
-                <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">CLOUD RUNS</span>
-                {len(runs) == 0 and <span className="stat-line text-neutral-600">no cloud runs yet</span>}
+            <div className="relative rounded-md border border-border bg-card p-4 pt-5">
+                <span className="micro-label absolute -top-2 left-3 bg-background px-2">CLOUD RUNS</span>
+                {len(runs) == 0 and <span className="stat-line text-muted-foreground/80">no cloud runs yet</span>}
                 <div className="flex flex-col gap-2">
                     {[_runRow(rr) for rr in runs]}
                 </div>
@@ -734,9 +734,9 @@ def:pub Cloud(active: bool) -> JsxElement {
     }
 
     return <div className="flex h-full min-w-0 flex-1 flex-col">
-        <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-2.5">
+        <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
             <SubTabs tabs={TABS} active={tab.upper()} onTab={onTab} />
-            <span className="micro-label text-neutral-600">SPHERON</span>
+            <span className="micro-label text-muted-foreground/80">SPHERON</span>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto">
             {tab == "instances" and _instances()}

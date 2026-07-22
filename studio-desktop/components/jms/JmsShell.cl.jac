@@ -1,12 +1,13 @@
 """JmsShell — the JMS product surface.
 
 Top bar: a JMS wordmark that doubles as a breadcrumb (PROJECTS / <NAME> once a
-project is open — PROJECTS is clickable to go back), a ◈ HUB return, and the
-theme switcher. Body routes on `projectId`: empty → the <JmsProjects/> card grid,
-otherwise the <JmsProject/> detail view for that id. The breadcrumb name is
-captured from JmsProjects' onOpen(pid, name) callback."""
+project is open — PROJECTS is clickable to go back) and a ◈ HUB return. Theme
+is locked to electric-minimal (the other 4 variants stay defined in jms.css,
+unused — cheap to revive later, not worth deleting now). Body routes on
+`projectId`: empty → the <JmsProjects/> card grid, otherwise the <JmsProject/>
+detail view for that id. The breadcrumb name is captured from JmsProjects'
+onOpen(pid, name) callback."""
 
-import from .JmsThemeSwitcher { JmsThemeSwitcher }
 import from .JmsProjects { JmsProjects }
 import from .JmsProject { JmsProject }
 import from .ApiKeyModal { ApiKeyModal }
@@ -16,7 +17,7 @@ def:pub JmsShell(onHub: any = None, theme: str = "", onTheme: any = None) -> Jsx
         projectName: str = "",
         keyModalOpen: bool = False;
 
-    t: str = theme if theme else "electric-minimal";
+    t: str = "electric-minimal";
 
     def openProject(pid: str, name: str) -> None {
         projectId = pid;
@@ -57,7 +58,6 @@ def:pub JmsShell(onHub: any = None, theme: str = "", onTheme: any = None) -> Jsx
                     title="back to hub"
                     onClick={lambda e: MouseEvent { if onHub is not None { onHub(); } }}
                 >◈ HUB</button>
-                <JmsThemeSwitcher theme={t} onTheme={onTheme} />
             </div>
         </div>
 

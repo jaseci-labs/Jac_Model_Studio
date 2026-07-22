@@ -179,23 +179,23 @@ def:pub Data -> JsxElement {
     def _rail() -> JsxElement {
         nstages = len(builders) if len(builders) > 0 else 13;
         pct = (doneCount * 100.0) / nstages if nstages > 0 else 0.0;
-        return <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-3 pt-4">
-            <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">PIPELINE</span>
+        return <div className="relative rounded-md border border-border bg-card p-3 pt-4">
+            <span className="micro-label absolute -top-2 left-3 bg-background px-2">PIPELINE</span>
             <div className="mb-3 flex flex-col gap-1.5">
                 <div className="flex items-center justify-between">
-                    <span className="stat-line text-neutral-500">{str(doneCount)}/{str(nstages)} DONE</span>
-                    {runningStage and <span className="micro-label pulse text-neutral-300">⦿ {runningStage}</span>}
+                    <span className="stat-line text-muted-foreground">{str(doneCount)}/{str(nstages)} DONE</span>
+                    {runningStage and <span className="micro-label pulse text-foreground/80">⦿ {runningStage}</span>}
                 </div>
                 <div className="h-1 w-full rounded-full bg-border">
                     <div className="h-1 rounded-full transition-all" style={{"width": str(pct) + "%", "background": "var(--ws-accent)"}}></div>
                 </div>
             </div>
             <div className="relative flex flex-col gap-0.5 pl-3">
-                <div className="absolute bottom-1 left-0 top-1 w-px bg-neutral-800"></div>
+                <div className="absolute bottom-1 left-0 top-1 w-px bg-secondary"></div>
                 {for group in GROUPS {
                     <div key={str(group["label"])} className="mt-2 first:mt-0">
                         <div className="mb-1 flex items-center gap-2">
-                            <span className="micro-label shrink-0 text-neutral-600">{str(group["label"])}</span>
+                            <span className="micro-label shrink-0 text-muted-foreground/80">{str(group["label"])}</span>
                             <div className="dashed-rule flex-1"></div>
                         </div>
                         {for stage in list(group["stages"]) {
@@ -203,20 +203,20 @@ def:pub Data -> JsxElement {
                                 <div
                                     onClick={lambda e: MouseEvent { selectStage(str(stage)); }}
                                     className={"flex cursor-pointer items-center gap-2 rounded px-2 py-1 " + (
-                                        "bg-[#1a1a1a]" if selectedStage == str(stage) else "hover:bg-[#141414]"
+                                        "bg-accent/15" if selectedStage == str(stage) else "hover:bg-secondary"
                                     )}
                                 >
                                     <StatusGlyph status={_statusOf(str(stage))} showLabel={False} />
-                                    <span className="flex-1 truncate font-mono text-xs text-neutral-400">{str(stage)}</span>
+                                    <span className="flex-1 truncate font-mono text-xs text-muted-foreground">{str(stage)}</span>
                                     <button
                                         disabled={_statusOf(str(stage)) == "running"}
                                         onClick={lambda e: MouseEvent { e.stopPropagation(); runStage(str(stage)); }}
-                                        className="micro-label rounded border border-neutral-700 px-1.5 py-0.5 text-neutral-500 transition-colors hover:border-neutral-500 hover:text-neutral-200 disabled:cursor-not-allowed disabled:opacity-30"
+                                        className="micro-label rounded border border-input px-1.5 py-0.5 text-muted-foreground transition-colors hover:border-ring hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
                                     >
                                         RUN
                                     </button>
                                 </div>
-                                {(str(stage) == "seed_conversion") and <div className="stat-line ml-8 mt-0.5 mb-1 border-l-2 border-neutral-600 pl-2">TRUNCATES sft.jsonl→32 · dpo.jsonl→2 · run idiomatic batches after, then downstream stages</div>}
+                                {(str(stage) == "seed_conversion") and <div className="stat-line ml-8 mt-0.5 mb-1 border-l-2 border-input pl-2">TRUNCATES sft.jsonl→32 · dpo.jsonl→2 · run idiomatic batches after, then downstream stages</div>}
                             </div>
                         }}
                     </div>
@@ -228,8 +228,8 @@ def:pub Data -> JsxElement {
     def _addExamples() -> JsxElement {
         ph = ('one JSON object per line · sft: {"messages":[...]}' if addTarget == "sft"
             else 'one JSON object per line · dpo: {"prompt","chosen","rejected"}');
-        return <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-3 pt-4">
-            <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">ADD.EXAMPLES</span>
+        return <div className="relative rounded-md border border-border bg-card p-3 pt-4">
+            <span className="micro-label absolute -top-2 left-3 bg-background px-2">ADD.EXAMPLES</span>
             <div className="flex flex-col gap-3">
                 <Segmented options={["sft", "dpo"]} value={addTarget} onSet={lambda v: str { addTarget = v; }} />
                 <textarea
@@ -237,12 +237,12 @@ def:pub Data -> JsxElement {
                     value={addText}
                     onChange={lambda e: ChangeEvent { addText = e.target.value; }}
                     placeholder={ph}
-                    className="w-full rounded-md border border-neutral-700 bg-[#121212] px-2 py-1.5 font-mono text-xs text-neutral-100 outline-none placeholder:text-neutral-600 focus:border-neutral-500 resize-none"
+                    className="w-full rounded-md border border-input bg-popover px-2 py-1.5 font-mono text-xs text-foreground outline-none placeholder:text-muted-foreground/80 focus:border-ring resize-none"
                 ></textarea>
                 <button
                     disabled={addBusy or (not addText.strip())}
                     onClick={lambda e: MouseEvent { submitExamples(); }}
-                    className="micro-label self-start rounded border border-neutral-600 px-3 py-1.5 text-neutral-300 transition-colors hover:border-neutral-400 hover:text-neutral-100 disabled:cursor-not-allowed disabled:opacity-30"
+                    className="micro-label self-start rounded border border-input px-3 py-1.5 text-foreground/80 transition-colors hover:border-ring hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
                 >
                     {"APPENDING…" if addBusy else "APPEND"}
                 </button>
@@ -264,8 +264,8 @@ def:pub Data -> JsxElement {
             <div className="grid gap-4" style={{"gridTemplateColumns": "280px 1fr"}}>
                 <div className="flex flex-col gap-4">
                     {_rail()}
-                    {selectedStage and <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-3 pt-4">
-                        <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">{selectedStage}</span>
+                    {selectedStage and <div className="relative rounded-md border border-border bg-card p-3 pt-4">
+                        <span className="micro-label absolute -top-2 left-3 bg-background px-2">{selectedStage}</span>
                         <LogView text={_logOf(selectedStage)} maxH="14rem" />
                     </div>}
                 </div>

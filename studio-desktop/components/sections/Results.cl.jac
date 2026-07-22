@@ -80,15 +80,15 @@ def _LadderTip(props: dict) -> JsxElement {
     for p in payload {
         if p.get("value") != None { present[str(p.get("dataKey"))] = p.get("value"); }
     }
-    return <div className="rounded-sm border border-neutral-700 bg-[#0a0a0c] px-2.5 py-2" style={{"fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 11}}>
-        <div className="micro-label mb-1 text-neutral-500">rung {props.get("label")} · pass@1</div>
+    return <div className="rounded-sm border border-input bg-background px-2.5 py-2" style={{"fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 11}}>
+        <div className="micro-label mb-1 text-muted-foreground">rung {props.get("label")} · pass@1</div>
         {for k in keys {
             <div key={k} className="flex items-center justify-between gap-4 leading-5">
                 <span className="flex items-center gap-1.5">
                     <span style={{"display": "inline-block", "width": 14, "borderTop": (("2px dashed " + _colorFor(k)) if _dashFor(k) else ("2px solid " + _colorFor(k)))}}></span>
                     <span style={{"color": _colorFor(k)}}>{k}</span>
                 </span>
-                {(<span className="text-neutral-100">{str(present[k]) + "%"}</span>) if (k in present) else (<span className="rounded-sm border border-dashed border-neutral-600 px-1 italic text-neutral-500">N/A</span>)}
+                {(<span className="text-foreground">{str(present[k]) + "%"}</span>) if (k in present) else (<span className="rounded-sm border border-dashed border-input px-1 italic text-muted-foreground">N/A</span>)}
             </div>
         }}
     </div>;
@@ -97,8 +97,8 @@ def _LadderTip(props: dict) -> JsxElement {
 def _ladderChart(props: dict) -> JsxElement {
     rows = props["rows"];
     keys: list = list(props["keys"]);
-    return <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-3 pt-4">
-        <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">HOLDOUT pass@1 % · by rung (train-N) · Y axis 0–100</span>
+    return <div className="relative rounded-md border border-border bg-card p-3 pt-4">
+        <span className="micro-label absolute -top-2 left-3 bg-background px-2">HOLDOUT pass@1 % · by rung (train-N) · Y axis 0–100</span>
         <ResponsiveContainer width="100%" height={260}>
             <LineChart data={rows} margin={{"top": 10, "right": 14, "left": 0, "bottom": 0}}>
                 <CartesianGrid stroke="#1c1c1f" vertical={False} />
@@ -111,19 +111,19 @@ def _ladderChart(props: dict) -> JsxElement {
                 }}
             </LineChart>
         </ResponsiveContainer>
-        <div className="stat-line mt-2 text-neutral-600">color = condition (base / sft / raw_grpo / sft_grpo / sft_grpo_tuned) · solid = jac- finetuned, dashed = base model · a broken line / lone dot = that series was only evaluated at that rung; gaps = N/A (hover for the full per-series breakdown incl. N/A) · coincident lines mean equal scores, not a render bug.</div>
+        <div className="stat-line mt-2 text-muted-foreground/80">color = condition (base / sft / raw_grpo / sft_grpo / sft_grpo_tuned) · solid = jac- finetuned, dashed = base model · a broken line / lone dot = that series was only evaluated at that rung; gaps = N/A (hover for the full per-series breakdown incl. N/A) · coincident lines mean equal scores, not a render bug.</div>
     </div>;
 }
 
 def _archiveLine(props: dict) -> JsxElement {
-    return <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-3 pt-4">
-        <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">{props["title"]}</span>
+    return <div className="relative rounded-md border border-border bg-card p-3 pt-4">
+        <span className="micro-label absolute -top-2 left-3 bg-background px-2">{props["title"]}</span>
         <ResponsiveContainer width="100%" height={180}>
             <LineChart data={props["rows"]} margin={{"top": 10, "right": 14, "left": 0, "bottom": 0}}>
                 <CartesianGrid stroke="#1c1c1f" vertical={False} />
                 <XAxis dataKey="x" tick={_tick()} tickLine={False} axisLine={{"stroke": "#333"}} />
                 <YAxis tick={_tick()} tickLine={False} axisLine={False} width={40} domain={[0, 100]} ticks={PCT_TICKS} unit="%" />
-                <Tooltip cursor={{"stroke": "#333", "strokeDasharray": "3 3"}} contentStyle={{"background": "#0a0a0c", "border": "1px solid #333", "borderRadius": 0, "fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 11}} labelStyle={{"color": "#777"}} itemStyle={{"color": "#fafafa"}} />
+                <Tooltip cursor={{"stroke": "#333", "strokeDasharray": "3 3"}} contentStyle={{"background": "var(--background)", "border": "1px solid #333", "borderRadius": 0, "fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 11}} labelStyle={{"color": "#777"}} itemStyle={{"color": "#fafafa"}} />
                 <Legend wrapperStyle={{"fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 10}} />
                 <Line type="monotone" dataKey="qwen3coder" stroke={STROKES[0]} strokeDasharray="5 3" strokeWidth={1.8} dot={{"r": 2.6, "fill": STROKES[0], "strokeWidth": 0}} isAnimationActive={False} />
                 <Line type="monotone" dataKey="jac-qwen3coder" stroke={STROKES[1]} strokeWidth={1.8} dot={{"r": 2.6, "fill": STROKES[1], "strokeWidth": 0}} isAnimationActive={False} />
@@ -172,49 +172,49 @@ def:pub Results -> JsxElement {
     has_v84 = len(v84cells) > 0;
 
     return <div className="flex h-full min-w-0 flex-1 flex-col">
-        <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-2.5">
+        <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
             <span className="micro-label">RESULTS · SFT/GRPO LADDER (live) + corrected + weekend archive</span>
-            <span className="micro-label text-neutral-600">{(str(len(cells)) + " cells") if has_live else "no ladder run yet"}</span>
+            <span className="micro-label text-muted-foreground/80">{(str(len(cells)) + " cells") if has_live else "no ladder run yet"}</span>
         </div>
 
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
-            <div className="relative rounded-md border border-emerald-900/40 bg-[#0d0d0d] p-3 pt-4">
-                <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2 text-emerald-500/80">THE STORY · a measurement bug hid an 11%→94% Jac generator</span>
+            <div className="relative rounded-md border border-emerald-900/40 bg-card p-3 pt-4">
+                <span className="micro-label absolute -top-2 left-3 bg-background px-2 text-emerald-500/80">THE STORY · a measurement bug hid an 11%→94% Jac generator</span>
                 <ResponsiveContainer width="100%" height={210}>
                     <LineChart data={corrJourney} margin={{"top": 14, "right": 20, "left": 0, "bottom": 0}}>
                         <CartesianGrid stroke="#1c1c1f" vertical={False} />
                         <XAxis dataKey="stage" tick={{"fill": "#888", "fontSize": 9, "fontFamily": "'Geist Mono', ui-monospace, monospace"}} tickLine={False} axisLine={{"stroke": "#333"}} interval={0} />
                         <YAxis tick={_tick()} tickLine={False} axisLine={False} width={40} domain={[0, 100]} ticks={PCT_TICKS} unit="%" />
-                        <Tooltip cursor={{"fill": "#ffffff08"}} contentStyle={{"background": "#0a0a0c", "border": "1px solid #333", "borderRadius": 0, "fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 11}} labelStyle={{"color": "#777"}} itemStyle={{"color": "#fafafa"}} />
+                        <Tooltip cursor={{"fill": "#ffffff08"}} contentStyle={{"background": "var(--background)", "border": "1px solid #333", "borderRadius": 0, "fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 11}} labelStyle={{"color": "#777"}} itemStyle={{"color": "#fafafa"}} />
                         <Line type="monotone" dataKey="acc" name="holdout accuracy %" stroke="#9ec98f" strokeWidth={2} dot={{"r": 4, "fill": "#9ec98f"}} isAnimationActive={False} />
                     </LineChart>
                 </ResponsiveContainer>
             </div>
 
-            <div className="relative rounded-md border border-emerald-900/40 bg-[#0d0d0d] p-3 pt-4">
-                <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2 text-emerald-500/80">CORRECTED LADDER · greedy vs pass@8 · pure-fn holdout (n=18) · jac-qwen3coder</span>
+            <div className="relative rounded-md border border-emerald-900/40 bg-card p-3 pt-4">
+                <span className="micro-label absolute -top-2 left-3 bg-background px-2 text-emerald-500/80">CORRECTED LADDER · greedy vs pass@8 · pure-fn holdout (n=18) · jac-qwen3coder</span>
                 <ResponsiveContainer width="100%" height={230}>
                     <BarChart data={corrLadder} margin={{"top": 10, "right": 14, "left": 0, "bottom": 0}}>
                         <CartesianGrid stroke="#1c1c1f" vertical={False} />
                         <XAxis dataKey="cell" tick={_tick()} tickLine={False} axisLine={{"stroke": "#333"}} />
                         <YAxis tick={_tick()} tickLine={False} axisLine={False} width={40} domain={[0, 100]} ticks={PCT_TICKS} unit="%" />
-                        <Tooltip cursor={{"fill": "#ffffff08"}} contentStyle={{"background": "#0a0a0c", "border": "1px solid #333", "borderRadius": 0, "fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 11}} labelStyle={{"color": "#777"}} itemStyle={{"color": "#fafafa"}} />
+                        <Tooltip cursor={{"fill": "#ffffff08"}} contentStyle={{"background": "var(--background)", "border": "1px solid #333", "borderRadius": 0, "fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 11}} labelStyle={{"color": "#777"}} itemStyle={{"color": "#fafafa"}} />
                         <Legend wrapperStyle={{"fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 10, "color": "#777"}} />
                         <Bar dataKey="greedy" name="greedy pass@1" fill="#7aa2f7" isAnimationActive={False} />
                         <Bar dataKey="passk" name="pass@8 (~best-of-k)" fill="#9ec98f" isAnimationActive={False} />
                     </BarChart>
                 </ResponsiveContainer>
-                <div className="stat-line mt-1 text-neutral-600">SFT lifts greedy 39%→61% (peak rung-20); GRPO≈SFT; raw-GRPO=base. The v1 "SFT does nothing" was the eval bug.</div>
+                <div className="stat-line mt-1 text-muted-foreground/80">SFT lifts greedy 39%→61% (peak rung-20); GRPO≈SFT; raw-GRPO=base. The v1 "SFT does nothing" was the eval bug.</div>
             </div>
 
-            <div className="relative rounded-md border border-emerald-900/40 bg-[#0d0d0d] p-3 pt-4">
-                <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2 text-emerald-500/80">BEST-OF-K + COMPILER VERIFIER · base vs SFT · across 3 holdouts</span>
+            <div className="relative rounded-md border border-emerald-900/40 bg-card p-3 pt-4">
+                <span className="micro-label absolute -top-2 left-3 bg-background px-2 text-emerald-500/80">BEST-OF-K + COMPILER VERIFIER · base vs SFT · across 3 holdouts</span>
                 <ResponsiveContainer width="100%" height={230}>
                     <BarChart data={corrHold} margin={{"top": 10, "right": 14, "left": 0, "bottom": 0}}>
                         <CartesianGrid stroke="#1c1c1f" vertical={False} />
                         <XAxis dataKey="name" tick={_tick()} tickLine={False} axisLine={{"stroke": "#333"}} />
                         <YAxis tick={_tick()} tickLine={False} axisLine={False} width={40} domain={[0, 100]} ticks={PCT_TICKS} unit="%" />
-                        <Tooltip cursor={{"fill": "#ffffff08"}} contentStyle={{"background": "#0a0a0c", "border": "1px solid #333", "borderRadius": 0, "fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 11}} labelStyle={{"color": "#777"}} itemStyle={{"color": "#fafafa"}} />
+                        <Tooltip cursor={{"fill": "#ffffff08"}} contentStyle={{"background": "var(--background)", "border": "1px solid #333", "borderRadius": 0, "fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 11}} labelStyle={{"color": "#777"}} itemStyle={{"color": "#fafafa"}} />
                         <Legend wrapperStyle={{"fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 10, "color": "#777"}} />
                         <Bar dataKey="greedy_base" name="greedy·base" fill="#4b5563" isAnimationActive={False} />
                         <Bar dataKey="greedy_sft" name="greedy·SFT" fill="#7aa2f7" isAnimationActive={False} />
@@ -222,34 +222,34 @@ def:pub Results -> JsxElement {
                         <Bar dataKey="bok_sft" name="best-of-k·SFT" fill="#9ec98f" isAnimationActive={False} />
                     </BarChart>
                 </ResponsiveContainer>
-                <div className="stat-line mt-1 text-neutral-600">best-of-k+compiler-verifier is the universal win (deploy==oracle: the compiler is a perfect picker). Conversion+SFT peaks at 82%. Fresh model dead (gap 0). clean n=16 → 94%.</div>
+                <div className="stat-line mt-1 text-muted-foreground/80">best-of-k+compiler-verifier is the universal win (deploy==oracle: the compiler is a perfect picker). Conversion+SFT peaks at 82%. Fresh model dead (gap 0). clean n=16 → 94%.</div>
             </div>
 
-            <div className="relative rounded-md border border-emerald-900/40 bg-[#0d0d0d] p-3 pt-4">
-                <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2 text-emerald-500/80">SAMPLING BUDGET vs ACCURACY · more samples, more solved (compiler picks)</span>
+            <div className="relative rounded-md border border-emerald-900/40 bg-card p-3 pt-4">
+                <span className="micro-label absolute -top-2 left-3 bg-background px-2 text-emerald-500/80">SAMPLING BUDGET vs ACCURACY · more samples, more solved (compiler picks)</span>
                 <ResponsiveContainer width="100%" height={200}>
                     <BarChart data={corrKscale} margin={{"top": 10, "right": 14, "left": 0, "bottom": 0}}>
                         <CartesianGrid stroke="#1c1c1f" vertical={False} />
                         <XAxis dataKey="k" tick={_tick()} tickLine={False} axisLine={{"stroke": "#333"}} />
                         <YAxis tick={_tick()} tickLine={False} axisLine={False} width={40} domain={[0, 100]} ticks={PCT_TICKS} unit="%" />
-                        <Tooltip cursor={{"fill": "#ffffff08"}} contentStyle={{"background": "#0a0a0c", "border": "1px solid #333", "borderRadius": 0, "fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 11}} labelStyle={{"color": "#777"}} itemStyle={{"color": "#fafafa"}} />
+                        <Tooltip cursor={{"fill": "#ffffff08"}} contentStyle={{"background": "var(--background)", "border": "1px solid #333", "borderRadius": 0, "fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 11}} labelStyle={{"color": "#777"}} itemStyle={{"color": "#fafafa"}} />
                         <Bar dataKey="acc" name="pure-fn accuracy %" fill="#7aa2f7" isAnimationActive={False} />
                     </BarChart>
                 </ResponsiveContainer>
-                <div className="stat-line mt-1 text-neutral-600">greedy 39% → k=8 72% → k=32 89%. The correct Jac is reachable; the compiler finds it among samples.</div>
+                <div className="stat-line mt-1 text-muted-foreground/80">greedy 39% → k=8 72% → k=32 89%. The correct Jac is reachable; the compiler finds it among samples.</div>
             </div>
 
-            <div className="mt-1 border-t border-neutral-800 pt-2">
+            <div className="mt-1 border-t border-border pt-2">
                 <span className="micro-label text-amber-500/70">⚠️ ARCHIVE BELOW · INVALIDATED broken-eval runs (~3.5× undercount) · kept for record</span>
             </div>
 
             {(<div className="flex flex-col gap-4">
                 {_ladderChart({"rows": curve, "keys": keys})}
-                <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-3 pt-4">
-                    <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">LADDER CELLS</span>
+                <div className="relative rounded-md border border-border bg-card p-3 pt-4">
+                    <span className="micro-label absolute -top-2 left-3 bg-background px-2">LADDER CELLS</span>
                     <table className="w-full font-mono text-xs">
                         <thead>
-                            <tr className="text-neutral-500">
+                            <tr className="text-muted-foreground">
                                 <th className="py-1 text-left">model</th><th className="text-left">rung</th>
                                 <th className="text-left">cond</th><th className="text-right">gen@1</th>
                                 <th className="text-right">gen@k</th><th className="text-right">mem</th>
@@ -258,30 +258,30 @@ def:pub Results -> JsxElement {
                         </thead>
                         <tbody>
                             {for c in cells {
-                                <tr key={str(c["model"]) + str(c["rung"]) + str(c["cond"])} className="border-t border-neutral-900 text-neutral-300">
+                                <tr key={str(c["model"]) + str(c["rung"]) + str(c["cond"])} className="border-t border-border text-foreground/80">
                                     <td className="py-1">{c["model"]}</td><td>{c["rung"]}</td>
-                                    <td className="text-neutral-500">{c["cond"]}</td>
-                                    <td className="text-right text-neutral-100">{_n(c["gen_pass1"])}</td>
+                                    <td className="text-muted-foreground">{c["cond"]}</td>
+                                    <td className="text-right text-foreground">{_n(c["gen_pass1"])}</td>
                                     <td className="text-right">{_n(c["gen_passk"])}</td>
-                                    <td className="text-right text-neutral-500">{_n(c["mem_pass1"])}</td>
-                                    <td className="text-right text-neutral-600">{c["n"] if c["n"] != None else "·"}</td>
+                                    <td className="text-right text-muted-foreground">{_n(c["mem_pass1"])}</td>
+                                    <td className="text-right text-muted-foreground/80">{c["n"] if c["n"] != None else "·"}</td>
                                 </tr>
                             }}
                         </tbody>
                     </table>
-                    <div className="stat-line mt-2 text-neutral-600">gen=holdout (generalization), mem=train recall. Read pass@k, not bare pass@1 — n is small.</div>
+                    <div className="stat-line mt-2 text-muted-foreground/80">gen=holdout (generalization), mem=train recall. Read pass@k, not bare pass@1 — n is small.</div>
                 </div>
-            </div>) if has_live else (<div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-4 pt-5">
-                <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">LADDER</span>
-                <p className="text-sm text-neutral-400">No ladder results yet. Run <span className="font-mono text-neutral-200">JAC_LADDER_GO=1 jac run 02-rl-grpo/rl/run_ladder.jac</span> — cells stream into this graph as evals land.</p>
+            </div>) if has_live else (<div className="relative rounded-md border border-border bg-card p-4 pt-5">
+                <span className="micro-label absolute -top-2 left-3 bg-background px-2">LADDER</span>
+                <p className="text-sm text-muted-foreground">No ladder results yet. Run <span className="font-mono text-foreground">JAC_LADDER_GO=1 jac run 02-rl-grpo/rl/run_ladder.jac</span> — cells stream into this graph as evals land.</p>
             </div>)}
 
-            {(<div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-3 pt-4">
-                <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">STEP 7 · SG-IDIOM HOLDOUT (sg walkers held out file-disjoint)</span>
+            {(<div className="relative rounded-md border border-border bg-card p-3 pt-4">
+                <span className="micro-label absolute -top-2 left-3 bg-background px-2">STEP 7 · SG-IDIOM HOLDOUT (sg walkers held out file-disjoint)</span>
                 {_ladderChart({"rows": sgcurve, "keys": sgkeys})}
                 <table className="mt-3 w-full font-mono text-xs">
                     <thead>
-                        <tr className="text-neutral-500">
+                        <tr className="text-muted-foreground">
                             <th className="py-1 text-left">model</th><th className="text-left">rung</th>
                             <th className="text-left">cond</th><th className="text-right">gen@1</th>
                             <th className="text-right">gen@k</th><th className="text-right">n</th>
@@ -289,25 +289,25 @@ def:pub Results -> JsxElement {
                     </thead>
                     <tbody>
                         {for c in sgcells {
-                            <tr key={"sg" + str(c["model"]) + str(c["rung"]) + str(c["cond"])} className="border-t border-neutral-900 text-neutral-300">
+                            <tr key={"sg" + str(c["model"]) + str(c["rung"]) + str(c["cond"])} className="border-t border-border text-foreground/80">
                                 <td className="py-1">{c["model"]}</td><td>{c["rung"]}</td>
-                                <td className="text-neutral-500">{c["cond"]}</td>
-                                <td className="text-right text-neutral-100">{_n(c["gen_pass1"])}</td>
+                                <td className="text-muted-foreground">{c["cond"]}</td>
+                                <td className="text-right text-foreground">{_n(c["gen_pass1"])}</td>
                                 <td className="text-right">{_n(c["gen_passk"])}</td>
-                                <td className="text-right text-neutral-600">{c["n"] if c["n"] != None else "·"}</td>
+                                <td className="text-right text-muted-foreground/80">{c["n"] if c["n"] != None else "·"}</td>
                             </tr>
                         }}
                     </tbody>
                 </table>
-                <div className="stat-line mt-2 text-neutral-600">Held-out sg slice is the hard frontier (0/5 base). Fresh qwen3coder SFT at rung-all is the only cell to crack it: sg 0→1/5, overall 14.3%→28.6%.</div>
+                <div className="stat-line mt-2 text-muted-foreground/80">Held-out sg slice is the hard frontier (0/5 base). Fresh qwen3coder SFT at rung-all is the only cell to crack it: sg 0→1/5, overall 14.3%→28.6%.</div>
             </div>) if has_sg else <span></span>}
 
-            {(<div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-3 pt-4">
-                <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">84-TASK HIGHER-POWER RE-RUN (null reproduced on a 2nd corpus)</span>
+            {(<div className="relative rounded-md border border-border bg-card p-3 pt-4">
+                <span className="micro-label absolute -top-2 left-3 bg-background px-2">84-TASK HIGHER-POWER RE-RUN (null reproduced on a 2nd corpus)</span>
                 {_ladderChart({"rows": v84curve, "keys": v84keys})}
                 <table className="mt-3 w-full font-mono text-xs">
                     <thead>
-                        <tr className="text-neutral-500">
+                        <tr className="text-muted-foreground">
                             <th className="py-1 text-left">model</th><th className="text-left">rung</th>
                             <th className="text-left">cond</th><th className="text-right">gen@1</th>
                             <th className="text-right">gen@k</th><th className="text-right">mem</th>
@@ -316,27 +316,27 @@ def:pub Results -> JsxElement {
                     </thead>
                     <tbody>
                         {for c in v84cells {
-                            <tr key={"v84" + str(c["model"]) + str(c["rung"]) + str(c["cond"])} className="border-t border-neutral-900 text-neutral-300">
+                            <tr key={"v84" + str(c["model"]) + str(c["rung"]) + str(c["cond"])} className="border-t border-border text-foreground/80">
                                 <td className="py-1">{c["model"]}</td><td>{c["rung"]}</td>
-                                <td className="text-neutral-500">{c["cond"]}</td>
-                                <td className="text-right text-neutral-100">{_n(c["gen_pass1"])}</td>
+                                <td className="text-muted-foreground">{c["cond"]}</td>
+                                <td className="text-right text-foreground">{_n(c["gen_pass1"])}</td>
                                 <td className="text-right">{_n(c["gen_passk"])}</td>
-                                <td className="text-right text-neutral-500">{_n(c["mem_pass1"])}</td>
-                                <td className="text-right text-neutral-600">{c["n"] if c["n"] != None else "·"}</td>
+                                <td className="text-right text-muted-foreground">{_n(c["mem_pass1"])}</td>
+                                <td className="text-right text-muted-foreground/80">{c["n"] if c["n"] != None else "·"}</td>
                             </tr>
                         }}
                     </tbody>
                 </table>
-                <div className="stat-line mt-2 text-neutral-600">Corpus squeezed 66→84 tasks for power. Same null: SFT moves cells, GRPO does not.</div>
+                <div className="stat-line mt-2 text-muted-foreground/80">Corpus squeezed 66→84 tasks for power. Same null: SFT moves cells, GRPO does not.</div>
             </div>) if has_v84 else <span></span>}
 
-            <div className="mt-2 border-t border-neutral-800 pt-3">
-                <span className="micro-label text-neutral-500">— WEEKEND ARCHIVE · GRPO + WARM-START + STaR (Jun 20–21) —</span>
+            <div className="mt-2 border-t border-border pt-3">
+                <span className="micro-label text-muted-foreground">— WEEKEND ARCHIVE · GRPO + WARM-START + STaR (Jun 20–21) —</span>
             </div>
 
-            <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-4 pt-5">
-                <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">RESULT (archive)</span>
-                <p className="text-sm text-neutral-300">
+            <div className="relative rounded-md border border-border bg-card p-4 pt-5">
+                <span className="micro-label absolute -top-2 left-3 bg-background px-2">RESULT (archive)</span>
+                <p className="text-sm text-foreground/80">
                     Supervised levers (SFT, DPO, gold warm-start) move models here. <b>RL does not.</b> GRPO added nothing (confirmed by pass@8), STaR added a faint flicker that didn't hold, and the bigger Qwen3.6 models can't be trained on 48 GB.
                 </p>
             </div>
@@ -346,14 +346,14 @@ def:pub Results -> JsxElement {
                 {_archiveLine({"title": "STaR · pass@4 sampled · by round", "rows": STAR4})}
             </div>
 
-            <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-3 pt-4">
-                <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">PHASE 1 · WARM-START LIFT · holdout pass%</span>
+            <div className="relative rounded-md border border-border bg-card p-3 pt-4">
+                <span className="micro-label absolute -top-2 left-3 bg-background px-2">PHASE 1 · WARM-START LIFT · holdout pass%</span>
                 <ResponsiveContainer width="100%" height={200}>
                     <BarChart data={PHASE1} margin={{"top": 10, "right": 14, "left": 0, "bottom": 0}}>
                         <CartesianGrid stroke="#1c1c1f" vertical={False} />
                         <XAxis dataKey="model" tick={_tick()} tickLine={False} axisLine={{"stroke": "#333"}} />
                         <YAxis tick={_tick()} tickLine={False} axisLine={False} width={40} domain={[0, 100]} ticks={PCT_TICKS} unit="%" />
-                        <Tooltip cursor={{"fill": "#ffffff08"}} contentStyle={{"background": "#0a0a0c", "border": "1px solid #333", "borderRadius": 0, "fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 11}} labelStyle={{"color": "#777"}} itemStyle={{"color": "#fafafa"}} />
+                        <Tooltip cursor={{"fill": "#ffffff08"}} contentStyle={{"background": "var(--background)", "border": "1px solid #333", "borderRadius": 0, "fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 11}} labelStyle={{"color": "#777"}} itemStyle={{"color": "#fafafa"}} />
                         <Legend wrapperStyle={{"fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 10, "color": "#777"}} />
                         <Bar dataKey="BASE" fill={STROKES[0]} isAnimationActive={False} />
                         <Bar dataKey="WARM" fill={STROKES[1]} isAnimationActive={False} />
@@ -362,13 +362,13 @@ def:pub Results -> JsxElement {
                 </ResponsiveContainer>
             </div>
 
-            <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-4 pt-5">
-                <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">FAILURES &amp; WHY (archive)</span>
+            <div className="relative rounded-md border border-border bg-card p-4 pt-5">
+                <span className="micro-label absolute -top-2 left-3 bg-background px-2">FAILURES &amp; WHY (archive)</span>
                 <div className="flex flex-col gap-2.5">
                     {for f in FAILS {
                         <div key={f["t"]} className="grid grid-cols-[200px_1fr] gap-3">
-                            <span className="font-mono text-xs text-neutral-300">{f["t"]}</span>
-                            <span className="stat-line text-neutral-500">{f["b"]}</span>
+                            <span className="font-mono text-xs text-foreground/80">{f["t"]}</span>
+                            <span className="stat-line text-muted-foreground">{f["b"]}</span>
                         </div>
                     }}
                 </div>

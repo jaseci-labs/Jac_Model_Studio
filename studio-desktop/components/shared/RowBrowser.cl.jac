@@ -19,16 +19,16 @@ raw text block (cpt corpus rows + plain-json rows). Called with a props dict."""
 def:pub RowDetail(row: any) -> JsxElement {
     kind = str(row["kind"]);
     structured = row["prompt"] or row["python"] or row["jac"] or row["chosen"];
-    return <div className="rounded-md border border-neutral-800 bg-[#0d0d0d] p-3 space-y-2">
+    return <div className="rounded-md border border-border bg-card p-3 space-y-2">
         {row["prompt"] and <div>
-            <div className="micro-label mb-1 text-neutral-600">PROMPT</div>
-            <pre className="whitespace-pre-wrap font-mono text-xs text-neutral-400 leading-relaxed">{row["prompt"]}</pre>
+            <div className="micro-label mb-1 text-muted-foreground/80">PROMPT</div>
+            <pre className="whitespace-pre-wrap font-mono text-xs text-muted-foreground leading-relaxed">{row["prompt"]}</pre>
         </div>}
         {row["python"] and <CodeBlock label="" code={str(row["python"])} lang="python" />}
         {(row["jac"] and kind != "dpo") and <CodeBlock label="" code={str(row["jac"])} lang="jac" />}
         {(kind == "dpo" and row["chosen"]) and <CodeBlock label="CHOSEN.JAC" code={str(row["chosen"])} lang="jac" />}
         {(kind == "dpo" and row["rejected"]) and <CodeBlock label="REJECTED.JAC" code={str(row["rejected"])} lang="jac" />}
-        {(row["raw"] and not structured) and <pre className="max-h-[32rem] overflow-y-auto whitespace-pre-wrap break-words font-mono text-xs text-neutral-400 leading-relaxed">{row["raw"]}</pre>}
+        {(row["raw"] and not structured) and <pre className="max-h-[32rem] overflow-y-auto whitespace-pre-wrap break-words font-mono text-xs text-muted-foreground leading-relaxed">{row["raw"]}</pre>}
     </div>;
 }
 
@@ -40,8 +40,8 @@ def:pub RowBrowser(
 ) -> JsxElement {
     canPrev = offset > 0;
     canNext = offset + len(rows) < total;
-    return <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-3 pt-4">
-        <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">{label}</span>
+    return <div className="relative rounded-md border border-border bg-card p-3 pt-4">
+        <span className="micro-label absolute -top-2 left-3 bg-background px-2">{label}</span>
         <div className="mb-3 flex flex-wrap gap-1">
             {(len(files) == 0) and <span className="stat-line">no files</span>}
             {for f in files {
@@ -49,8 +49,8 @@ def:pub RowBrowser(
                     key={str(f.path)}
                     onClick={lambda e: MouseEvent { onOpen(str(f.path)); }}
                     className={"rounded border px-2 py-0.5 font-mono text-[10px] transition-colors " + (
-                        "border-neutral-500 bg-[#1a1a1a] text-neutral-100" if str(f.path) == path
-                        else "border-neutral-700 text-neutral-500 hover:text-neutral-300"
+                        "border-accent bg-accent/15 text-foreground" if str(f.path) == path
+                        else "border-input text-muted-foreground hover:text-foreground/80"
                     )}
                 >
                     {f.label} {str(f.count)}
@@ -72,23 +72,23 @@ def:pub RowBrowser(
                     <div key={str(row["idx"])}>
                         <div
                             onClick={lambda e: MouseEvent { onToggle(int(row["idx"])); }}
-                            className="grid cursor-pointer grid-cols-[2rem_1fr_3rem_3rem_5rem_1fr] gap-2 rounded px-0.5 py-1 font-mono text-xs hover:bg-[#141414]"
+                            className="grid cursor-pointer grid-cols-[2rem_1fr_3rem_3rem_5rem_1fr] gap-2 rounded px-0.5 py-1 font-mono text-xs hover:bg-secondary"
                         >
-                            <span className="text-neutral-600">{str(row["idx"])}</span>
-                            <span className="truncate text-neutral-300">{row["name"]}</span>
-                            <span className="text-neutral-500">{str(KIND_LABEL[str(row["kind"])]) if str(row["kind"]) in KIND_LABEL else str(row["kind"])}</span>
-                            <span className="text-neutral-500">{row["difficulty"]}</span>
-                            <span className="truncate text-neutral-500">{row["source"]}</span>
-                            <span className="truncate text-neutral-600">{row["preview"]}</span>
+                            <span className="text-muted-foreground/80">{str(row["idx"])}</span>
+                            <span className="truncate text-foreground/80">{row["name"]}</span>
+                            <span className="text-muted-foreground">{str(KIND_LABEL[str(row["kind"])]) if str(row["kind"]) in KIND_LABEL else str(row["kind"])}</span>
+                            <span className="text-muted-foreground">{row["difficulty"]}</span>
+                            <span className="truncate text-muted-foreground">{row["source"]}</span>
+                            <span className="truncate text-muted-foreground/80">{row["preview"]}</span>
                         </div>
                         {(expanded == int(row["idx"])) and <div className="mb-1">{RowDetail({"row": row})}</div>}
                     </div>
                 }}
             </div>
             {(total > 0) and <div className="mt-3 flex items-center justify-center gap-3 stat-line">
-                <button disabled={not canPrev} onClick={lambda e: MouseEvent { onPrev(); }} className="disabled:opacity-30 hover:text-neutral-200 transition-colors">← PREV</button>
+                <button disabled={not canPrev} onClick={lambda e: MouseEvent { onPrev(); }} className="disabled:opacity-30 hover:text-foreground transition-colors">← PREV</button>
                 <span>{str(offset + 1)} to {str(offset + len(rows))} of {str(total)}</span>
-                <button disabled={not canNext} onClick={lambda e: MouseEvent { onNext(); }} className="disabled:opacity-30 hover:text-neutral-200 transition-colors">NEXT →</button>
+                <button disabled={not canNext} onClick={lambda e: MouseEvent { onNext(); }} className="disabled:opacity-30 hover:text-foreground transition-colors">NEXT →</button>
             </div>}
         </div>}
         {(not path) and <div className="stat-line py-6 text-center">select a file above</div>}

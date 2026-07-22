@@ -15,8 +15,8 @@ def _tick2() -> dict {
 }
 
 def:pub MultiLineChart(title: str, rows: list[dict], names: list[str]) -> JsxElement {
-    return <div className="relative rounded-md border border-neutral-800 bg-[#0d0d0d] p-3 pt-4">
-        <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">{title}</span>
+    return <div className="relative rounded-md border border-border bg-card p-3 pt-4">
+        <span className="micro-label absolute -top-2 left-3 bg-background px-2">{title}</span>
         {if len(rows) == 0 {
             <div className="micro-label flex items-center justify-center" style={{"height": 180}}>NO SIGNAL</div>
             skip;
@@ -27,7 +27,7 @@ def:pub MultiLineChart(title: str, rows: list[dict], names: list[str]) -> JsxEle
                     <CartesianGrid stroke="#1c1c1f" vertical={False} />
                     <XAxis dataKey="x" tick={_tick2()} tickLine={False} axisLine={{"stroke": "#333"}} />
                     <YAxis tick={_tick2()} tickLine={False} axisLine={False} width={46} domain={["auto", "auto"]} />
-                    <Tooltip cursor={{"stroke": "#333", "strokeDasharray": "3 3"}} contentStyle={{"background": "#0a0a0c", "border": "1px solid #333", "borderRadius": 0, "fontFamily": MONO2, "fontSize": 11}} labelStyle={{"color": "#777"}} itemStyle={{"color": "#fafafa"}} />
+                    <Tooltip cursor={{"stroke": "#333", "strokeDasharray": "3 3"}} contentStyle={{"background": "var(--background)", "border": "1px solid #333", "borderRadius": 0, "fontFamily": MONO2, "fontSize": 11}} labelStyle={{"color": "#777"}} itemStyle={{"color": "#fafafa"}} />
                     {for (i, name) in enumerate(names) {
                         <Line key={name} type="monotone" dataKey={name} stroke={HUES[i % len(HUES)]} strokeWidth={1.4} dot={False} isAnimationActive={False} connectNulls={True} />
                     }}

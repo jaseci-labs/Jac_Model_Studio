@@ -27,11 +27,11 @@ def:pub Composer(
                 <button
                     key={str(cat["id"])}
                     onClick={lambda e: MouseEvent { onChip(str(cat["id"])); }}
-                    className="rounded-full border border-dashed border-neutral-600 px-2.5 py-0.5 font-mono text-[9px] text-neutral-400 hover:border-neutral-400 hover:text-neutral-200"
+                    className="rounded-full border border-dashed border-input px-2.5 py-0.5 font-mono text-[9px] text-muted-foreground hover:border-ring hover:text-foreground"
                 >{str(cat["id"])}</button>
             }}
         </div>
-        <div className="flex items-end gap-2 rounded-xl border border-neutral-700 bg-[#121212] p-2 focus-within:border-neutral-500">
+        <div className="flex items-end gap-2 rounded-xl border border-input bg-popover p-2 focus-within:border-ring">
             <textarea
                 value={value}
                 onChange={lambda e: ChangeEvent { onSet(str(e.target.value)); }}
@@ -43,12 +43,12 @@ def:pub Composer(
                 }}
                 rows={_rows(value)}
                 placeholder="Ask the model…  (Enter to send, Shift+Enter for newline)"
-                className="max-h-48 flex-1 resize-none bg-transparent px-2 py-1 text-sm text-neutral-200 outline-none placeholder:text-neutral-600"
+                className="max-h-48 flex-1 resize-none bg-transparent px-2 py-1 text-sm text-foreground outline-none placeholder:text-muted-foreground/80"
             />
             <button
                 onClick={lambda e: MouseEvent { if busy { onStop(); } else { onSend(value); } }}
                 disabled={(not busy) and not value.strip()}
-                className="rounded-lg border border-neutral-600 px-3 py-1 font-mono text-[10px] text-neutral-300 hover:border-neutral-400 disabled:opacity-30"
+                className="rounded-lg border border-input px-3 py-1 font-mono text-[10px] text-foreground/80 hover:border-ring disabled:opacity-30"
             >
                 {"■ STOP" if busy else "⏎ SEND"}
             </button>

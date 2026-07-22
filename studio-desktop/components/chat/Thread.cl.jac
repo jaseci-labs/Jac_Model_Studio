@@ -66,8 +66,8 @@ def _rows(messages: list) -> list[dict] {
 def:pub CodeBlock(lang: str, code: str) -> JsxElement {
     has copied: bool = False;
 
-    return <div className="relative mt-3 mb-1 rounded-lg border border-neutral-800 bg-[#121212]">
-        <span className="micro-label absolute -top-2 left-3 bg-[#0a0a0a] px-2">
+    return <div className="relative mt-3 mb-1 rounded-lg border border-border bg-popover">
+        <span className="micro-label absolute -top-2 left-3 bg-background px-2">
             OUTPUT.{(lang.upper() if lang else "TXT")}
         </span>
         <button
@@ -76,9 +76,9 @@ def:pub CodeBlock(lang: str, code: str) -> JsxElement {
                 copied = True;
                 setTimeout(lambda -> None { copied = False; }, 1200);
             }}
-            className="absolute right-2 top-2 font-mono text-[9px] text-neutral-500 hover:text-neutral-200"
+            className="absolute right-2 top-2 font-mono text-[9px] text-muted-foreground hover:text-foreground"
         >{"COPIED" if copied else "COPY"}</button>
-        <pre className="overflow-x-auto p-3 pt-4 font-mono text-xs leading-relaxed text-neutral-200">{code}</pre>
+        <pre className="overflow-x-auto p-3 pt-4 font-mono text-xs leading-relaxed text-foreground">{code}</pre>
     </div>;
 }
 
@@ -87,7 +87,7 @@ def:pub Bubble(msg: dict, label: str, paired: bool, userText: str, onSave: any) 
 
     if msg["role"] == "user" {
         return <div className="my-2 flex justify-end">
-            <div className="max-w-[80%] whitespace-pre-wrap rounded-xl bg-neutral-200 px-4 py-2 text-sm text-neutral-900">{str(msg["content"])}</div>
+            <div className="max-w-[80%] whitespace-pre-wrap rounded-xl bg-accent px-4 py-2 text-sm text-accent-foreground">{str(msg["content"])}</div>
         </div>;
     }
     content = str(msg["content"]);
@@ -102,13 +102,13 @@ def:pub Bubble(msg: dict, label: str, paired: bool, userText: str, onSave: any) 
                     skip;
                 }}
                 {if part["kind"] == "text" {
-                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-neutral-200">{str(part["text"])}</p>
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">{str(part["text"])}</p>
                     skip;
                 }}
             </div>
         }}
-        {(streaming and content) and <span className="animate-pulse font-mono text-neutral-400">▍</span>}
-        {msg["error"] and <div className="stat-line mt-1 border border-dashed border-neutral-600 p-2">ERROR: {str(msg["error"])}</div>}
+        {(streaming and content) and <span className="animate-pulse font-mono text-muted-foreground">▍</span>}
+        {msg["error"] and <div className="stat-line mt-1 border border-dashed border-input p-2">ERROR: {str(msg["error"])}</div>}
         {msg["stats"] and <div className="stat-line mt-1.5">└─ {str(msg["stats"]["tps"])} tok/s · {str(msg["stats"]["tokens"])} tok · Δ{str(msg["stats"]["gen_s"])}s · load {str(msg["stats"]["load_s"])}s</div>}
         {(onSave is not None and not streaming and content and userText) and <button
             onClick={lambda e: MouseEvent {
@@ -116,7 +116,7 @@ def:pub Bubble(msg: dict, label: str, paired: bool, userText: str, onSave: any) 
                 saved = True;
                 setTimeout(lambda -> None { saved = False; }, 1400);
             }}
-            className="micro-label mt-1.5 rounded border border-neutral-700 px-1.5 py-0.5 text-neutral-500 transition-colors hover:border-neutral-500 hover:text-neutral-200"
+            className="micro-label mt-1.5 rounded border border-input px-1.5 py-0.5 text-muted-foreground transition-colors hover:border-ring hover:text-foreground"
         >{"SAVED ✓ → sft.jsonl" if saved else "+ SAVE EXAMPLE"}</button>}
     </div>;
 }
@@ -143,10 +143,10 @@ def:pub Thread(messages: list, labels: dict, onSave: any) -> JsxElement {
             <div key={str(ri)}>
                 {if row["kind"] == "pair" {
                     <div className="grid grid-cols-2 gap-4">
-                        <div className="rounded-lg border border-dashed border-neutral-800 p-3">
+                        <div className="rounded-lg border border-dashed border-border p-3">
                             <Bubble msg={row["a"]} label={lbl(str(row["a"]["modelId"]))} paired={True} userText={str(row["user"])} onSave={onSave} />
                         </div>
-                        <div className="rounded-lg border border-dashed border-neutral-800 p-3">
+                        <div className="rounded-lg border border-dashed border-border p-3">
                             <Bubble msg={row["b"]} label={lbl(str(row["b"]["modelId"]))} paired={True} userText={str(row["user"])} onSave={onSave} />
                         </div>
                     </div>

@@ -33,6 +33,6 @@ def:pub SectionMount(
     if component == "Plan" { return <Plan />; }
     if component == "Cloud" { return <Cloud active={active} />; }
     return <div className="flex flex-1 items-center justify-center">
-        <span className="micro-label text-neutral-600">UNKNOWN SECTION {component}</span>
+        <span className="micro-label text-muted-foreground/80">UNKNOWN SECTION {component}</span>
     </div>;
 }

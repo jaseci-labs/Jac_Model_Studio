@@ -84,26 +84,26 @@ def:pub Login(onDone: Callable[([], None)]) -> JsxElement {
         error = "";
     }
 
-    inputCls: str = "w-full rounded-md border border-neutral-700 bg-[#121212] px-2 py-1 text-sm text-neutral-100 outline-none placeholder:text-neutral-600 focus:border-neutral-500";
+    inputCls: str = "w-full rounded-md border border-input bg-popover px-2 py-1 text-sm text-foreground outline-none placeholder:text-muted-foreground/80 focus:border-ring";
 
-    return <div className="flex h-screen items-center justify-center bg-[#0a0a0a]">
-        <div className="w-full max-w-sm rounded-lg border border-neutral-800 bg-[#0d0d0d] p-6">
+    return <div className="flex h-screen items-center justify-center bg-background">
+        <div className="w-full max-w-sm rounded-lg border border-border bg-card p-6">
             <div className="micro-label mb-1">JAC.STUDIO</div>
-            <h1 className="mb-4 text-lg text-neutral-100">{_heading(mode)}</h1>
+            <h1 className="mb-4 text-lg text-foreground">{_heading(mode)}</h1>
 
             <div className="mb-4 flex gap-1">
                 <button
                     onClick={lambda e: MouseEvent { onMode("login"); }}
                     className={"rounded-md border px-3 py-1 text-xs transition-colors " + (
-                        "border-neutral-500 bg-[#1a1a1a] text-neutral-100" if mode == "login"
-                        else "border-neutral-700 text-neutral-500 hover:text-neutral-300"
+                        "border-accent bg-accent/15 text-foreground" if mode == "login"
+                        else "border-input text-muted-foreground hover:text-foreground/80"
                     )}
                 >SIGN IN</button>
                 <button
                     onClick={lambda e: MouseEvent { onMode("signup"); }}
                     className={"rounded-md border px-3 py-1 text-xs transition-colors " + (
-                        "border-neutral-500 bg-[#1a1a1a] text-neutral-100" if mode == "signup"
-                        else "border-neutral-700 text-neutral-500 hover:text-neutral-300"
+                        "border-accent bg-accent/15 text-foreground" if mode == "signup"
+                        else "border-input text-muted-foreground hover:text-foreground/80"
                     )}
                 >CREATE</button>
             </div>
@@ -138,8 +138,8 @@ def:pub Login(onDone: Callable[([], None)]) -> JsxElement {
                 onClick={lambda e: MouseEvent { submit(); }}
                 disabled={busy}
                 className={"mt-5 w-full rounded-md px-3 py-2 text-sm transition-colors " + (
-                    "bg-neutral-700 text-neutral-300" if busy
-                    else "bg-neutral-100 text-neutral-900 hover:bg-white"
+                    "bg-secondary text-muted-foreground" if busy
+                    else "bg-primary text-primary-foreground hover:bg-white"
                 )}
             >
                 {_submitLabel(busy, mode)}

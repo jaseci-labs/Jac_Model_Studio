@@ -13,7 +13,7 @@ def:pub TextInput(value: str, onSet: Callable[([str], None)], placeholder: str, 
         value={value}
         onChange={lambda e: ChangeEvent { onSet(e.target.value); }}
         placeholder={placeholder}
-        className={"w-full rounded-md border border-neutral-700 bg-[#121212] px-2 py-1 text-sm text-neutral-100 outline-none placeholder:text-neutral-600 focus:border-neutral-500 " + (
+        className={"w-full rounded-md border border-input bg-popover px-2 py-1 text-sm text-foreground outline-none placeholder:text-muted-foreground/80 focus:border-ring " + (
             "font-mono" if mono else ""
         )}
     />;
@@ -26,8 +26,8 @@ def:pub Segmented(options: list[str], value: str, onSet: Callable[([str], None)]
                 key={opt}
                 onClick={lambda e: MouseEvent { onSet(opt); }}
                 className={"rounded-md border px-3 py-1 text-xs transition-colors " + (
-                    "border-neutral-500 bg-[#1a1a1a] text-neutral-100" if value == opt
-                    else "border-neutral-700 text-neutral-500 hover:text-neutral-300"
+                    "border-accent bg-accent/15 text-foreground" if value == opt
+                    else "border-input text-muted-foreground hover:text-foreground/80"
                 )}
             >
                 {opt}

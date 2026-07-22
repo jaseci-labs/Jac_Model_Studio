@@ -152,7 +152,7 @@ def:pub AppShell -> JsxElement {
         return <Offline />;
     }
     if online == -1 or layout is None {
-        return <div className="h-screen bg-[#0a0a0a]" />;
+        return <div className="h-screen bg-background" />;
     }
 
     return <div className="flex h-screen overflow-hidden" data-ws={workspace}>

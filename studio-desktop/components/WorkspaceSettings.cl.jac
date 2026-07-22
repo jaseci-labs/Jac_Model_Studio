@@ -279,12 +279,12 @@ def:pub WorkspaceSettings(
             className="flex-1 bg-black/60"
             onClick={lambda e: MouseEvent { onClose(); }}
         />
-        <aside className="flex h-full w-[28rem] shrink-0 flex-col border-l border-neutral-800 bg-[#0d0d0d]">
-            <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-3">
+        <aside className="flex h-full w-[28rem] shrink-0 flex-col border-l border-border bg-card">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
                 <span className="micro-label">WORKSPACES</span>
                 <button
                     onClick={lambda e: MouseEvent { onClose(); }}
-                    className="text-neutral-500 hover:text-neutral-200"
+                    className="text-muted-foreground hover:text-foreground"
                 >✕</button>
             </div>
 
@@ -297,8 +297,8 @@ def:pub WorkspaceSettings(
                             key={wid}
                             onClick={lambda e: MouseEvent { selected = wid; }}
                             className={"flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left font-mono text-[10px] tracking-wider " + (
-                                "bg-[#161616] text-neutral-100" if wid == selected
-                                else "text-neutral-500 hover:bg-[#121212]"
+                                "bg-accent/15 text-foreground" if wid == selected
+                                else "text-muted-foreground hover:bg-popover"
                             )}
                         >
                             <span className="h-2 w-2 rounded-full" style={{"background": "var(--" + str(w["accent"]) + ")"}} />
@@ -315,7 +315,7 @@ def:pub WorkspaceSettings(
                         <button
                             onClick={addWorkspace}
                             disabled={busy}
-                            className="shrink-0 rounded-md border border-neutral-600 px-3 text-xs text-neutral-200 hover:bg-[#161616]"
+                            className="shrink-0 rounded-md border border-input px-3 text-xs text-foreground hover:bg-secondary"
                         >ADD</button>
                     </div>
                 </Field>
@@ -332,7 +332,7 @@ def:pub WorkspaceSettings(
                             <select
                                 value={defaultModel}
                                 onChange={lambda e: ChangeEvent { defaultModel = e.target.value; }}
-                                className="w-full rounded-md border border-neutral-700 bg-[#121212] px-2 py-1 text-sm text-neutral-100"
+                                className="w-full rounded-md border border-input bg-popover px-2 py-1 text-sm text-foreground"
                             >
                                 {for m in models {
                                     <option key={m.id} value={m.id}>{m.label}</option>
@@ -343,10 +343,10 @@ def:pub WorkspaceSettings(
                             <TextInput value={filesStr} onSet={lambda v: str { filesStr = v; }} placeholder="01-sft-dpo" mono={True} />
                         </Field>
                         <div className="flex gap-2">
-                            <button onClick={saveWorkspace} disabled={busy} className="rounded-md border border-neutral-600 px-3 py-1 text-xs text-neutral-200 hover:bg-[#161616]">SAVE</button>
-                            <button onClick={lambda -> None { moveWorkspace(True); }} disabled={busy} className="rounded-md border border-neutral-700 px-2 py-1 text-xs text-neutral-400">↑</button>
-                            <button onClick={lambda -> None { moveWorkspace(False); }} disabled={busy} className="rounded-md border border-neutral-700 px-2 py-1 text-xs text-neutral-400">↓</button>
-                            <button onClick={removeWorkspace} disabled={busy} className="rounded-md border border-neutral-700 px-3 py-1 text-xs text-neutral-500 hover:text-neutral-200">DELETE</button>
+                            <button onClick={saveWorkspace} disabled={busy} className="rounded-md border border-input px-3 py-1 text-xs text-foreground hover:bg-secondary">SAVE</button>
+                            <button onClick={lambda -> None { moveWorkspace(True); }} disabled={busy} className="rounded-md border border-input px-2 py-1 text-xs text-muted-foreground">↑</button>
+                            <button onClick={lambda -> None { moveWorkspace(False); }} disabled={busy} className="rounded-md border border-input px-2 py-1 text-xs text-muted-foreground">↓</button>
+                            <button onClick={removeWorkspace} disabled={busy} className="rounded-md border border-input px-3 py-1 text-xs text-muted-foreground hover:text-foreground">DELETE</button>
                         </div>
                     </div>
                 }}
@@ -359,13 +359,13 @@ def:pub WorkspaceSettings(
                     sid = str(sd["id"]);
                     sl = secLabel(sid, str(sd["label"]));
                     sc = secComponent(sid, str(sd["component"]));
-                    <div key={sid} className="rounded-md border border-neutral-800 bg-[#0a0a0a] p-2 space-y-2">
-                        <div className="font-mono text-[10px] text-neutral-500">{sid}</div>
+                    <div key={sid} className="rounded-md border border-border bg-background p-2 space-y-2">
+                        <div className="font-mono text-[10px] text-muted-foreground">{sid}</div>
                         <TextInput value={sl} onSet={lambda v: str { setSecLabel(sid, v); }} placeholder="LABEL" mono={False} />
                         <select
                             value={sc}
                             onChange={lambda e: ChangeEvent { setSecComponent(sid, e.target.value); }}
-                            className="w-full rounded-md border border-neutral-700 bg-[#121212] px-2 py-1 text-xs text-neutral-100"
+                            className="w-full rounded-md border border-input bg-popover px-2 py-1 text-xs text-foreground"
                         >
                             {for st in secTypes {
                                 d = st as dict;
@@ -376,14 +376,14 @@ def:pub WorkspaceSettings(
                             <button
                                 onClick={lambda -> None { saveSection(sid); }}
                                 disabled={busy}
-                                className="rounded border border-neutral-700 px-2 py-0.5 text-[10px] text-neutral-300"
+                                className="rounded border border-input px-2 py-0.5 text-[10px] text-foreground/80"
                             >SAVE</button>
-                            <button onClick={lambda -> None { moveSection(sid, True); }} disabled={busy} className="px-1 text-[10px] text-neutral-500">↑</button>
-                            <button onClick={lambda -> None { moveSection(sid, False); }} disabled={busy} className="px-1 text-[10px] text-neutral-500">↓</button>
+                            <button onClick={lambda -> None { moveSection(sid, True); }} disabled={busy} className="px-1 text-[10px] text-muted-foreground">↑</button>
+                            <button onClick={lambda -> None { moveSection(sid, False); }} disabled={busy} className="px-1 text-[10px] text-muted-foreground">↓</button>
                             <button
                                 onClick={lambda -> None { removeSection(sid); }}
                                 disabled={busy}
-                                className="px-1 text-[10px] text-neutral-600 hover:text-neutral-300"
+                                className="px-1 text-[10px] text-muted-foreground/80 hover:text-foreground/80"
                             >✕</button>
                         </div>
                     </div>
@@ -396,19 +396,19 @@ def:pub WorkspaceSettings(
                         <select
                             value={newSecComponent}
                             onChange={lambda e: ChangeEvent { newSecComponent = e.target.value; }}
-                            className="w-full rounded-md border border-neutral-700 bg-[#121212] px-2 py-1 text-sm text-neutral-100"
+                            className="w-full rounded-md border border-input bg-popover px-2 py-1 text-sm text-foreground"
                         >
                             {for st in secTypes {
                                 d = st as dict;
                                 <option key={str(d["component"])} value={str(d["component"])}>{str(d["label"])}</option>
                             }}
                         </select>
-                        <button onClick={createSection} disabled={busy} className="rounded-md border border-neutral-600 px-3 py-1 text-xs text-neutral-200">ADD SECTION</button>
+                        <button onClick={createSection} disabled={busy} className="rounded-md border border-input px-3 py-1 text-xs text-foreground">ADD SECTION</button>
                     </div>
                 </Field>
 
                 {if status {
-                    <p className="text-xs text-neutral-500">{status}</p>
+                    <p className="text-xs text-muted-foreground">{status}</p>
                 }}
             </div>
         </aside>
