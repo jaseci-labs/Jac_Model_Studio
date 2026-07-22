@@ -46,6 +46,11 @@ glob _CATS: list[str] = [
     "explanation", "code_gen", "conversion", "documentation", "trajectory", "debug", "migration"
 ];
 
+# 5 DPO preference axes in display order (largest-first, from the on-disk build).
+glob _AXES: list[str] = [
+    "graph_native", "idiomatic", "correctness", "auth_security", "typing"
+];
+
 glob _HOLDOUT_FILES: list[list[str]] = [
     ["model-experiments/04-cpt-sft/dataset/shared/holdouts/code_gen_holdout.jsonl", "code_gen"],
     ["model-experiments/04-cpt-sft/dataset/shared/holdouts/debug_holdout.jsonl", "debug"],
@@ -67,6 +72,15 @@ def _allowed(rel: str) -> bool {
         if pair[0] == rel { return True; }
     }
     return False;
+}
+
+"""Row-level filter predicate for cptsft_rows: does *rec* pass the (optional)
+category + axis filters? Empty string means that axis is unconstrained. Pure
+(no filesystem) so the filter logic is unit-testable."""
+def _row_matches(rec: any, category: str, axis: str) -> bool {
+    if category and str(rec.get("category", "")) != category { return False; }
+    if axis and str(rec.get("axis", "")) != axis { return False; }
+    return True;
 }
 
 def _read_lines(rel: str) -> list {
@@ -147,8 +161,10 @@ def _build_row(idx: int, rec: any) -> DataRowView {
     );
 }
 
-"""Dataset stats: SFT total + per-category composition (pct is per-mille 0-1000 so
-the client avoids float math), DPO pairs, and carved holdout counts."""
+"""Dataset stats: SFT total + per-category composition, DPO pairs + per-axis
+composition (both pct as per-mille 0-1000 so the client avoids float math), and
+carved holdout counts. `categories`/`axes` double as the client's filter-option
+source for the SFT/DPO row-level filters (see cptsft_rows)."""
 def cptsft_stats() -> dict {
     sft_lines = _read_lines(_SFT_REL);
     sft_total = len(sft_lines);
@@ -179,6 +195,36 @@ def cptsft_stats() -> dict {
         }
     }
 
+    # DPO axis composition, same shape/logic as categories (largest-first order,
+    # any unknown axis still surfaced honestly).
+    dpo_lines = _read_lines(_DPO_REL);
+    dpo_total = len(dpo_lines);
+    acounts: dict = {};
+    for ln in dpo_lines {
+        try {
+            r = json.loads(str(ln));
+            a = str(r.get("axis", "other"));
+            acounts[a] = int(acounts.get(a, 0)) + 1;
+        } except Exception {}
+    }
+    axes: list = [];
+    aseen: list = [];
+    for a in _AXES {
+        n = int(acounts.get(a, 0));
+        if n > 0 {
+            pct = (n * 1000) // dpo_total if dpo_total > 0 else 0;
+            axes.append({"name": a, "count": n, "pct": pct});
+            aseen.append(a);
+        }
+    }
+    for a in acounts {
+        if a not in aseen {
+            n = int(acounts[a]);
+            pct = (n * 1000) // dpo_total if dpo_total > 0 else 0;
+            axes.append({"name": str(a), "count": n, "pct": pct});
+        }
+    }
+
     holdouts: list = [];
     htotal = 0;
     for pair in _HOLDOUT_FILES {
@@ -189,8 +235,9 @@ def cptsft_stats() -> dict {
 
     return {
         "sft_total": sft_total,
-        "dpo_pairs": len(_read_lines(_DPO_REL)),
+        "dpo_pairs": dpo_total,
         "categories": categories,
+        "axes": axes,
         "holdouts": holdouts,
         "holdout_total": htotal
     };
@@ -205,24 +252,57 @@ def cptsft_files() -> list[FileRefView] {
     return out;
 }
 
-"""A page of parsed rows from an allowlisted jsonl (cap 40), gated by the allowlist."""
-def cptsft_rows(path: str, offset: int, limit: int) -> dict {
+"""A page of parsed rows from an allowlisted jsonl (cap 40), gated by the allowlist.
+
+Optional row-level filters: `category` scopes SFT/holdout rows to `row["category"]`,
+`axis` scopes DPO rows to `row["axis"]`. Empty string (the default) means no filter
+— identical to the original offset-into-file pagination, so old callers are
+unchanged. With a filter set, pagination is over the FILTERED set (total = matched
+count, offset indexes into matches), so we scan the whole file to build a matched
+index first (O(total) — fine at these ≤10k row counts, same reasoning as
+jms_curate.curate_rows). The returned row `idx` stays the on-disk line index so
+expand/toggle keys remain unique and truthful."""
+def cptsft_rows(path: str, offset: int, limit: int, category: str = "", axis: str = "") -> dict {
     if not _allowed(path) {
         return {"rows": [], "total": 0};
     }
     cap = max(1, min(limit, 40));
     lines = _read_lines(path);
-    total = len(lines);
-    result: list[DataRowView] = [];
-    i = offset;
-    while i < total and i < offset + cap {
-        try {
-            rec = json.loads(str(lines[i]));
-            result.append(_build_row(i, rec));
-        } except Exception {}
-        i += 1;
+
+    # fast path: no filter → original offset-into-file pagination, unchanged.
+    if not category and not axis {
+        total = len(lines);
+        result: list[DataRowView] = [];
+        i = offset;
+        while i < total and i < offset + cap {
+            try {
+                rec = json.loads(str(lines[i]));
+                result.append(_build_row(i, rec));
+            } except Exception {}
+            i += 1;
+        }
+        return {"rows": result, "total": total};
     }
-    return {"rows": result, "total": total};
+
+    # filtered path: build the matched (on-disk index, record) list, then slice.
+    matched: list = [];
+    li = 0;
+    for ln in lines {
+        try {
+            rec = json.loads(str(ln));
+            if _row_matches(rec, category, axis) { matched.append({"idx": li, "rec": rec}); }
+        } except Exception {}
+        li += 1;
+    }
+    mtotal = len(matched);
+    filtered: list[DataRowView] = [];
+    j = max(0, offset);
+    while j < mtotal and j < offset + cap {
+        m = matched[j];
+        filtered.append(_build_row(int(m["idx"]), m["rec"]));
+        j += 1;
+    }
+    return {"rows": filtered, "total": mtotal};
 }
 
 # ---------------------------------------------------------------- plan status

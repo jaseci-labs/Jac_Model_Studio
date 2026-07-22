@@ -10,6 +10,7 @@ Follows Data.cl.jac's message/pair-shaped shape (the closer match), .exp-* class
 sv import from ...cptsft { cptsft_stats, cptsft_files, cptsft_rows }
 import from ..shared.StatTile { StatTile }
 import from ..shared.RowBrowser { RowBrowser }
+import from ..shared.Field { Segmented }
 
 # Purple ramp for the composition bar (light→dark, largest category first).
 glob SHADES: list[str] = ["#e8dcf7", "#d3bdec", "#b89ce8", "#9a78d4", "#7d5cba", "#5f4499", "#48317a"];
@@ -21,10 +22,18 @@ def:pub CptSftData -> JsxElement {
         rows: list = [],
         offset: int = 0,
         total: int = 0,
-        expanded: int = -1;
+        expanded: int = -1,
+        category: str = "all",
+        axis: str = "all";
 
-    async def _fetch(p: str, off: int) -> None {
-        r = await cptsft_rows(p, off, 25);
+    # `p`/`off`/`cat`/`ax` passed explicitly — reading state right after setting
+    # it returns the stale value (React writes are async). Only the filter that
+    # matches the open file is applied server-side ("" = no filter); the SFT
+    # category never leaks onto the DPO file and vice-versa.
+    async def _fetch(p: str, off: int, cat: str, ax: str) -> None {
+        catArg = cat if (("sft_train.jsonl" in p) and cat != "all") else "";
+        axArg = ax if (("dpo_train.jsonl" in p) and ax != "all") else "";
+        r = await cptsft_rows(p, off, 25, catArg, axArg);
         rows = list(r["rows"]);
         total = int(r["total"]);
     }
@@ -33,7 +42,21 @@ def:pub CptSftData -> JsxElement {
         path = p;
         offset = 0;
         expanded = -1;
-        await _fetch(p, 0);
+        await _fetch(p, 0, category, axis);
+    }
+
+    async def pickCategory(c: str) -> None {
+        category = c;
+        offset = 0;
+        expanded = -1;
+        await _fetch(path, 0, c, axis);
+    }
+
+    async def pickAxis(a: str) -> None {
+        axis = a;
+        offset = 0;
+        expanded = -1;
+        await _fetch(path, 0, category, a);
     }
 
     def toggleRow(idx: int) -> None {
@@ -45,7 +68,7 @@ def:pub CptSftData -> JsxElement {
             noff = max(0, offset - 25);
             offset = noff;
             expanded = -1;
-            await _fetch(path, noff);
+            await _fetch(path, noff, category, axis);
         }
     }
 
@@ -54,7 +77,7 @@ def:pub CptSftData -> JsxElement {
             noff = offset + 25;
             offset = noff;
             expanded = -1;
-            await _fetch(path, noff);
+            await _fetch(path, noff, category, axis);
         }
     }
 
@@ -133,6 +156,36 @@ def:pub CptSftData -> JsxElement {
         </div>;
     }
 
+    # Row-level filter picker — a CATEGORY Segmented over the SFT release, an AXIS
+    # Segmented over the DPO release (options = ["all"] + stat breakdown names).
+    # Only the picker matching the open file shows; other files (holdouts) get none.
+    def _filters() -> JsxElement {
+        if not stats {
+            return <span></span>;
+        }
+        if "sft_train.jsonl" in path {
+            opts: list = ["all"];
+            for c in list(stats["categories"]) {
+                opts.append(str(c["name"]));
+            }
+            return <div className="flex flex-wrap items-center gap-2">
+                <span className="micro-label text-muted-foreground/80">CATEGORY</span>
+                <Segmented options={opts} value={category} onSet={lambda v: str { pickCategory(v); }} />
+            </div>;
+        }
+        if "dpo_train.jsonl" in path {
+            aopts: list = ["all"];
+            for a in list(stats["axes"]) {
+                aopts.append(str(a["name"]));
+            }
+            return <div className="flex flex-wrap items-center gap-2">
+                <span className="micro-label text-muted-foreground/80">AXIS</span>
+                <Segmented options={aopts} value={axis} onSet={lambda v: str { pickAxis(v); }} />
+            </div>;
+        }
+        return <span></span>;
+    }
+
     return <div className="flex h-full min-w-0 flex-1 flex-col">
         <div className="section-header flex items-center justify-between border-b border-border px-4 py-2.5">
             <span className="micro-label">DATA · CPT-SFT RELEASE (read-only)</span>
@@ -142,6 +195,7 @@ def:pub CptSftData -> JsxElement {
             {_tiles()}
             {_composition()}
             {_holdouts()}
+            {_filters()}
             <RowBrowser
                 files={files} path={path} rows={rows} offset={offset}
                 total={total} expanded={expanded}

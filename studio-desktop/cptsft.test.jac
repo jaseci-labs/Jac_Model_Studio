@@ -64,6 +64,24 @@ test "_build_row defaults difficulty and source to em-dash when fields absent" {
     assert row.source == "—", row.source;
 }
 
+test "_row_matches passes everything when both filters are empty" {
+    assert _row_matches({"category": "debug"}, "", "");
+    assert _row_matches({"axis": "typing"}, "", "");
+    assert _row_matches({}, "", "");
+}
+
+test "_row_matches filters SFT rows by category" {
+    assert _row_matches({"category": "debug"}, "debug", "");
+    assert not _row_matches({"category": "code_gen"}, "debug", "");
+    assert not _row_matches({}, "debug", "");             # missing category never matches a filter
+}
+
+test "_row_matches filters DPO rows by axis" {
+    assert _row_matches({"axis": "graph_native"}, "", "graph_native");
+    assert not _row_matches({"axis": "idiomatic"}, "", "graph_native");
+    assert not _row_matches({}, "", "graph_native");
+}
+
 test "_allowed gates to the release + holdout allowlist only" {
     assert _allowed("model-experiments/04-cpt-sft/dataset/fresh/releases/sft_train.jsonl");
     assert _allowed("model-experiments/04-cpt-sft/dataset/shared/holdouts/debug_holdout.jsonl");
