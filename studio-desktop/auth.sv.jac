@@ -20,6 +20,7 @@ import os;
 import models;
 import paths;
 import from pathlib { Path }
+import from jaclang { JacRuntime }
 
 """True when the server was started for local single-user desktop use
 (start.sh sets JAC_LOCAL_USER=1). The client uses this to auto-provision a
@@ -48,41 +49,33 @@ through the native `__jac_invoke` bridge, which dispatches `/walker/*` and
 back a token it can `jacSetToken()` with, after which every authenticated
 `def:priv` call succeeds.
 
-Uses the in-process TestClient (`_tc`) directly so the token is minted by the
-SAME server that will validate it — no separate user-manager instance, no
-JWT-secret or SQLite-path matching. The re-entrant `tc.post` is safe: each call
-runs the ASGI app on its own anyio portal thread, and `dispatch()` does not
-hold `_sv_lock`. Returns "" on any failure or when not in local mode; the
-client then falls back to the production login gate.
+Mints the token via `Jac.get_user_manager(base_path=...)` directly — the same
+factory `JacAPIServer` itself calls at startup (`Jac.get_user_manager` ->
+`UserManager(base_path=...)`), pointed at the same `<base_path>/.jac/data/main.db`
+SQLite file the running server's own UserManager reads/writes. Tokens are
+opaque `secrets.token_urlsafe` strings looked up by exact match (no JWT, no
+secret to reproduce) — a second UserManager instance writing to the same file
+is safe and immediately valid.
 
-`def:pub` (no auth) so a logged-out client can bootstrap. The `local_mode()`
-guard is defense-in-depth — prod never calls this."""
+(An earlier version of this routed through a desktop-webview-only in-process
+TestClient bridge; that module does not exist in this jaclang install for
+ANY target, desktop included, so it always failed here — hence the rewrite.)
+
+Returns "" on any failure or when not in local mode; the client then falls
+back to the production login gate. `def:pub` (no auth) so a logged-out client
+can bootstrap. The `local_mode()` guard is defense-in-depth — prod never calls
+this."""
 def:pub local_session() -> str {
     if not local_mode() { return ""; }
-    import from jaclang.runtimelib.client.targets.desktop.native.inprocess_dispatch { _tc };
-    tc = _tc;
-    if tc is None { return ""; }
-    identities: list[dict[str, any]] = [{"type": "username", "value": LOCAL_EMAIL}];
-    credential: dict[str, any] = {"type": "password", "password": LOCAL_PASSWORD};
-    # Register; idempotent — "identity taken" on second+ launch is expected and
-    # the body is swallowed. The subsequent /user/login succeeds either way.
     try {
-        tc.post(
-            "/user/register",
-            json={"identities": identities, "credential": credential},
-        );
-    } except Exception { }
-    try {
-        resp = tc.post(
-            "/user/login",
-            json={"identity": identities[0], "credential": credential},
-        );
-        if resp.status_code == 200 {
-            body: dict[str, any] = resp.json() as dict[str, any];
-            data: any = body.get("data", {});
-            if isinstance(data, dict) and "token" in data {
-                return str(data["token"]);
-            }
+        um = JacRuntime.get_user_manager(base_path=str(paths.studio_root()));
+        # Idempotent — "already exists" on second+ launch is expected.
+        try {
+            um.create_user(LOCAL_EMAIL, LOCAL_PASSWORD);
+        } except Exception { }
+        result = um.authenticate(LOCAL_EMAIL, LOCAL_PASSWORD);
+        if result is not None and "token" in result {
+            return str(result["token"]);
         }
     } except Exception { }
     return "";
