@@ -324,6 +324,21 @@ glob _SEED_WORKSPACES: list[dict] = [
             {"id": "train", "label": "TRAIN", "component": "CptTrain", "order": 2},
             {"id": "plan", "label": "PLAN", "component": "Plan", "order": 3}
         ]
+    },
+    {
+        "id": "04",
+        "label": "CPT-SFT",
+        "accent": "ws04",
+        "default_model": "qwen-cpt-v1",
+        "files": ["04-cpt-sft"],
+        "sections": [
+            {"id": "chat", "label": "CHAT", "component": "Chat", "order": 0},
+            {"id": "data", "label": "DATA", "component": "CptSftData", "order": 1},
+            {"id": "train", "label": "TRAIN", "component": "Train", "order": 2},
+            {"id": "evals", "label": "EVALS", "component": "Evals", "order": 3},
+            {"id": "cloud", "label": "CLOUD", "component": "Cloud", "order": 4},
+            {"id": "plan", "label": "PLAN", "component": "CptSftPlan", "order": 5}
+        ]
     }
 ];
 
@@ -338,31 +353,50 @@ def _ensure_cloud_section(ws: Workspace) -> None {
     ws ++> WorkspaceSection(sid="cloud", label="CLOUD", component="Cloud", order=4);
 }
 
+# Construct one Workspace (+ its sections) from a _SEED_WORKSPACES spec at the given
+# sort index. `root ++> Workspace(...)` returns a LIST — unwrap [0] before any
+# attribute/edge access (a real bug class this file has hit before).
+def _seed_one_workspace(spec: dict, sort_index: int) -> None {
+    ws = (root ++> Workspace(
+        wid=str(spec["id"]),
+        label=str(spec["label"]),
+        accent=str(spec["accent"]),
+        default_model=str(spec["default_model"]),
+        files=[str(f) for f in (spec["files"] as list)],
+        sort_order=sort_index
+    ))[0];
+    for sec in (spec["sections"] as list) {
+        sd = sec as dict;
+        ws ++> WorkspaceSection(
+            sid=str(sd["id"]),
+            label=str(sd["label"]),
+            component=str(sd["component"]),
+            order=int(sd["order"])
+        );
+    }
+}
+
 def _ensure_workspaces_seeded() -> None {
-    if len([root -->][?:Workspace]) > 0 {
+    existing = [root -->][?:Workspace];
+    if len(existing) > 0 {
+        # Already-seeded graph (persisted to SQLite): the initial-seed loop below
+        # never re-runs, so a NEW _SEED_WORKSPACES entry (e.g. workspace 04) would
+        # be skipped forever. Backfill any spec whose wid isn't on the graph yet,
+        # then run the existing cloud-section backfill for 01.
+        present: list[str] = [];
+        for ws in existing { present.append(ws.wid); }
+        for (i, spec) in enumerate(_SEED_WORKSPACES) {
+            if str(spec["id"]) not in present {
+                _seed_one_workspace(spec, i);
+            }
+        }
         for ws in [root -->][?:Workspace] {
             _ensure_cloud_section(ws);
         }
         return;
     }
     for (i, spec) in enumerate(_SEED_WORKSPACES) {
-        ws = root ++> Workspace(
-            wid=str(spec["id"]),
-            label=str(spec["label"]),
-            accent=str(spec["accent"]),
-            default_model=str(spec["default_model"]),
-            files=[str(f) for f in (spec["files"] as list)],
-            sort_order=i
-        );
-        for sec in (spec["sections"] as list) {
-            sd = sec as dict;
-            ws ++> WorkspaceSection(
-                sid=str(sd["id"]),
-                label=str(sd["label"]),
-                component=str(sd["component"]),
-                order=int(sd["order"])
-            );
-        }
+        _seed_one_workspace(spec, i);
     }
 }
 
@@ -418,6 +452,8 @@ glob SECTION_TYPES: list[dict] = [
     {"component": "Data", "label": "SFT/DPO Data", "default_sid": "data"},
     {"component": "RlData", "label": "RL Data", "default_sid": "data"},
     {"component": "CptData", "label": "CPT Data", "default_sid": "data"},
+    {"component": "CptSftData", "label": "CPT-SFT Data", "default_sid": "data"},
+    {"component": "CptSftPlan", "label": "CPT-SFT Plan", "default_sid": "plan"},
     {"component": "Train", "label": "Train", "default_sid": "train"},
     {"component": "CptTrain", "label": "CPT Train", "default_sid": "train"},
     {"component": "Evals", "label": "Evals", "default_sid": "evals"},

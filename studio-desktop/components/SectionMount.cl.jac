@@ -13,6 +13,8 @@ import from .sections.Results { Results }
 import from .sections.Generate { Generate }
 import from .sections.CptData { CptData }
 import from .sections.CptTrain { CptTrain }
+import from .sections.CptSftData { CptSftData }
+import from .sections.CptSftPlan { CptSftPlan }
 import from .sections.Plan { Plan }
 import from .sections.Cloud { Cloud }
 
@@ -25,6 +27,8 @@ def:pub SectionMount(
     if component == "Data" { return <Data />; }
     if component == "RlData" { return <RlData />; }
     if component == "CptData" { return <CptData />; }
+    if component == "CptSftData" { return <CptSftData />; }
+    if component == "CptSftPlan" { return <CptSftPlan />; }
     if component == "Train" { return <Train active={active} />; }
     if component == "CptTrain" { return <CptTrain active={active} />; }
     if component == "Evals" { return <Evals />; }

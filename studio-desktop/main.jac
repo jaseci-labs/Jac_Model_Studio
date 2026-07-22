@@ -29,6 +29,11 @@ import from cpt {
     cpt_manifest, cpt_files, cpt_rows,
     start_cpt_training, stop_cpt_training, get_cpt_status, get_all_cpt_status
 }
+# 04-cpt-sft dataset browser + three-arm plan status (model-experiments/04-cpt-sft)
+# — consumed by the CPT-SFT workspace's DATA + PLAN sections via `sv import` stubs.
+import from cptsft {
+    cptsft_stats, cptsft_files, cptsft_rows, cptsft_plan_status
+}
 # Streaming chat endpoint — consumed by a raw fetch reader on the client (not an
 # `sv import` RPC stub), so register it explicitly at the top level.
 import from chat { chat_stream }
