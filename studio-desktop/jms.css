@@ -94,53 +94,6 @@
   width: 56px;
 }
 
-/* -------------------------------------------------------- theme switcher --- */
-.jms-switcher {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.jms-switcher-name {
-  font-family: var(--jms-font-mono);
-  font-size: 9px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--jms-fg-dim);
-}
-.jms-swatch {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  border: 1px solid var(--jms-border);
-  padding: 0;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
-}
-.jms-swatch:hover {
-  transform: scale(1.18);
-  border-color: var(--jms-fg-dim);
-}
-.jms-swatch-active {
-  box-shadow: 0 0 0 2px var(--jms-bg), 0 0 0 4px var(--jms-accent);
-}
-/* two-tone identity dots — fixed per theme, independent of active tokens */
-.jms-swatch-electric-minimal {
-  background: linear-gradient(135deg, #050507 50%, #3355ff 50%);
-}
-.jms-swatch-warm-industrial {
-  background: linear-gradient(135deg, #111008 50%, #ffb000 50%);
-}
-.jms-swatch-bright-lab {
-  background: linear-gradient(135deg, #f7f7f4 50%, #6620e0 50%);
-}
-.jms-swatch-phosphor {
-  background: linear-gradient(135deg, #0a0f0a 50%, #33ff66 50%);
-}
-.jms-swatch-print-shop {
-  background: linear-gradient(135deg, #f4f0e6 50%, #e03e1f 50%);
-}
-
 /* ------------------------------------------------------------ JMS shell --- */
 .jms-shell-empty {
   flex: 1;

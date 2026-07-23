@@ -2,16 +2,14 @@
 and EXPERIMENTS (the existing lab, deliberately quieter). No page scroll at any
 window size ≥ ~900×600: the hero grid flexes between a fixed top bar and footer
 strip, display type is clamp()-sized against both vw and vh, and everything
-overflow-hidden. Theme is locked to electric-minimal (see JmsShell docstring
-for why)."""
+overflow-hidden. Light/dark mode is inherited from `:root`/`.dark` via the
+`<ThemeSwitcher/>` in the top bar — no per-jms-theme lock."""
 
 import from ..ThemeSwitcher { ThemeSwitcher }
 
 def:pub Landing(onPick: any = None, theme: str = "", onTheme: any = None) -> JsxElement {
-    t: str = "electric-minimal";
     return <div
         className="jms-scope flex h-screen w-screen flex-col overflow-hidden"
-        data-jms-theme={t}
     >
         <div className="jms-topbar">
             <span className="jms-label">JAC MODEL STUDIO</span>

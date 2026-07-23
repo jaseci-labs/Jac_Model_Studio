@@ -31,21 +31,12 @@ import from .components.jms.JmsShell { JmsShell }
 def:pub app -> JsxElement {
     has authTick: int = 0,
         checking: bool = True,
-        surface: str = "",
-        jmsTheme: str = "";
+        surface: str = "";
 
     """On mount: read local_mode() once. Local desktop mints an in-process
     session token (see module docstring); prod falls through to <Login/> when
     no session is present."""
     async can with entry {
-        # Restore the persisted JMS theme before anything renders.
-        w: any = window;
-        try {
-            saved: any = w.localStorage.getItem("jms.theme");
-            jmsTheme = str(saved) if saved else "electric-minimal";
-        } except Exception {
-            jmsTheme = "electric-minimal";
-        }
         # apply persisted light/dark mode before first paint
         try {
             dc: any = document;
@@ -95,14 +86,6 @@ def:pub app -> JsxElement {
     if checking {
         return <div className="h-screen bg-background" />;
     }
-    def applyJmsTheme(t: str) {
-        jmsTheme = t;
-        win: any = window;
-        try {
-            win.localStorage.setItem("jms.theme", t);
-        } except Exception { }
-    }
-
     # Valid session (local auto-login OR prod login) → surface router:
     # "" = hub landing, "jms" = new product shell, "experiments" = the existing
     # AppShell — its WorkspaceBar's "‹ EXPERIMENTS" button calls onHub directly,
@@ -111,8 +94,6 @@ def:pub app -> JsxElement {
         if surface == "jms" {
             return <JmsShell
                 onHub={lambda { surface = ""; }}
-                theme={jmsTheme}
-                onTheme={applyJmsTheme}
             />;
         }
         if surface == "experiments" {
@@ -120,8 +101,6 @@ def:pub app -> JsxElement {
         }
         return <Landing
             onPick={lambda(s: str) { surface = s; }}
-            theme={jmsTheme}
-            onTheme={applyJmsTheme}
         />;
     }
     # Production gate for logged-out visitors (or expired session).

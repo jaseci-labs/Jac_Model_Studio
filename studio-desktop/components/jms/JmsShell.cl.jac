@@ -1,24 +1,22 @@
 """JmsShell — the JMS product surface.
 
 Top bar: a JMS wordmark that doubles as a breadcrumb (PROJECTS / <NAME> once a
-project is open — PROJECTS is clickable to go back) and a ◈ HUB return. Theme
-is locked to electric-minimal (the other 4 variants stay defined in jms.css,
-unused — cheap to revive later, not worth deleting now). Body routes on
-`projectId`: empty → the <JmsProjects/> card grid, otherwise the <JmsProject/>
-detail view for that id. The breadcrumb name is captured from JmsProjects'
-onOpen(pid, name) callback."""
+project is open — PROJECTS is clickable to go back) and a ◈ HUB return.
+Light/dark mode is inherited from `:root`/`.dark` via the `<ThemeSwitcher/>`
+in the top bar — no per-jms-theme lock. Body routes on `projectId`: empty →
+the <JmsProjects/> card grid, otherwise the <JmsProject/> detail view for that
+id. The breadcrumb name is captured from JmsProjects' onOpen(pid, name)
+callback."""
 
 import from .JmsProjects { JmsProjects }
 import from .JmsProject { JmsProject }
 import from .ApiKeyModal { ApiKeyModal }
 import from ..ThemeSwitcher { ThemeSwitcher }
 
-def:pub JmsShell(onHub: any = None, theme: str = "", onTheme: any = None) -> JsxElement {
+def:pub JmsShell(onHub: any = None) -> JsxElement {
     has projectId: str = "",
         projectName: str = "",
         keyModalOpen: bool = False;
-
-    t: str = "electric-minimal";
 
     def openProject(pid: str, name: str) -> None {
         projectId = pid;
@@ -32,7 +30,6 @@ def:pub JmsShell(onHub: any = None, theme: str = "", onTheme: any = None) -> Jsx
 
     return <div
         className="jms-scope flex h-screen w-screen flex-col overflow-hidden"
-        data-jms-theme={t}
     >
         <div className="jms-topbar">
             <div className="flex items-center gap-4">
