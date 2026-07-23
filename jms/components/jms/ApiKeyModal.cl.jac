@@ -1,4 +1,4 @@
-"""ApiKeyModal — the JMS provider-key overlay (Anthropic API key).
+"""ApiKeyModal — the JMS provider-key overlay (Anthropic + OpenAI API keys).
 
 A centered card over a click-to-dismiss scrim. Shows the current credential
 status from llm_status (configured / source user|env|none + a masked tail — never
@@ -6,23 +6,38 @@ the raw key), a password input to set a new key, and SET / CLEAR / CLOSE. The ke
 is stored server-side encrypted (jms_llm) and never round-trips back to the
 client. Triggered by the ⚙ gear in the JmsShell topbar; `onClose` unmounts it.
 
-Handlers are named applyKey / clearKey / reload — never set<HasVar> (that would
-shadow the auto-useState setter for a `has` field)."""
+A second, mirrored section manages the OpenAI key (assistant.sv.jac's
+set_openai_key/clear_openai_key), sourcing its configured/masked status from
+assistant_providers()'s "openai" provider entry (Task A5).
+
+Handlers are named applyKey / clearKey / reload (and applyOpenAiKey /
+clearOpenAiKey / reloadOpenAi for the OpenAI section) — never set<HasVar>
+(that would shadow the auto-useState setter for a `has` field)."""
 
 sv import from ...jms_llm { llm_status, set_anthropic_key, clear_anthropic_key }
+sv import from ...assistant { set_openai_key, clear_openai_key, assistant_providers }
 
 def:pub ApiKeyModal(open: bool = False, onClose: any = None) -> JsxElement {
     has status: any = None,
         keyInput: str = "",
         busy: bool = False,
-        err: str = "";
+        err: str = "",
+        oaiProviders: any = None,
+        oaiKeyInput: str = "",
+        oaiBusy: bool = False,
+        oaiErr: str = "";
 
     async def reload -> None {
         try { status = await llm_status(); } except Exception { status = None; }
     }
 
+    async def reloadOpenAi -> None {
+        try { oaiProviders = await assistant_providers(); } except Exception { oaiProviders = None; }
+    }
+
     async can with entry {
         await reload();
+        await reloadOpenAi();
     }
 
     async def applyKey -> None {
@@ -55,6 +70,36 @@ def:pub ApiKeyModal(open: bool = False, onClose: any = None) -> JsxElement {
         await reload();
     }
 
+    async def applyOpenAiKey -> None {
+        if not oaiKeyInput.strip() { oaiErr = "enter a key first"; return; }
+        oaiBusy = True;
+        oaiErr = "";
+        res: any = None;
+        try {
+            res = await set_openai_key(oaiKeyInput.strip());
+        } except Exception {
+            oaiErr = "save failed";
+            oaiBusy = False;
+            return;
+        }
+        if res and not res["ok"] {
+            oaiErr = str(res["error"]);
+        } else {
+            oaiKeyInput = "";
+        }
+        oaiBusy = False;
+        await reloadOpenAi();
+    }
+
+    async def clearOpenAiKey -> None {
+        oaiBusy = True;
+        oaiErr = "";
+        try { await clear_openai_key(); } except Exception { }
+        oaiKeyInput = "";
+        oaiBusy = False;
+        await reloadOpenAi();
+    }
+
     def _close -> None {
         if onClose is not None { onClose(); }
     }
@@ -71,6 +116,19 @@ def:pub ApiKeyModal(open: bool = False, onClose: any = None) -> JsxElement {
     }
     if configured and source == "env" {
         statusLine = "Using the ANTHROPIC_API_KEY environment key (shared).";
+    }
+
+    oaiProvider: any = None;
+    if oaiProviders {
+        for p in oaiProviders["providers"] {
+            if p["id"] == "openai" { oaiProvider = p; break; }
+        }
+    }
+    oaiConfigured: bool = bool(oaiProvider and oaiProvider["configured"]);
+
+    oaiStatusLine: str = "No key configured — OpenAI models are unavailable until you set one.";
+    if oaiConfigured {
+        oaiStatusLine = "Key configured · stored encrypted, never shown.";
     }
 
     return <div
@@ -104,28 +162,62 @@ def:pub ApiKeyModal(open: bool = False, onClose: any = None) -> JsxElement {
 
             {err and <span className="jms-mono-dim" style={{"color": "var(--jms-danger)"}}>{err}</span>}
 
+            <div className="flex items-center gap-2">
+                <button
+                    className="jms-btn jms-btn-accent"
+                    disabled={busy}
+                    onClick={lambda e: MouseEvent { applyKey(); }}
+                >{"SAVING…" if busy else "SET"}</button>
+                <button
+                    className="jms-btn jms-btn-danger"
+                    disabled={busy or (source != "user")}
+                    onClick={lambda e: MouseEvent { clearKey(); }}
+                >CLEAR</button>
+            </div>
+
+            <div style={{"height": "1px", "background": "var(--jms-border)", "opacity": "0.6"}} />
+
             <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <button
-                        className="jms-btn jms-btn-accent"
-                        disabled={busy}
-                        onClick={lambda e: MouseEvent { applyKey(); }}
-                    >{"SAVING…" if busy else "SET"}</button>
-                    <button
-                        className="jms-btn jms-btn-danger"
-                        disabled={busy or (source != "user")}
-                        onClick={lambda e: MouseEvent { clearKey(); }}
-                    >CLEAR</button>
-                </div>
+                <span className="jms-label">OPENAI API KEY</span>
+                <span className={"jms-chip"} style={{"color": ("var(--jms-ok)" if oaiConfigured else "var(--jms-fg-dim)")}}>
+                    {"CONFIGURED" if oaiConfigured else "NOT SET"}
+                </span>
+            </div>
+
+            <span className="jms-mono-dim">{oaiStatusLine}</span>
+
+            <input
+                className="jms-input"
+                type="password"
+                value={oaiKeyInput}
+                placeholder="sk-…"
+                onChange={lambda e: any { oaiKeyInput = str(e.target.value); oaiErr = ""; }}
+            />
+
+            {oaiErr and <span className="jms-mono-dim" style={{"color": "var(--jms-danger)"}}>{oaiErr}</span>}
+
+            <div className="flex items-center gap-2">
+                <button
+                    className="jms-btn jms-btn-accent"
+                    disabled={oaiBusy}
+                    onClick={lambda e: MouseEvent { applyOpenAiKey(); }}
+                >{"SAVING…" if oaiBusy else "SET"}</button>
+                <button
+                    className="jms-btn jms-btn-danger"
+                    disabled={oaiBusy or (not oaiConfigured)}
+                    onClick={lambda e: MouseEvent { clearOpenAiKey(); }}
+                >CLEAR</button>
+            </div>
+
+            <div className="flex items-center justify-between">
+                <span className="jms-mono-dim" style={{"opacity": "0.7"}}>
+                    Keys are sent once, encrypted at rest, and used only to power the app assistant + dataset plans on your behalf.
+                </span>
                 <button
                     className="jms-btn"
                     onClick={lambda e: MouseEvent { _close(); }}
                 >CLOSE</button>
             </div>
-
-            <span className="jms-mono-dim" style={{"opacity": "0.7"}}>
-                The key is sent once, encrypted at rest, and used only to draft dataset plans on your behalf.
-            </span>
         </div>
     </div>;
 }
