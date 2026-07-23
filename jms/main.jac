@@ -83,9 +83,13 @@ import from jms_llm {
 }
 # In-app AI assistant (phase 2, task A1): OpenAI key storage (encrypted,
 # mirrors jms_llm's Anthropic pattern) + a unified provider listing
-# (mlx/claude/openai) for the assistant's model picker.
+# (mlx/claude/openai) for the assistant's model picker. Task A3's
+# `assistant_stream` (grounded streaming chat over MLX/Claude/OpenAI) is
+# consumed by a raw fetch reader on the client, same as `chat_stream` below —
+# registered here too so it doesn't 404.
 import from assistant {
-    assistant_providers, set_openai_key, clear_openai_key, assistant_context
+    assistant_providers, set_openai_key, clear_openai_key, assistant_context,
+    assistant_stream
 }
 # JMS GENERATE stage, PLAN step: LLM-authored dataset plans (claude via byllm /
 # mlx via the resident model), edit + approve. Consumed by GenerateStage.

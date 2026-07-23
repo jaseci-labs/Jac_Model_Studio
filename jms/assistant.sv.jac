@@ -16,6 +16,7 @@ import os;
 import datetime;
 import crypto;
 import models;
+import inference;
 import from jms_llm { resolved_anthropic_key, llm_status }
 import from workspace { ui_layout }
 import from jms_workspaces { jms_ui_layout }
@@ -436,4 +437,114 @@ primed with (Task A2 self-check calls this directly too). Never returns
 secrets — see the module-level note above `_collect_assistant_context`."""
 def assistant_context() -> str {
     return _collect_assistant_context();
+}
+
+# ================================================================================
+# Task A3 — grounded streaming chat over MLX / Claude / OpenAI.
+#
+# `assistant_stream` prepends the full-app-state grounding digest (Task A2) as a
+# system message, then dispatches by `provider`. Same SSE frame protocol as
+# `chat.sv.jac:chat_stream` — {kind:"load",...} once, {kind:"token",...} per
+# token, {kind:"done",...} last, {kind:"error",...} on failure — so the client
+# reuses the exact same raw-fetch-reader plumbing for either endpoint.
+#
+# mlx branch: mirrors chat_stream's model resolution (model_by_id + model_path +
+# model_available) verbatim, then delegates to inference.stream_chat with the
+# grounded message list. NOT runtime-testable in this worktree — mlx isn't
+# installed in the serving venv here — correctness is by construction (same
+# calls chat_stream already makes, which IS exercised at integration).
+#
+# claude/openai branches call litellm directly (installed in the serving venv)
+# rather than byllm (jms_plan.sv.jac's approach for the PLAN feature) because
+# byllm has no token-streaming API — litellm.completion(..., stream=True) does.
+# Never yields the resolved key in any frame.
+# ================================================================================
+
+glob _ASSISTANT_PREAMBLE: str = (
+    "You are the in-app assistant for Jac Model Studio. Answer using ONLY the "
+    "live app state below plus the user's question. Be concrete; cite "
+    "project/run/eval names. If the data doesn't contain the answer, say so.\n\n"
+    "=== LIVE APP STATE ===\n"
+);
+
+"""Prepend a system message carrying the grounding preamble + the full-app-state
+digest, then the caller's own messages, unmodified."""
+def _grounded_messages(messages: list[dict]) -> list[dict] {
+    sysmsg = {"role": "system", "content": _ASSISTANT_PREAMBLE + _collect_assistant_context()};
+    out: list[dict] = [sysmsg];
+    for m in messages {
+        out.append(m);
+    }
+    return out;
+}
+
+"""Grounded streaming chat over any provider. Same SSE frame protocol as
+chat_stream: {kind:"load",load_s,model_id} once, {kind:"token",token,text} per
+token, {kind:"done",text,tokens,tps,load_s,gen_s} last, {kind:"error",text} on
+failure or an unrecognized provider."""
+def assistant_stream(
+    messages: list[dict], provider: str, model_id: str,
+    temperature: float = 0.3, top_p: float = 0.9, max_tokens: int = 1536
+) -> any {
+    grounded = _grounded_messages(messages);
+
+    if provider == "mlx" {
+        try {
+            m = models.model_by_id(model_id);
+            if not m {
+                yield {"kind": "error", "text": f"unknown model_id: {model_id}"};
+                return;
+            }
+            if not models.model_available(m) {
+                yield {"kind": "error", "text": f"model not found on disk: {model_id}"};
+                return;
+            }
+            path = str(models.model_path(m));
+            # stream_chat guards load+generate in try/except and emits its own error frame.
+            gen: any = inference.stream_chat(grounded, model_id, path, temperature, top_p, max_tokens);
+            for frame in gen {
+                yield frame;
+            }
+        } except Exception as e {
+            yield {"kind": "error", "text": str(e)};
+        }
+        return;
+    }
+
+    if provider == "claude" or provider == "openai" {
+        key = resolved_anthropic_key() if provider == "claude" else resolved_openai_key();
+        if not key {
+            yield {"kind": "error", "text": provider + " API key not set — add it in ⚙ KEYS"};
+            return;
+        }
+        model_str = ("anthropic/" if provider == "claude" else "openai/") + model_id;
+        try {
+            import litellm;
+            yield {"kind": "load", "load_s": 0.0, "model_id": model_id};
+            resp: any = litellm.completion(
+                model=model_str, messages=grounded, stream=True,
+                api_key=key, max_tokens=max_tokens, temperature=temperature
+            );
+            text = "";
+            ntok = 0;
+            for chunk in resp {
+                delta: any = chunk.choices[0].delta.content;
+                if delta is None {
+                    continue;
+                }
+                text += str(delta);
+                ntok += 1;
+                yield {"kind": "token", "token": delta, "text": text};
+            }
+            yield {
+                "kind": "done", "text": text, "tokens": ntok, "tps": 0,
+                "load_s": 0, "gen_s": 0
+            };
+        } except Exception as e {
+            yield {"kind": "error", "text": str(e)};
+        }
+        return;
+    }
+
+    yield {"kind": "error", "text": f"unknown provider: {provider}"};
 }
