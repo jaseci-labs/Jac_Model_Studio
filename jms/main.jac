@@ -65,6 +65,13 @@ import from jms_projects {
     create_project, list_projects, get_project, update_project, delete_project,
     add_source, remove_source, scan_source, write_project_snapshot
 }
+# JMS top nav: a lean per-user workspace registry that GROUPS projects (no
+# sections — a project keeps its own internal stage rail). Consumed by
+# JmsShell's WorkspaceBar + the future JmsWorkspaceSettings drawer.
+import from jms_workspaces {
+    jms_ui_layout, create_jms_workspace, update_jms_workspace,
+    delete_jms_workspace, reorder_jms_workspaces
+}
 # JMS LLM provider config: per-user Anthropic key storage (encrypted) + the
 # provider/model catalog + price table. Consumed by the ApiKeyModal + PLAN picker.
 import from jms_llm {
