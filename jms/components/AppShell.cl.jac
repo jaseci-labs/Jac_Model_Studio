@@ -15,6 +15,7 @@ import from .WorkspaceBar { WorkspaceBar }
 import from .Offline { Offline }
 import from .SectionMount { SectionMount }
 import from .WorkspaceSettings { WorkspaceSettings }
+import from .AssistantPanel { AssistantPanel }
 
 """Fresh per-workspace section pointers (first section in each workspace)."""
 def _defaultSections(layout: any) -> dict {
@@ -77,7 +78,8 @@ def:pub AppShell(onHub: any = None) -> JsxElement {
         workspace: str = "03",
         sections: dict = {},
         online: int = -1,
-        settingsOpen: bool = False;
+        settingsOpen: bool = False,
+        assistantOpen: bool = False;
 
     async def probe -> None {
         try {
@@ -171,6 +173,7 @@ def:pub AppShell(onHub: any = None) -> JsxElement {
             onWorkspace={goWorkspace}
             onSettings={lambda -> None { settingsOpen = True; }}
             onHub={onHub}
+            onAssistant={lambda -> None { assistantOpen = True; }}
         />
 
         <div className="flex min-h-0 flex-1 overflow-hidden">
@@ -204,5 +207,7 @@ def:pub AppShell(onHub: any = None) -> JsxElement {
             onClose={lambda -> None { settingsOpen = False; }}
             onChanged={handleLayoutChange}
         />
+
+        <AssistantPanel open={assistantOpen} onClose={lambda -> None { assistantOpen = False; }} />
     </div>;
 }

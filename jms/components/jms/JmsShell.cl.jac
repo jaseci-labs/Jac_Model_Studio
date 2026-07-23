@@ -28,6 +28,7 @@ import from .JmsWorkspaceSettings { JmsWorkspaceSettings }
 import from .ApiKeyModal { ApiKeyModal }
 import from ..ThemeSwitcher { ThemeSwitcher }
 import from ..WorkspaceBar { WorkspaceBar }
+import from ..AssistantPanel { AssistantPanel }
 
 """MAIN/default workspace shows every project (back-compat list_projects("")
 — includes pre-workspace ungrouped projects); any other workspace filters
@@ -44,7 +45,8 @@ def:pub JmsShell(onHub: any = None) -> JsxElement {
         keyModalOpen: bool = False,
         jmsLayout: any = None,
         jmsWorkspace: str = "",
-        wsSettingsOpen: bool = False;
+        wsSettingsOpen: bool = False,
+        assistantOpen: bool = False;
 
     async can with entry {
         try {
@@ -92,6 +94,11 @@ def:pub JmsShell(onHub: any = None) -> JsxElement {
                 <div className="flex items-center gap-4">
                     <ThemeSwitcher />
                     <button
+                        className="jms-btn jms-btn-accent"
+                        title="ask the assistant"
+                        onClick={lambda e: MouseEvent { assistantOpen = True; }}
+                    >✦ ASK</button>
+                    <button
                         className="jms-btn"
                         title="provider keys"
                         onClick={lambda e: MouseEvent { keyModalOpen = True; }}
@@ -113,6 +120,7 @@ def:pub JmsShell(onHub: any = None) -> JsxElement {
                 onSettings={openWsSettings}
                 onHub={onHub}
                 onKeys={lambda -> None { keyModalOpen = True; }}
+                onAssistant={lambda -> None { assistantOpen = True; }}
                 backLabel="‹ JMS"
             />;
             skip;
@@ -143,6 +151,8 @@ def:pub JmsShell(onHub: any = None) -> JsxElement {
             onClose={lambda -> None { wsSettingsOpen = False; }}
             onChanged={lambda ly: any { jmsLayout = ly; }}
         />
+
+        <AssistantPanel open={assistantOpen} onClose={lambda -> None { assistantOpen = False; }} />
 
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden reveal stagger-2">
             {if projectId {

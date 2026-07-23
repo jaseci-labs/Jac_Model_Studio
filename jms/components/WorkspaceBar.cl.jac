@@ -9,14 +9,20 @@ WORKSPACES) sits at the right, mirroring the JMS top bar's right-side action gro
 
 `onKeys` is optional: when a caller passes it (JMS does, for its ⚙ KEYS provider-key
 modal), a `⚙ KEYS` button renders just before ⚙ WORKSPACES. Experiments doesn't pass
-it, so its bar is unchanged."""
+it, so its bar is unchanged.
+
+`onAssistant` is optional too (phase-2 task A6): when a caller passes it, a
+`✦ ASK` button renders in the right group (before ⚙ KEYS/⚙ WORKSPACES) that
+toggles the shell-level `<AssistantPanel>`. Both JmsShell and AppShell pass it,
+so the grounded assistant is reachable from either surface via the same bar."""
 
 import from .ThemeSwitcher { ThemeSwitcher }
 
 def:pub WorkspaceBar(
     layout: any, workspace: str,
     onWorkspace: Callable[([str], None)], onSettings: Callable[[], None],
-    onHub: any = None, backLabel: str = "‹ EXPERIMENTS", onKeys: any = None
+    onHub: any = None, backLabel: str = "‹ EXPERIMENTS", onKeys: any = None,
+    onAssistant: any = None
 ) -> JsxElement {
     wsList: list = list(layout["workspaces"]);
     return <header className="exp-topbar">
@@ -48,6 +54,10 @@ def:pub WorkspaceBar(
         </div>
         <div className="flex shrink-0 items-center gap-2">
             <ThemeSwitcher />
+            {onAssistant is not None and <button
+                onClick={lambda e: MouseEvent { onAssistant(); }}
+                className="exp-btn exp-btn-accent shrink-0"
+            >✦ ASK</button>}
             {onKeys is not None and <button
                 onClick={lambda e: MouseEvent { onKeys(); }}
                 className="exp-btn exp-btn-ghost shrink-0"
