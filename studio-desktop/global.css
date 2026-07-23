@@ -68,11 +68,23 @@
 }
 
 body {
-  background-color: var(--background);
-  background-image: radial-gradient(#101014 1px, transparent 1px);
-  background-size: 18px 18px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-weight: var(--weight-light);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+/* fixed mesh gradient behind all content (DESIGN.md §5) */
+body::before {
+  content: ""; position: fixed; inset: 0; z-index: -2;
+  background: var(--bg-gradient); background-attachment: fixed;
+}
+/* subtle grain (Distinctive §4 backgrounds) */
+body::after {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  opacity: 0.04; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 /* matches jms.css's .jms-label exactly — same role (floating section tab) */
@@ -269,3 +281,14 @@ body {
 /* Per-workspace accent (nav tile dots + active-bars only; interiors stay
    monochrome). --ws0N / --ws-accent / [data-ws] mapping all live in
    theme.css now — this file only owns the .tok-* syntax colors above. */
+
+/* ---- page-load choreography (Distinctive §3) ---- */
+.reveal { opacity: 0; animation: fadeInUp var(--dur-base) var(--ease-out) forwards; }
+.stagger-1{animation-delay:.05s} .stagger-2{animation-delay:.10s} .stagger-3{animation-delay:.15s}
+.stagger-4{animation-delay:.20s} .stagger-5{animation-delay:.25s} .stagger-6{animation-delay:.30s}
+@keyframes fadeInUp { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:none} }
+.reveal-scale { opacity:0; animation: scaleIn var(--dur-base) var(--ease-out) forwards; }
+@keyframes scaleIn { from{opacity:0;transform:scale(.94)} to{opacity:1;transform:none} }
+@media (prefers-reduced-motion: reduce) {
+  .reveal,.reveal-scale{animation:none;opacity:1;transform:none}
+}
