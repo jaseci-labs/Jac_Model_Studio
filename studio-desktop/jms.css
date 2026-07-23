@@ -39,7 +39,7 @@
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 1.12fr 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: clamp(12px, 1.6vw, 24px);
   padding: clamp(14px, 2vw, 28px) clamp(16px, 2.5vw, 32px);
   overflow: hidden;
@@ -66,10 +66,7 @@
 }
 
 .jms-hero-word {
-  font-size: clamp(72px, min(14vw, 26vh), 200px);
-}
-.jms-hero-word-sm {
-  font-size: clamp(38px, min(5vw, 11vh), 82px);
+  font-size: clamp(40px, min(6vw, 11vh), 88px);
 }
 .jms-hero-sub {
   font-family: var(--jms-font-body);
@@ -78,10 +75,6 @@
   color: var(--jms-fg);
   opacity: 0.85;
   max-width: 34ch;
-}
-.jms-hero-quiet .jms-hero-sub {
-  color: var(--jms-fg-dim);
-  opacity: 1;
 }
 .jms-hero-accent-tick {
   width: 34px;
@@ -92,6 +85,23 @@
 }
 .jms-hero-panel:hover .jms-hero-accent-tick {
   width: 56px;
+}
+
+/* floating pill nav (DESIGN.md §4 navigation) */
+.jms-pillnav {
+  position: absolute; top: 18px; left: 50%; transform: translateX(-50%); z-index: 20;
+  display: flex; align-items: center; gap: 18px;
+  padding: 8px 18px; border-radius: 999px;
+  background: var(--surface-strong); backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+  border: 1px solid var(--border); box-shadow: var(--shadow-nav), var(--inner-hi);
+}
+/* depth row beneath the two entries */
+.jms-feature-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(12px,1.4vw,20px);
+  padding: 0 clamp(16px,2.5vw,32px) clamp(14px,2vw,28px); }
+.jms-feature {
+  padding: 16px 18px; border-radius: var(--radius);
+  background: var(--surface); backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+  border: 1px solid var(--border); box-shadow: var(--shadow-soft), var(--inner-hi);
 }
 
 /* ------------------------------------------------------------ JMS shell --- */
