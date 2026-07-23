@@ -78,8 +78,7 @@ def:pub AppShell(onHub: any = None) -> JsxElement {
         workspace: str = "03",
         sections: dict = {},
         online: int = -1,
-        settingsOpen: bool = False,
-        assistantOpen: bool = False;
+        settingsOpen: bool = False;
 
     async def probe -> None {
         try {
@@ -173,7 +172,6 @@ def:pub AppShell(onHub: any = None) -> JsxElement {
             onWorkspace={goWorkspace}
             onSettings={lambda -> None { settingsOpen = True; }}
             onHub={onHub}
-            onAssistant={lambda -> None { assistantOpen = True; }}
         />
 
         <div className="flex min-h-0 flex-1 overflow-hidden">
@@ -208,6 +206,6 @@ def:pub AppShell(onHub: any = None) -> JsxElement {
             onChanged={handleLayoutChange}
         />
 
-        <AssistantPanel open={assistantOpen} onClose={lambda -> None { assistantOpen = False; }} />
+        <AssistantPanel pageContext="" />
     </div>;
 }

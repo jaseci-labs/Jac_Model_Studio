@@ -45,8 +45,7 @@ def:pub JmsShell(onHub: any = None) -> JsxElement {
         keyModalOpen: bool = False,
         jmsLayout: any = None,
         jmsWorkspace: str = "",
-        wsSettingsOpen: bool = False,
-        assistantOpen: bool = False;
+        wsSettingsOpen: bool = False;
 
     async can with entry {
         try {
@@ -94,11 +93,6 @@ def:pub JmsShell(onHub: any = None) -> JsxElement {
                 <div className="flex items-center gap-4">
                     <ThemeSwitcher />
                     <button
-                        className="jms-btn jms-btn-accent"
-                        title="ask the assistant"
-                        onClick={lambda e: MouseEvent { assistantOpen = True; }}
-                    >✦ ASK</button>
-                    <button
                         className="jms-btn"
                         title="provider keys"
                         onClick={lambda e: MouseEvent { keyModalOpen = True; }}
@@ -120,7 +114,6 @@ def:pub JmsShell(onHub: any = None) -> JsxElement {
                 onSettings={openWsSettings}
                 onHub={onHub}
                 onKeys={lambda -> None { keyModalOpen = True; }}
-                onAssistant={lambda -> None { assistantOpen = True; }}
                 backLabel="‹ HOME"
             />;
             skip;
@@ -152,7 +145,7 @@ def:pub JmsShell(onHub: any = None) -> JsxElement {
             onChanged={lambda ly: any { jmsLayout = ly; }}
         />
 
-        <AssistantPanel open={assistantOpen} onClose={lambda -> None { assistantOpen = False; }} />
+        <AssistantPanel pageContext="" />
 
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden reveal stagger-2">
             {if projectId {
