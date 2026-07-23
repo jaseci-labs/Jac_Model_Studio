@@ -21,7 +21,7 @@ import from .ThemeSwitcher { ThemeSwitcher }
 def:pub WorkspaceBar(
     layout: any, workspace: str,
     onWorkspace: Callable[([str], None)], onSettings: Callable[[], None],
-    onHub: any = None, backLabel: str = "‹ EXPERIMENTS", onKeys: any = None,
+    onHub: any = None, backLabel: str = "‹ HOME", onKeys: any = None,
     onAssistant: any = None
 ) -> JsxElement {
     wsList: list = list(layout["workspaces"]);

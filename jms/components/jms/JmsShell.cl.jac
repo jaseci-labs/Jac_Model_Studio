@@ -121,7 +121,7 @@ def:pub JmsShell(onHub: any = None) -> JsxElement {
                 onHub={onHub}
                 onKeys={lambda -> None { keyModalOpen = True; }}
                 onAssistant={lambda -> None { assistantOpen = True; }}
-                backLabel="‹ JMS"
+                backLabel="‹ HOME"
             />;
             skip;
         }}
