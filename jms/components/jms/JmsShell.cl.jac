@@ -17,13 +17,14 @@ internal stage rail, so the workspace bar isn't needed there. Body routes on
 detail view for that id. The breadcrumb name is captured from JmsProjects'
 onOpen(pid, name) callback.
 
-`openWsSettings` is a stub for now (TODO B6: mount the real
-`JmsWorkspaceSettings` drawer here) — clicking ⚙ WORKSPACES just flips
-`wsSettingsOpen`, which nothing renders off of yet."""
+`openWsSettings` flips `wsSettingsOpen`, which mounts the `<JmsWorkspaceSettings>`
+drawer (add/rename/delete JMS workspaces); its `onChanged` refreshes `jmsLayout`
+so the WorkspaceBar tiles above stay in sync with the graph."""
 
 sv import from ..jms_workspaces { jms_ui_layout }
 import from .JmsProjects { JmsProjects }
 import from .JmsProject { JmsProject }
+import from .JmsWorkspaceSettings { JmsWorkspaceSettings }
 import from .ApiKeyModal { ApiKeyModal }
 import from ..ThemeSwitcher { ThemeSwitcher }
 import from ..WorkspaceBar { WorkspaceBar }
@@ -68,7 +69,6 @@ def:pub JmsShell(onHub: any = None) -> JsxElement {
     }
 
     def openWsSettings -> None {
-        # TODO(B6): wire this to the real JmsWorkspaceSettings drawer.
         wsSettingsOpen = True;
     }
 
@@ -136,6 +136,13 @@ def:pub JmsShell(onHub: any = None) -> JsxElement {
         }}
 
         {keyModalOpen and <ApiKeyModal open={True} onClose={lambda -> None { keyModalOpen = False; }} />}
+
+        <JmsWorkspaceSettings
+            open={wsSettingsOpen}
+            layout={jmsLayout}
+            onClose={lambda -> None { wsSettingsOpen = False; }}
+            onChanged={lambda ly: any { jmsLayout = ly; }}
+        />
 
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden reveal stagger-2">
             {if projectId {
