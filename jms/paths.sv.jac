@@ -2,7 +2,7 @@
 
 Single source of truth for studio_root, workspace_root, data_root, and jacgen
 script paths. Overrides via JAC_STUDIO_WORKSPACE and JAC_STUDIO_DATA_ROOT; without
-them both default to the parent of studio-desktop when 01-sft-dpo exists there
+them both default to the parent of jms when 01-sft-dpo exists there
 (jac_ml_studio repo layout).
 """
 
