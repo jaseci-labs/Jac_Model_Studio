@@ -39,6 +39,26 @@ def _now() -> float { return time.monotonic(); }
 
 def _elapsed(t0: float) -> float { return time.monotonic() - t0; }
 
+"""Raise this process's soft open-file limit toward the hard cap before loading a
+model. In `jac start --dev` the file-watcher holds ~17k fds on node_modules, and
+a model load (safetensors shards + tokenizer files) then hits the default soft
+limit -> `[Errno 24] Too many open files`, silently breaking ALL local-MLX chat
+(Experiments Chat, JMS eval chat, the assistant). A process may raise its own
+soft limit up to the hard limit without privileges, so we do it in-process here —
+this works even when the launch shell's `ulimit` didn't propagate."""
+def _raise_fd_limit() {
+    try {
+        cur: any = resource.getrlimit(resource.RLIMIT_NOFILE);
+        soft = cur[0];
+        hard = cur[1];
+        want = 200000;
+        newsoft = want if (hard == resource.RLIM_INFINITY or hard > want) else hard;
+        if newsoft > soft {
+            resource.setrlimit(resource.RLIMIT_NOFILE, (newsoft, hard));
+        }
+    } except Exception {}
+}
+
 """Residency key: the plain model_id when no adapter (so the base-model chat
 residency used by Experiments Chat is untouched — empty adapter_path behaves
 exactly as before), else model_id+"+"+adapter_path so an adapter-backed JMS chat
@@ -78,6 +98,7 @@ residency separately — the empty-adapter path is byte-identical to before."""
 def load_sync(model_id: str, path: str, adapter_path: str = "") -> float {
     _S["lock"].acquire();
     try {
+        _raise_fd_limit();
         key = _reskey(model_id, adapter_path);
         if _S["current_id"] == key {
             _S["load_seconds"] = 0.0;
@@ -138,6 +159,7 @@ def stream_chat(
 ) -> any {
     _S["lock"].acquire();
     try {
+        _raise_fd_limit();
         import from mlx_lm { stream_generate }
         import from mlx_lm.sample_utils { make_sampler }
         load_s = 0.0;
