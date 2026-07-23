@@ -5,6 +5,8 @@ strip, display type is clamp()-sized against both vw and vh, and everything
 overflow-hidden. Theme is locked to electric-minimal (see JmsShell docstring
 for why)."""
 
+import from ..ThemeSwitcher { ThemeSwitcher }
+
 def:pub Landing(onPick: any = None, theme: str = "", onTheme: any = None) -> JsxElement {
     t: str = "electric-minimal";
     return <div
@@ -13,6 +15,7 @@ def:pub Landing(onPick: any = None, theme: str = "", onTheme: any = None) -> Jsx
     >
         <div className="jms-topbar">
             <span className="jms-label">JAC MODEL STUDIO</span>
+            <ThemeSwitcher />
         </div>
 
         <div className="jms-hero-grid">

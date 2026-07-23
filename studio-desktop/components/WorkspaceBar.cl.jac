@@ -7,6 +7,8 @@ underline uses --ws-accent (stamped on the shell root via data-ws) — the exact
 accent mechanism the old vertical rail used, only laid out horizontally. Settings (⚙
 WORKSPACES) sits at the right, mirroring the JMS top bar's right-side action group."""
 
+import from .ThemeSwitcher { ThemeSwitcher }
+
 def:pub WorkspaceBar(
     layout: any, workspace: str,
     onWorkspace: Callable[([str], None)], onSettings: Callable[[], None],
@@ -40,9 +42,12 @@ def:pub WorkspaceBar(
                 }}
             </div>
         </div>
-        <button
-            onClick={lambda e: MouseEvent { onSettings(); }}
-            className="exp-btn exp-btn-ghost shrink-0"
-        >⚙ WORKSPACES</button>
+        <div className="flex shrink-0 items-center gap-2">
+            <ThemeSwitcher />
+            <button
+                onClick={lambda e: MouseEvent { onSettings(); }}
+                className="exp-btn exp-btn-ghost shrink-0"
+            >⚙ WORKSPACES</button>
+        </div>
     </header>;
 }

@@ -11,6 +11,7 @@ onOpen(pid, name) callback."""
 import from .JmsProjects { JmsProjects }
 import from .JmsProject { JmsProject }
 import from .ApiKeyModal { ApiKeyModal }
+import from ..ThemeSwitcher { ThemeSwitcher }
 
 def:pub JmsShell(onHub: any = None, theme: str = "", onTheme: any = None) -> JsxElement {
     has projectId: str = "",
@@ -48,6 +49,7 @@ def:pub JmsShell(onHub: any = None, theme: str = "", onTheme: any = None) -> Jsx
                 </div>
             </div>
             <div className="flex items-center gap-4">
+                <ThemeSwitcher />
                 <button
                     className="jms-btn"
                     title="provider keys"
