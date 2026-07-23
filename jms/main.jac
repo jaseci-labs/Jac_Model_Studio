@@ -81,6 +81,12 @@ import from jms_workspaces {
 import from jms_llm {
     set_anthropic_key, clear_anthropic_key, llm_status, price_for
 }
+# In-app AI assistant (phase 2, task A1): OpenAI key storage (encrypted,
+# mirrors jms_llm's Anthropic pattern) + a unified provider listing
+# (mlx/claude/openai) for the assistant's model picker.
+import from assistant {
+    assistant_providers, set_openai_key, clear_openai_key
+}
 # JMS GENERATE stage, PLAN step: LLM-authored dataset plans (claude via byllm /
 # mlx via the resident model), edit + approve. Consumed by GenerateStage.
 import from jms_plan {
