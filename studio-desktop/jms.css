@@ -19,7 +19,10 @@
   justify-content: space-between;
   gap: 16px;
   padding: 14px clamp(16px, 2.5vw, 32px);
-  border-bottom: 1px var(--jms-rule-style) var(--jms-border);
+  background: var(--surface-strong);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border-bottom: 1px solid var(--border-alt);
   flex-shrink: 0;
 }
 
@@ -28,7 +31,7 @@
   align-items: center;
   justify-content: center;
   padding: 10px clamp(16px, 2.5vw, 32px);
-  border-top: 1px var(--jms-rule-style) var(--jms-border);
+  border-top: 1px solid var(--border-alt);
   flex-shrink: 0;
 }
 
@@ -84,7 +87,7 @@
   width: 34px;
   height: 3px;
   border-radius: 2px;
-  background: linear-gradient(90deg, var(--jms-accent), var(--jms-accent-2));
+  background: linear-gradient(90deg, var(--accent), var(--accent-soft));
   transition: width 200ms ease;
 }
 .jms-hero-panel:hover .jms-hero-accent-tick {
@@ -209,8 +212,8 @@
   flex-shrink: 0;
 }
 .jms-dot-on {
-  background: var(--jms-accent);
-  border-color: var(--jms-accent);
+  background: var(--accent);
+  border-color: var(--accent);
 }
 
 /* new-project dashed card + inline form */
@@ -265,8 +268,8 @@
 .jms-pill:hover { color: var(--jms-fg); }
 .jms-pill-active {
   color: var(--jms-fg);
-  background-color: var(--jms-bg-raised);
-  border-color: var(--jms-border);
+  background-color: var(--accent-tint);
+  border-color: var(--accent);
 }
 .jms-pill-dot {
   width: 7px;
@@ -276,7 +279,7 @@
   background: transparent;
   flex-shrink: 0;
 }
-.jms-pill-dot-done { background: var(--jms-accent); border-color: var(--jms-accent); }
+.jms-pill-dot-done { background: var(--accent); border-color: var(--accent); }
 
 /* -- bordered section frame (like the terminal app's labeled panels) ---- */
 /* background/border/radius/shadow unified with .exp-panel/.jms-card in
@@ -290,7 +293,9 @@
   top: -8px;
   left: 14px;
   padding: 0 8px;
-  background-color: var(--jms-bg);
+  background: var(--surface-strong);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
   font-family: var(--jms-font-mono);
   font-size: 9px;
   letter-spacing: 0.18em;
