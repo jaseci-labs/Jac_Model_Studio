@@ -145,7 +145,7 @@ def:pub JmsShell(onHub: any = None) -> JsxElement {
             onChanged={lambda ly: any { jmsLayout = ly; }}
         />
 
-        <AssistantPanel pageContext="" />
+        <AssistantPanel pageContext={("JMS surface · project '" + projectName + "' (pipeline: sources/generate/curate/train/eval)") if projectId else ("JMS surface · project list · workspace " + jmsWorkspace)} />
 
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden reveal stagger-2">
             {if projectId {

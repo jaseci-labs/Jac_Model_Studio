@@ -206,6 +206,6 @@ def:pub AppShell(onHub: any = None) -> JsxElement {
             onChanged={handleLayoutChange}
         />
 
-        <AssistantPanel pageContext="" />
+        <AssistantPanel pageContext={"Experiments surface · workspace " + workspace + (" · section " + str(sections[workspace]) if workspace in sections else "")} />
     </div>;
 }

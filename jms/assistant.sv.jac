@@ -476,10 +476,23 @@ def _grounded_messages(messages: list[dict], context: str) -> list[dict] {
     # fetches assistant_context() first (correct root) and passes it in. Fall
     # back to the in-generator collect only if the caller passed nothing.
     ground = context if context else _collect_assistant_context();
-    sysmsg = {"role": "system", "content": _ASSISTANT_PREAMBLE + ground};
-    out: list[dict] = [sysmsg];
+    preamble = _ASSISTANT_PREAMBLE + ground;
+    # Fold the grounding into the FIRST user turn rather than a system message:
+    # some local chat templates (e.g. Gemma) reject a `system` role outright
+    # (TemplateError: System role not supported). Prepending to the user turn
+    # is universal across MLX (qwen/gemma), Claude, and OpenAI.
+    out: list[dict] = [];
+    injected = False;
     for m in messages {
-        out.append(m);
+        if (not injected) and str(m["role"]) == "user" {
+            out.append({"role": "user", "content": preamble + "\n\n--- USER QUESTION ---\n" + str(m["content"])});
+            injected = True;
+        } else {
+            out.append(m as dict);
+        }
+    }
+    if not injected {
+        out.append({"role": "user", "content": preamble});
     }
     return out;
 }

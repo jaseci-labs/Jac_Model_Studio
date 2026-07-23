@@ -59,6 +59,11 @@ id = "qwen-cpt-v1"
 label = "Qwen · CPT-v1"
 path = "models/qwen-cpt-v1-fused-q4"
 
+[[models.registry]]
+id = "gemma-base"
+label = "Gemma · BASE"
+path = "models/gemma-base"
+
 # eval holdout sets (rel to data root); keys are the client-facing holdout ids
 [models.holdouts]
 function = "model-experiments/01-sft-dpo/dataset/eval_holdout/conversion.jsonl"
