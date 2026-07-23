@@ -6,46 +6,10 @@
    in theme.css, so nothing below needed to change. */
 
 /* ---------------------------------------------------------- components --- */
-.jms-label {
-  font-family: var(--jms-font-mono);
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--jms-fg-dim);
-  transition: color 180ms ease;
-}
-
-.jms-stat {
-  font-family: var(--jms-font-mono);
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  color: var(--jms-fg-dim);
-}
-
-.jms-display {
-  font-family: var(--jms-font-display);
-  font-weight: var(--jms-display-weight);
-  letter-spacing: var(--jms-display-tracking);
-  text-transform: var(--jms-display-transform);
-  line-height: 0.92;
-  text-shadow: var(--jms-display-glow);
-  color: var(--jms-fg);
-}
-
-.jms-card {
-  background-color: var(--jms-bg-raised);
-  border: var(--jms-border-w) solid var(--jms-border);
-  border-radius: var(--jms-radius);
-  box-shadow: var(--jms-card-shadow);
-  transition: border-color 200ms ease, box-shadow 200ms ease,
-    transform 200ms ease, background-color 220ms ease;
-}
-.jms-card:hover {
-  border-color: var(--jms-accent);
-  box-shadow: var(--jms-hover-shadow);
-}
-
+/* .jms-label unified with .micro-label in global.css */
+/* .jms-stat unified with .stat-line in global.css */
+/* .jms-display unified with .exp-display in global.css */
+/* .jms-card (+hover) unified with .exp-panel/.exp-hoverable in global.css */
 /* .jms-btn* unified with .exp-btn* in global.css */
 
 /* ------------------------------------------------------- landing layout --- */
@@ -213,8 +177,8 @@
 }
 .jms-pname {
   font-family: var(--jms-font-display);
-  font-weight: var(--jms-display-weight);
-  letter-spacing: var(--jms-display-tracking);
+  font-weight: var(--weight-black);
+  letter-spacing: -0.03em;
   font-size: 22px;
   line-height: 1.05;
   color: var(--jms-fg);
@@ -259,38 +223,9 @@
 .jms-newcard:hover { color: var(--jms-fg); }
 
 /* -- form controls (mono, token-colored) -------------------------------- */
-.jms-input,
-.jms-textarea {
-  width: 100%;
-  font-family: var(--jms-font-mono);
-  font-size: 12px;
-  color: var(--jms-fg);
-  background-color: var(--jms-bg);
-  border: 1px solid var(--jms-border);
-  border-radius: calc(var(--jms-radius) * 0.5);
-  padding: 8px 10px;
-  outline: none;
-  transition: border-color 160ms ease;
-}
-.jms-textarea { resize: vertical; min-height: 68px; line-height: 1.45; }
-.jms-input:focus,
-.jms-textarea:focus { border-color: var(--jms-accent); }
-.jms-input::placeholder,
-.jms-textarea::placeholder { color: var(--jms-fg-dim); opacity: 0.7; }
+/* .jms-input/.jms-textarea (+focus/placeholder) unified with .exp-input in global.css */
 
-/* kind chip + toggle */
-.jms-chip {
-  font-family: var(--jms-font-mono);
-  font-size: 9px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--jms-accent);
-  border: 1px solid var(--jms-border);
-  border-radius: 999px;
-  padding: 2px 8px;
-  background: transparent;
-  flex-shrink: 0;
-}
+/* .jms-chip (+active) unified with .exp-chip in global.css */
 
 /* saved flash */
 .jms-flash {
@@ -344,13 +279,12 @@
 .jms-pill-dot-done { background: var(--jms-accent); border-color: var(--jms-accent); }
 
 /* -- bordered section frame (like the terminal app's labeled panels) ---- */
-.jms-section {
-  position: relative;
-  border: var(--jms-border-w) solid var(--jms-border);
-  border-radius: var(--jms-radius);
-  background-color: var(--jms-bg-raised);
-  padding: 18px;
-}
+/* background/border/radius/shadow unified with .exp-panel/.jms-card in
+   global.css. padding kept here: unlike .jms-card call sites (which always
+   supply their own padding via Tailwind/inline style), every .jms-section
+   call site relies on the class for padding — dropping it collided the
+   floating label with the content below. */
+.jms-section { padding: 18px; }
 .jms-section-label {
   position: absolute;
   top: -8px;
