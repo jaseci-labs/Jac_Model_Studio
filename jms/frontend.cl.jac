@@ -33,6 +33,27 @@ def:pub app -> JsxElement {
         checking: bool = True,
         surface: str = "";
 
+    """Read the current surface from the URL hash (#jms / #experiments / else "")."""
+    def _hashSurface() -> str {
+        try {
+            w: any = window;
+            s: str = str(w.location.hash).replace("#", "");
+            if s == "jms" or s == "experiments" { return s; }
+        } except Exception { }
+        return "";
+    }
+
+    """Navigate to a surface AND push a browser history entry so the OS/browser
+    Back button returns to the previous surface (popstate handler below restores
+    it). Hash-based so a refresh/deeplink lands on the same surface."""
+    def goSurface(s: str) -> None {
+        surface = s;
+        try {
+            w: any = window;
+            w.history.pushState({"surface": s}, "", ("#" + s) if s else "#");
+        } except Exception { }
+    }
+
     """On mount: read local_mode() once. Local desktop mints an in-process
     session token (see module docstring); prod falls through to <Login/> when
     no session is present."""
@@ -81,6 +102,18 @@ def:pub app -> JsxElement {
         };
     }, [authTick]);
 
+    # Browser Back/Forward ↔ surface sync. On mount, adopt the URL hash (so a
+    # refresh/deeplink lands on the right surface); listen for popstate (Back)
+    # and restore the surface from the hash.
+    useEffect(lambda {
+        init = _hashSurface();
+        if init { surface = init; }
+        wp: any = window;
+        onPop = lambda(_e: any) { surface = _hashSurface(); };
+        wp.addEventListener("popstate", onPop);
+        return lambda { wp.removeEventListener("popstate", onPop); };
+    }, []);
+
     # Still resolving local_mode()/local_session() — hold a blank frame so we
     # never flash the login screen (which local users should never see).
     if checking {
@@ -93,14 +126,14 @@ def:pub app -> JsxElement {
     if jacIsLoggedIn() {
         if surface == "jms" {
             return <JmsShell
-                onHub={lambda { surface = ""; }}
+                onHub={lambda { goSurface(""); }}
             />;
         }
         if surface == "experiments" {
-            return <AppShell onHub={lambda { surface = ""; }} />;
+            return <AppShell onHub={lambda { goSurface(""); }} />;
         }
         return <Landing
-            onPick={lambda(s: str) { surface = s; }}
+            onPick={lambda(s: str) { goSurface(s); }}
         />;
     }
     # Production gate for logged-out visitors (or expired session).
