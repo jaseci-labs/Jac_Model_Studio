@@ -61,8 +61,8 @@ path = "models/qwen-cpt-v1-fused-q4"
 
 [[models.registry]]
 id = "gemma-base"
-label = "Gemma · BASE"
-path = "models/gemma-base"
+label = "Gemma 3 · 4B"
+path = "models/gemma-3-4b"
 
 # eval holdout sets (rel to data root); keys are the client-facing holdout ids
 [models.holdouts]
