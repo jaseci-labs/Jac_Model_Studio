@@ -12,7 +12,7 @@ import from .ThemeSwitcher { ThemeSwitcher }
 def:pub WorkspaceBar(
     layout: any, workspace: str,
     onWorkspace: Callable[([str], None)], onSettings: Callable[[], None],
-    onHub: any = None
+    onHub: any = None, backLabel: str = "‹ EXPERIMENTS"
 ) -> JsxElement {
     wsList: list = list(layout["workspaces"]);
     return <header className="exp-topbar">
@@ -21,7 +21,7 @@ def:pub WorkspaceBar(
                 className="exp-btn shrink-0"
                 title="back to hub"
                 onClick={lambda e: MouseEvent { if onHub is not None { onHub(); } }}
-            >‹ EXPERIMENTS</button>
+            >{backLabel}</button>
             <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto">
                 {for ws in wsList {
                     wd = ws as dict;

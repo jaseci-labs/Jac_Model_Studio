@@ -19,7 +19,11 @@ import from evals { EvalView, create_eval, list_evals, get_eval, stop_eval, dele
 # `sv import` RPC stubs, so register them at the top level.
 import from train { start_training, stop_training, get_status, list_sessions }
 import from backends { list_backends }
-import from workspace { ui_layout }
+import from workspace {
+    ui_layout, section_types,
+    create_workspace, update_workspace, delete_workspace, reorder_workspaces,
+    add_section, update_section, delete_section, reorder_sections
+}
 import from runs { list_runs, get_run, compare_runs }
 # Live RL ladder results — consumed by the RL section's `sv import` RPC stub.
 import from rl { get_rl_ladder, get_rl_corrected, rl_generate }
