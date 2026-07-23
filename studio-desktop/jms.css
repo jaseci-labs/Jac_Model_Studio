@@ -46,32 +46,7 @@
   box-shadow: var(--jms-hover-shadow);
 }
 
-.jms-btn {
-  font-family: var(--jms-font-mono);
-  font-size: 10px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--jms-fg-dim);
-  background: transparent;
-  border: 1px solid var(--jms-border);
-  border-radius: calc(var(--jms-radius) * 0.6);
-  padding: 6px 12px;
-  cursor: pointer;
-  transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease;
-}
-.jms-btn:hover {
-  color: var(--jms-fg);
-  border-color: var(--jms-accent);
-}
-.jms-btn-accent {
-  background-color: var(--jms-accent);
-  border-color: var(--jms-accent);
-  color: var(--jms-accent-fg);
-}
-.jms-btn-accent:hover {
-  color: var(--jms-accent-fg);
-  filter: brightness(1.08);
-}
+/* .jms-btn* unified with .exp-btn* in global.css */
 
 /* ------------------------------------------------------- landing layout --- */
 .jms-topbar {
@@ -316,10 +291,6 @@
   background: transparent;
   flex-shrink: 0;
 }
-
-/* danger variant of jms-btn (delete confirm) */
-.jms-btn-danger { color: var(--jms-danger); border-color: var(--jms-border); }
-.jms-btn-danger:hover { color: var(--jms-danger); border-color: var(--jms-danger); }
 
 /* saved flash */
 .jms-flash {
