@@ -17,6 +17,7 @@
     radial-gradient(at 50% 100%, rgba(255,170,120,0.40) 0%, transparent 55%);
   --surface: rgba(255,255,255,0.60);
   --surface-strong: rgba(255,255,255,0.85);
+  --bar: rgba(255,255,255,0.80);
   --text: #16130f;
   --text-muted: #6b6459;
   --border: rgba(255,255,255,0.55);
@@ -91,6 +92,7 @@
     radial-gradient(at 50% 100%, rgba(236,130,66,0.14) 0%, transparent 60%);
   --surface: rgba(255,255,255,0.05);
   --surface-strong: rgba(255,255,255,0.09);
+  --bar: rgba(22,18,14,0.74);
   --text: #f5f2ec;
   --text-muted: #9a9082;
   --border: rgba(255,255,255,0.08);

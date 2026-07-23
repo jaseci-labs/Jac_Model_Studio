@@ -181,12 +181,14 @@ body::after {
   gap: 16px;
   flex-shrink: 0;
   padding: 14px clamp(16px, 2.5vw, 32px);
-  background: var(--surface-strong);
+  background: var(--bar);
   backdrop-filter: var(--blur);
   -webkit-backdrop-filter: var(--blur);
   border-bottom: 1px solid var(--border-alt);
 }
-@supports not (backdrop-filter: blur(1px)) { .exp-topbar { background: var(--surface-strong); } }
+@supports not (backdrop-filter: blur(1px)) { .exp-topbar { background: var(--bar); } }
+/* workspace tiles live in a fixed-height bar — no lift (it clips outside the frame) */
+.exp-topbar .exp-hoverable:hover { transform: none; box-shadow: none; }
 
 /* -- text input / textarea ---------------------------------------------- */
 .exp-input, .jms-input, .jms-textarea {
