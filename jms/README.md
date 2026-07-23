@@ -2,7 +2,7 @@
 
 One-stop local ML workbench for the Jac fine-tuning project: chat with the
 trained models, launch + monitor training, run the data pipeline, and run
-evals — all in one monochrome UI. Written in **pure Jac** (full-stack: server
+evals — all in one frosted-glass light/dark UI. Written in **pure Jac** (full-stack: server
 + React-in-Jac client from one codebase). Supersedes the old FastAPI + Next.js
 app (deleted) and the earlier web_app/ + dashboard_app/.
 
@@ -59,8 +59,8 @@ Everything lives in this directory (`jms/`):
   port of procs.py), `metrics` (log/metric parsers, port of runlogs.py),
   `prompts`.
 - `components/**/*.cl.jac` — the UI. Sections CHAT / TRAIN / DATA / EVALS / RL
-  behind the left icon rail; shared chart/form/log primitives; monochrome
-  Geist-Mono schematic theme (`global.css`).
+  behind the left icon rail; shared chart/form/log primitives; frosted-glass
+  light/dark theme with warm orange accent (`global.css`, `theme.css`).
 - `main.jac` — registers every endpoint + mounts the client app.
 
 ## Test

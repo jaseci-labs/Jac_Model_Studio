@@ -12,8 +12,8 @@ import from ..shared.StatTile { StatTile }
 import from ..shared.RowBrowser { RowBrowser }
 import from ..shared.Field { Segmented }
 
-# Purple ramp for the composition bar (light→dark, largest category first).
-glob SHADES: list[str] = ["#e8dcf7", "#d3bdec", "#b89ce8", "#9a78d4", "#7d5cba", "#5f4499", "#48317a"];
+# Warm ramp for the composition bar (light→dark, largest category first).
+glob SHADES: list[str] = ["#f9e2d0", "#f4c9a8", "#eeae7f", "#e8935a", "#d97a3e", "#b85f2c", "#8a4620"];
 
 def:pub CptSftData -> JsxElement {
     has stats: any = None,

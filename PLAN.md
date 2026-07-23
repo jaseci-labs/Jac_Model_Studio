@@ -23,7 +23,7 @@
  │ rl.sv.jac       │ RUNG_ORDER, RL_PREVIEW_FILES     │ workspace.rung_order() / .rl_preview_files()   │
  └─────────────────┴──────────────────────────────────┴────────────────────────────────────────────────┘
 
- Shipped fallback: `studio-desktop/studio.workspace.toml` (copied from repo root; workspace_root
+ Shipped fallback: `jms/studio.workspace.toml` (copied from repo root; workspace_root
  wins at runtime). TOML is the single source for **checkout config** (models, datasets, backends) —
  not for user workspaces (those live on the graph; see Layer 2 #2).
 

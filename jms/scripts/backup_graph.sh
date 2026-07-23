@@ -1,6 +1,6 @@
 #!/bin/bash
 # Snapshot the OSP graph + user DB (.jac/data/) for disaster recovery.
-# Run from cron, e.g. 0 3 * * * /opt/jac_ml_studio/studio-desktop/scripts/backup_graph.sh
+# Run from cron, e.g. 0 3 * * * /opt/jac_ml_studio/jms/scripts/backup_graph.sh
 set -euo pipefail
 STUDIO_DIR="${JAC_STUDIO_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 DATA_DIR="$STUDIO_DIR/.jac/data"

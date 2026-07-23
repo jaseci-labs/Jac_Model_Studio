@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fake Spheron REST API for local dev/testing of spheron.sv.jac + supervisor.py.
 
-Implements the endpoints (paths/shapes copied from studio-desktop/spheron.sv.jac):
+Implements the endpoints (paths/shapes copied from jms/spheron.sv.jac):
   GET    /api/gpu-offers                       -> {"data":[{gpuType, displayName, offers:[...]}]}
   POST   /api/deployments                      -> deployment dict (has "id")
   GET    /api/deployments                      -> [deployment, ...]

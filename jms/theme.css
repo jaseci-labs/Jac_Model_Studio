@@ -79,6 +79,7 @@
   /* --exp-* aliases */
   --exp-radius: var(--radius); --exp-glow: var(--shadow-soft);
   --exp-accent-tint: var(--accent-tint); --exp-accent-ring: var(--accent-ring);
+  --scrollbar: rgba(20,16,12,0.28);
 }
 
 .dark {
@@ -106,6 +107,7 @@
   --shadow-nav: 0 4px 16px rgba(0,0,0,0.40);
   --primary-foreground: #0c0a08;
   --jms-accent-fg: #0c0a08; --accent-foreground: #0c0a08;
+  --scrollbar: rgba(255,255,255,0.18);
 }
 
 /* mobile: cheaper blur (DESIGN.md §8) */
