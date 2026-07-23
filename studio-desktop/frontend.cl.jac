@@ -46,6 +46,17 @@ def:pub app -> JsxElement {
         } except Exception {
             jmsTheme = "electric-minimal";
         }
+        # apply persisted light/dark mode before first paint
+        try {
+            dc: any = document;
+            wm: any = window;
+            md: str = "dark";
+            sv2: any = wm.localStorage.getItem("jacml.mode");
+            if sv2 { md = str(sv2); }
+            elif wm.matchMedia and wm.matchMedia("(prefers-color-scheme: light)").matches { md = "light"; }
+            if md == "dark" { dc.documentElement.classList.add("dark"); }
+            else { dc.documentElement.classList.remove("dark"); }
+        } except Exception { }
         lm: bool = False;
         try {
             lm = await local_mode();
@@ -82,7 +93,7 @@ def:pub app -> JsxElement {
     # Still resolving local_mode()/local_session() — hold a blank frame so we
     # never flash the login screen (which local users should never see).
     if checking {
-        return <div className="h-screen bg-[#0a0a0a]" />;
+        return <div className="h-screen bg-background" />;
     }
     def applyJmsTheme(t: str) {
         jmsTheme = t;

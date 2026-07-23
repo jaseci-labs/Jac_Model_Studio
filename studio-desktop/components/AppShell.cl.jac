@@ -107,7 +107,15 @@ def:pub AppShell(onHub: any = None) -> JsxElement {
 
     async can with entry {
         doc: any = document;
-        doc.documentElement.classList.add("dark");
+        win: any = window;
+        mode: str = "dark";
+        try {
+            saved: any = win.localStorage.getItem("jacml.mode");
+            if saved { mode = str(saved); }
+            elif win.matchMedia and win.matchMedia("(prefers-color-scheme: light)").matches { mode = "light"; }
+        } except Exception { }
+        if mode == "dark" { doc.documentElement.classList.add("dark"); }
+        else { doc.documentElement.classList.remove("dark"); }
         doc.body.classList.add("antialiased");
         try {
             ly = await ui_layout();
