@@ -31,7 +31,7 @@ def:pub JmsShell(onHub: any = None) -> JsxElement {
     return <div
         className="jms-scope flex h-screen w-screen flex-col overflow-hidden"
     >
-        <div className="jms-topbar">
+        <div className="jms-topbar reveal stagger-1">
             <div className="flex items-center gap-4">
                 <span className="jms-label">JMS</span>
                 <div className="flex items-center gap-2">
@@ -62,13 +62,15 @@ def:pub JmsShell(onHub: any = None) -> JsxElement {
 
         {keyModalOpen and <ApiKeyModal open={True} onClose={lambda -> None { keyModalOpen = False; }} />}
 
-        {if projectId {
-            <JmsProject pid={projectId} onBack={backToProjects} />
-            skip;
-        }}
-        {if not projectId {
-            <JmsProjects onOpen={openProject} />
-            skip;
-        }}
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden reveal stagger-2">
+            {if projectId {
+                <JmsProject pid={projectId} onBack={backToProjects} />
+                skip;
+            }}
+            {if not projectId {
+                <JmsProjects onOpen={openProject} />
+                skip;
+            }}
+        </div>
     </div>;
 }

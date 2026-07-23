@@ -154,7 +154,7 @@ def:pub AppShell(onHub: any = None) -> JsxElement {
 
     def slot(ws: str, s: str) -> str {
         vis = ws == workspace and s == str(sections[ws]);
-        return "flex min-w-0 flex-1" if vis else "hidden";
+        return "flex min-w-0 flex-1 reveal" if vis else "hidden";
     }
 
     if online == 0 {

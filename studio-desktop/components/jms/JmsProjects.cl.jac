@@ -70,7 +70,7 @@ def:pub JmsProjects(onOpen: any = None) -> JsxElement {
         confirmId = "";
     }
 
-    def _card(d: any) -> JsxElement {
+    def _card(d: any, i: int) -> JsxElement {
         pid = str(d["pid"]);
         rs: any = d["row_stats"];
         raw = str(rs["raw"]) if rs else "0";
@@ -78,7 +78,7 @@ def:pub JmsProjects(onOpen: any = None) -> JsxElement {
         nsrc = len(list(d["sources"]));
         return <div
             key={pid}
-            className="jms-card jms-pcard"
+            className={"jms-card jms-pcard" + (" reveal stagger-" + str(min(i + 1, 6)))}
             onClick={lambda e: MouseEvent {
                 if onOpen is not None { onOpen(pid, str(d["name"])); }
             }}
@@ -165,8 +165,8 @@ def:pub JmsProjects(onOpen: any = None) -> JsxElement {
     return <div className="min-h-0 flex-1 overflow-y-auto p-6">
         <div className="jms-grid">
             {_newCard()}
-            {# _card takes a param → compiles to a props-component; call with a props dict, not positionally
-             [_card({"d": d}) for d in rows]}
+            {# _card takes params → compiles to a props-component; call with a props dict, not positionally
+             [_card({"d": d, "i": i}) for (i, d) in enumerate(rows)]}
         </div>
     </div>;
 }
