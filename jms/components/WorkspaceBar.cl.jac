@@ -5,14 +5,18 @@ and rendered fully dynamically (3, 4, … up to the --ws0N tokens defined in glo
 never a hardcoded id list. Accent dots use --ws01/--ws02/… CSS vars and the active
 underline uses --ws-accent (stamped on the shell root via data-ws) — the exact same
 accent mechanism the old vertical rail used, only laid out horizontally. Settings (⚙
-WORKSPACES) sits at the right, mirroring the JMS top bar's right-side action group."""
+WORKSPACES) sits at the right, mirroring the JMS top bar's right-side action group.
+
+`onKeys` is optional: when a caller passes it (JMS does, for its ⚙ KEYS provider-key
+modal), a `⚙ KEYS` button renders just before ⚙ WORKSPACES. Experiments doesn't pass
+it, so its bar is unchanged."""
 
 import from .ThemeSwitcher { ThemeSwitcher }
 
 def:pub WorkspaceBar(
     layout: any, workspace: str,
     onWorkspace: Callable[([str], None)], onSettings: Callable[[], None],
-    onHub: any = None, backLabel: str = "‹ EXPERIMENTS"
+    onHub: any = None, backLabel: str = "‹ EXPERIMENTS", onKeys: any = None
 ) -> JsxElement {
     wsList: list = list(layout["workspaces"]);
     return <header className="exp-topbar">
@@ -44,6 +48,10 @@ def:pub WorkspaceBar(
         </div>
         <div className="flex shrink-0 items-center gap-2">
             <ThemeSwitcher />
+            {onKeys is not None and <button
+                onClick={lambda e: MouseEvent { onKeys(); }}
+                className="exp-btn exp-btn-ghost shrink-0"
+            >⚙ KEYS</button>}
             <button
                 onClick={lambda e: MouseEvent { onSettings(); }}
                 className="exp-btn exp-btn-ghost shrink-0"

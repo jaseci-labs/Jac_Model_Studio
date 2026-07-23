@@ -9,8 +9,15 @@ into an inline name + use-case form. With no projects at all, a centered
 
 Cards are built from get_project() dicts (fetched per project after list_projects)
 so the stat line + stage dots have row_stats + stage_state to read. `onOpen(pid,
-name)` hands the selection up to JmsShell for the breadcrumb + detail switch."""
+name)` hands the selection up to JmsShell for the breadcrumb + detail switch.
 
+`group` (from JmsShell's active workspace) filters the list to that workspace
+and is stamped onto any project created from this grid. A plain mount effect
+only runs once, so switching workspaces needs a real prop-change refetch —
+`useEffect(..., [group])` reloads whenever `group` changes (it also fires once
+on mount, replacing the old `async can with entry` load)."""
+
+import from react { useEffect }
 sv import from ...jms_projects { create_project, list_projects, get_project, delete_project }
 
 glob STAGE_IDS: list[str] = ["sources", "generate", "curate", "train", "eval"];
@@ -21,7 +28,7 @@ def _sstate(d: any, sid: str) -> str {
     return "empty";
 }
 
-def:pub JmsProjects(onOpen: any = None) -> JsxElement {
+def:pub JmsProjects(onOpen: any = None, group: str = "") -> JsxElement {
     has rows: list = [],
         loading: bool = True,
         creating: bool = False,
@@ -31,7 +38,7 @@ def:pub JmsProjects(onOpen: any = None) -> JsxElement {
         confirmId: str = "";
 
     async def load -> None {
-        r = await list_projects();
+        r = await list_projects(group);
         acc: list = [];
         for p in r {
             d = await get_project(p.pid);
@@ -41,15 +48,17 @@ def:pub JmsProjects(onOpen: any = None) -> JsxElement {
         loading = False;
     }
 
-    async can with entry {
-        await load();
-    }
+    useEffect(lambda {
+        loading = True;
+        load();
+        return lambda {};
+    }, [group]);
 
     async def createNew -> None {
         if not newName.strip() { return; }
         createBusy = True;
         try {
-            await create_project(newName.strip(), newUse.strip());
+            await create_project(newName.strip(), newUse.strip(), group);
         } except Exception { }
         newName = "";
         newUse = "";
