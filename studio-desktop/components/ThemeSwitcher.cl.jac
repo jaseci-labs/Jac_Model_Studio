@@ -10,6 +10,7 @@ def:pub ThemeSwitcher() -> JsxElement {
         try {
             saved: any = win.localStorage.getItem("jacml.mode");
             if saved { mode = str(saved); }
+            elif win.matchMedia and win.matchMedia("(prefers-color-scheme: light)").matches { mode = "light"; }
         } except Exception { }
     }
 
