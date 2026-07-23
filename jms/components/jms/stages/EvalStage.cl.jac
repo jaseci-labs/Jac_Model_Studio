@@ -498,7 +498,7 @@ def:pub EvalStage(project: any = None, onRefresh: any = None) -> JsxElement {
                 <textarea
                     className="jms-textarea flex-1"
                     value={chatDraft}
-                    placeholder="Ask the adapter…  (Enter to send, Shift+Enter for newline)"
+                    placeholder="Ask the adapter…"
                     onChange={lambda e: any { chatDraft = str(e.target.value); }}
                     onKeyDown={lambda e: KeyboardEvent {
                         if e.key == "Enter" and not e.shiftKey {

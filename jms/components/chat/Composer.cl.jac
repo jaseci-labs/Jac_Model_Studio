@@ -42,7 +42,7 @@ def:pub Composer(
                     }
                 }}
                 rows={_rows(value)}
-                placeholder="Ask the model…  (Enter to send, Shift+Enter for newline)"
+                placeholder="Ask the model…"
                 className="max-h-48 flex-1 resize-none bg-transparent px-2 py-1 text-sm text-foreground outline-none placeholder:text-muted-foreground/80"
             />
             <button
