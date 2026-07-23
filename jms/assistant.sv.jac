@@ -469,8 +469,14 @@ glob _ASSISTANT_PREAMBLE: str = (
 
 """Prepend a system message carrying the grounding preamble + the full-app-state
 digest, then the caller's own messages, unmodified."""
-def _grounded_messages(messages: list[dict]) -> list[dict] {
-    sysmsg = {"role": "system", "content": _ASSISTANT_PREAMBLE + _collect_assistant_context()};
+def _grounded_messages(messages: list[dict], context: str) -> list[dict] {
+    # Prefer a context assembled by the CALLER (client) in a normal request:
+    # this generator's body runs deferred, OUTSIDE the authenticated user-root,
+    # so _collect_assistant_context() reads an empty graph here. The client
+    # fetches assistant_context() first (correct root) and passes it in. Fall
+    # back to the in-generator collect only if the caller passed nothing.
+    ground = context if context else _collect_assistant_context();
+    sysmsg = {"role": "system", "content": _ASSISTANT_PREAMBLE + ground};
     out: list[dict] = [sysmsg];
     for m in messages {
         out.append(m);
@@ -483,10 +489,10 @@ chat_stream: {kind:"load",load_s,model_id} once, {kind:"token",token,text} per
 token, {kind:"done",text,tokens,tps,load_s,gen_s} last, {kind:"error",text} on
 failure or an unrecognized provider."""
 def assistant_stream(
-    messages: list[dict], provider: str, model_id: str,
+    messages: list[dict], provider: str, model_id: str, context: str = "",
     temperature: float = 0.3, top_p: float = 0.9, max_tokens: int = 1536
 ) -> any {
-    grounded = _grounded_messages(messages);
+    grounded = _grounded_messages(messages, context);
 
     if provider == "mlx" {
         try {

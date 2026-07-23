@@ -18,7 +18,7 @@ Reuses `chat/Thread` for the bubble list and `chat/Composer` for the input —
 both already glass-styled and theme-aware — rather than hand-rolling either.
 """
 
-sv import from ..assistant { assistant_providers }
+sv import from ..assistant { assistant_providers, assistant_context }
 import from ..auth_session { bearerHeaders, handleUnauthorized }
 import from .chat.Thread { Thread }
 import from .chat.Composer { Composer }
@@ -142,10 +142,16 @@ def:pub AssistantPanel(open: bool, onClose: any) -> JsxElement {
         acc = "";
         errtext = "";
         try {
+            # Assemble the grounding context HERE (a normal sv call = correct
+            # user-root). assistant_stream is an SSE generator whose body runs
+            # deferred, outside the auth root, so it can't read the graph itself.
+            ctx: str = "";
+            try { ctx = await assistant_context(); } except Exception { ctx = ""; }
             # Raw fetch (not sv import) → bearer token + 401 recovery, same as Chat.cl.jac.
             hdrs: dict = bearerHeaders();
             body: str = JSON.stringify({
                 "messages": hist, "provider": provider, "model_id": modelId,
+                "context": ctx,
                 "temperature": 0.3, "top_p": 0.9, "max_tokens": 1536
             });
             resp: any = await fetch(
