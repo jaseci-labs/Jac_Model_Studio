@@ -140,7 +140,7 @@ def:pub ApiKeyModal(open: bool = False, onClose: any = None) -> JsxElement {
             onClick={lambda e: MouseEvent { _close(); }}
         />
         <div
-            className="jms-card relative flex flex-col gap-4"
+            className="jms-card g-overlay relative flex flex-col gap-4"
             style={{"width": "min(460px, 92vw)", "padding": "22px", "zIndex": "1"}}
         >
             <div className="flex items-center justify-between">

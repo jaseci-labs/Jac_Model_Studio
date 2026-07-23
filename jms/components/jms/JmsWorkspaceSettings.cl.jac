@@ -104,7 +104,7 @@ def:pub JmsWorkspaceSettings(open: bool, layout: any, onClose: any, onChanged: a
             className="flex-1 bg-black/60"
             onClick={lambda e: MouseEvent { onClose(); }}
         />
-        <aside className="jms-card !rounded-none flex h-full w-[24rem] shrink-0 flex-col border-l !border-r-0">
+        <aside className="jms-card g-overlay !rounded-none flex h-full w-[24rem] shrink-0 flex-col border-l !border-r-0">
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
                 <span className="micro-label">WORKSPACES</span>
                 <button

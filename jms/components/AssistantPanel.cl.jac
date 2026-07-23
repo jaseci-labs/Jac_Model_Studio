@@ -455,7 +455,7 @@ def:pub AssistantPanel(pageContext: str = "") -> JsxElement {
                     className="flex-1 bg-black/60"
                     onClick={closeWidget}
                 />
-                <aside className="exp-panel flex h-full w-[34rem] max-w-[92vw] shrink-0 flex-col !rounded-none !border-y-0 !border-r-0">
+                <aside className="exp-panel g-overlay flex h-full w-[34rem] max-w-[92vw] shrink-0 flex-col !rounded-none !border-y-0 !border-r-0">
                     <div className="flex items-center justify-between border-b border-border px-4 py-3">
                         <span className="micro-label">✦ ASSISTANT</span>
                         <div className="flex items-center gap-2">

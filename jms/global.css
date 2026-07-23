@@ -116,6 +116,11 @@ body::after {
 }
 @supports not (backdrop-filter: blur(1px)) { .exp-panel,.jms-card,.jms-section { background: var(--surface-strong); } }
 
+/* Near-opaque surface for OVERLAYS that sit over other UI (slide-over drawers,
+   modals, popovers) — plain glass lets the content behind bleed through and
+   read as noise. Apply alongside a glass panel/popover class. */
+.g-overlay { background: var(--overlay) !important; backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur); }
+
 /* -- accent-glow hover — the single treatment that makes the JMS surface feel
    alive rather than flat. Add to any clickable card / nav tile / row / chip. */
 .exp-hoverable { transition: border-color 180ms, box-shadow 180ms, background-color 200ms, color 160ms, transform 180ms; }

@@ -15,9 +15,10 @@
     radial-gradient(at 18% 0%,  rgba(255,196,150,0.55) 0%, transparent 50%),
     radial-gradient(at 82% 22%, rgba(255,178,120,0.42) 0%, transparent 52%),
     radial-gradient(at 50% 100%, rgba(255,158,100,0.40) 0%, transparent 55%);
-  --surface: rgba(255,255,255,0.60);
-  --surface-strong: rgba(255,255,255,0.85);
-  --bar: rgba(255,255,255,0.80);
+  --surface: rgba(255,255,255,0.74);
+  --surface-strong: rgba(252,251,249,0.94);
+  --bar: rgba(252,251,249,0.92);
+  --overlay: rgba(250,249,247,0.975);
   --text: #16130f;
   --text-muted: #6b6459;
   --border: rgba(255,255,255,0.55);
@@ -91,9 +92,10 @@
     radial-gradient(at 18% 0%,  rgba(236,130,66,0.22) 0%, transparent 55%),
     radial-gradient(at 82% 22%, rgba(200,110,55,0.16) 0%, transparent 55%),
     radial-gradient(at 50% 100%, rgba(236,130,66,0.14) 0%, transparent 60%);
-  --surface: rgba(255,255,255,0.05);
-  --surface-strong: rgba(255,255,255,0.09);
-  --bar: rgba(22,18,14,0.74);
+  --surface: rgba(38,32,26,0.62);
+  --surface-strong: rgba(30,25,20,0.95);
+  --bar: rgba(26,21,16,0.94);
+  --overlay: rgba(20,16,12,0.975);
   --text: #f5f2ec;
   --text-muted: #9a9082;
   --border: rgba(255,255,255,0.08);

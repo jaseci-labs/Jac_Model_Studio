@@ -279,7 +279,7 @@ def:pub WorkspaceSettings(
             className="flex-1 bg-black/60"
             onClick={lambda e: MouseEvent { onClose(); }}
         />
-        <aside className="flex h-full w-[28rem] shrink-0 flex-col border-l border-border bg-card">
+        <aside className="g-overlay flex h-full w-[28rem] shrink-0 flex-col border-l border-border">
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
                 <span className="micro-label">WORKSPACES</span>
                 <button
