@@ -59,7 +59,8 @@ obj JmsProjectView {
         created: str = "",
         provider: str = "claude",
         model: str = "claude-sonnet-5",
-        source_count: int = 0;
+        source_count: int = 0,
+        group_id: str = "";
 }
 
 # ------------------------------------------------------------------- nodes -----
@@ -70,7 +71,8 @@ node JmsProject {
         use_case: str = "",
         created: str = "",
         provider: str = "claude",
-        model: str = "claude-sonnet-5";
+        model: str = "claude-sonnet-5",
+        group_id: str = "";
 }
 
 node JmsSource {
@@ -380,7 +382,7 @@ def _project_view(p: JmsProject) -> JmsProjectView {
     return JmsProjectView(
         pid=p.pid, name=p.name, slug=p.slug, use_case=p.use_case,
         created=p.created, provider=p.provider, model=p.model,
-        source_count=len(_sources_of(p))
+        source_count=len(_sources_of(p)), group_id=p.group_id
     );
 }
 
@@ -479,8 +481,9 @@ def _scan_walk(path: str, kind: str, inc: list[str], exc: list[str]) -> dict {
 """Create a project. Slug = slugified name (immutable fs identity), de-duplicated
 on collision, and gated through jobs.safe(). Lays down the on-disk skeleton
 (dataset/ sources/ jobs/ runs/ evals/). Name is display-only and cannot be
-renamed later (the slug would drift from the directory)."""
-def create_project(name: str, use_case: str) -> JmsProjectView {
+renamed later (the slug would drift from the directory). `group_id` optionally
+places the project in a JMS workspace ("" = ungrouped, back-compat)."""
+def create_project(name: str, use_case: str, group_id: str = "") -> JmsProjectView {
     base = _slugify(name);
     if not jobs.safe(base) { base = "project"; }
     slug = _unique_slug(base);
@@ -490,16 +493,19 @@ def create_project(name: str, use_case: str) -> JmsProjectView {
     }
     p = (root ++> JmsProject(
         pid=uuid4().hex[:12], name=name, slug=slug, use_case=use_case,
-        created=_now(), provider="claude", model="claude-sonnet-5"
+        created=_now(), provider="claude", model="claude-sonnet-5", group_id=group_id
     ))[0];
     write_project_snapshot(p.pid);
     return _project_view(p);
 }
 
-"""All of the caller's projects, newest-first."""
-def list_projects() -> list[JmsProjectView] {
+"""All of the caller's projects, newest-first. `group_id` != "" filters to
+projects in that workspace; "" (default) returns every project, ungrouped or
+not — unchanged back-compat behavior."""
+def list_projects(group_id: str = "") -> list[JmsProjectView] {
     out: list[JmsProjectView] = [];
     for p in [root -->][?:JmsProject] {
+        if group_id != "" and p.group_id != group_id { continue; }
         out.append(_project_view(p));
     }
     out.sort(key=lambda v: JmsProjectView -> str { return v.created; }, reverse=True);
@@ -556,15 +562,16 @@ def get_project(pid: str) -> dict {
     };
 }
 
-"""Patch mutable fields (use_case / provider / model). Name is NOT renamable — the
-slug is the filesystem identity. Returns the refreshed view, or a blank view if
-the pid is unknown / not the caller's."""
+"""Patch mutable fields (use_case / provider / model / group_id). Name is NOT
+renamable — the slug is the filesystem identity. Returns the refreshed view, or
+a blank view if the pid is unknown / not the caller's."""
 def update_project(pid: str, fields: dict) -> JmsProjectView {
     p = _find_project(pid);
     if p is None { return JmsProjectView(); }
     if "use_case" in fields { p.use_case = str(fields["use_case"]); }
     if "provider" in fields { p.provider = str(fields["provider"]); }
     if "model" in fields { p.model = str(fields["model"]); }
+    if "group_id" in fields { p.group_id = str(fields["group_id"]); }
     write_project_snapshot(p.pid);
     return _project_view(p);
 }
