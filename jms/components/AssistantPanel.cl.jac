@@ -83,7 +83,7 @@ def:pub AssistantPanel(pageContext: str = "") -> JsxElement {
         keyErr: str = "",
         loaded: bool = False;
 
-    async def refreshProviders -> None {
+    async def refreshProviders -> list {
         try {
             res = await assistant_providers();
             plist: list[dict] = [];
@@ -91,7 +91,8 @@ def:pub AssistantPanel(pageContext: str = "") -> JsxElement {
                 plist.append(p as dict);
             }
             providers = plist;
-        } except Exception { }
+            return plist;
+        } except Exception { return []; }
     }
 
     async def refreshHistory -> None {
@@ -106,14 +107,16 @@ def:pub AssistantPanel(pageContext: str = "") -> JsxElement {
             return;
         }
         loaded = True;
-        await refreshProviders();
+        # Pick from the RETURNED local list — the `providers` state set inside
+        # refreshProviders is not yet visible in this closure (useState is async).
+        plist: list = await refreshProviders();
 
         # Prefer local MLX when it actually has a model on disk; otherwise the
         # first provider that's already configured (key set / env fallback);
         # otherwise just the first provider so the picker isn't empty.
         pick = "";
         pickModel = "";
-        for p in providers {
+        for p in plist {
             if str(p["id"]) == "mlx" {
                 mdls = list(p["models"]);
                 if len(mdls) > 0 {
@@ -123,7 +126,7 @@ def:pub AssistantPanel(pageContext: str = "") -> JsxElement {
             }
         }
         if not pick {
-            for p in providers {
+            for p in plist {
                 if bool(p["configured"]) {
                     mdls = list(p["models"]);
                     pick = str(p["id"]);
@@ -132,8 +135,10 @@ def:pub AssistantPanel(pageContext: str = "") -> JsxElement {
                 }
             }
         }
-        if not pick and len(providers) > 0 {
-            pick = str(providers[0]["id"]);
+        if not pick and len(plist) > 0 {
+            pick = str(plist[0]["id"]);
+            m0 = list(plist[0]["models"]);
+            pickModel = str(m0[0]) if len(m0) > 0 else "";
         }
         provider = pick;
         modelId = pickModel;
