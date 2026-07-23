@@ -1,255 +1,119 @@
-/* theme.css - the ONE canonical design-token source for the entire Studio.
-   Every color, radius, font, and spacing token used by BOTH product surfaces
-   (Experiments in global.css, JMS in jms.css) is defined here, exactly once.
-   Neither global.css nor jms.css defines its own token VALUES anymore - they
-   only define component classes (.exp-btn, .jms-pill) that consume the
-   tokens declared below. This file must load before both.
+/* theme.css — the ONE canonical token source for the whole Studio.
+   Light-glass :root + dark-glass .dark override. Orange accent #EC8242.
+   Both product surfaces (Experiments .exp-*, JMS .jms-*) read these tokens;
+   --jms-*, --exp-*, and shadcn names below are thin aliases so existing component
+   classes need no edits. Loads before global.css + jms.css (main.jac order). */
 
-   :root = the default theme. Experiments always uses this. JMS's
-   "electric-minimal" theme is deliberately the same values, so the whole
-   Studio is one visual identity out of the box.
-
-   .jms-scope[data-jms-theme="..."] = JMS's 4 additional theme variants.
-   These override the bare canonical names (--accent, --card, --radius),
-   not a separate --jms- namespace, so any component rendered inside a
-   non-default JMS theme re-themes correctly. --jms- and --exp- names are
-   declared once in :root as plain aliases (--jms-accent: var(--accent)); CSS custom
-   properties resolve at use time against the live cascade, so a theme
-   block only has to override the bare name once and every alias follows
-   automatically. */
-
-/* ---- fonts: single source for all four families the Studio uses ---- */
-@import url('https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&display=swap');
+/* ---- fonts: display grotesque (heavy) + body (light) + mono ---- */
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&family=Inter:wght@100..900&display=swap');
 @import "@fontsource-variable/space-grotesk";
-@import "@fontsource-variable/archivo";
-@import "@fontsource-variable/instrument-sans";
-@import "@fontsource/instrument-serif";
 
 :root {
-  /* ---- canonical color tokens (shadcn-style names - Tailwind's
-     @theme inline in global.css binds utility classes to these) ---- */
-  --background: #050507;
-  --foreground: #f2f2f5;
-  --card: #0b0b10;
-  --card-foreground: #f2f2f5;
-  --popover: #0f0f14;
-  --popover-foreground: #f2f2f5;
-  --primary: #f2f2f5;
-  --primary-foreground: #050507;
-  --secondary: #14141a;
-  --secondary-foreground: #f2f2f5;
-  --muted: #101014;
-  --muted-foreground: #85859a;
-  --accent: #3355ff;
-  --accent-foreground: #ffffff;
-  --destructive: #d4d4d4;        /* monochrome default: errors are gray + typography, not red */
-  --destructive-strong: #ff4d5e; /* real red - reserved for genuinely urgent/destructive UI (billing alerts, confirm-delete) */
-  --ok: #34d399;
-  --border: #1a1a22;
-  --input: #2a2a35;
-  --ring: #3355ff;
-  --radius: 12px;
-  --glow: 0 0 60px -18px rgba(51, 85, 255, 0.55);
-  --accent-tint: rgba(51, 85, 255, 0.14);
-  --accent-ring: 0 0 0 3px rgba(51, 85, 255, 0.18);
+  /* ===== glass palette — LIGHT (default) ===== */
+  --bg: #faf9f7;
+  --bg-gradient:
+    radial-gradient(at 18% 0%,  rgba(255,196,150,0.55) 0%, transparent 50%),
+    radial-gradient(at 82% 22%, rgba(180,210,255,0.45) 0%, transparent 50%),
+    radial-gradient(at 50% 100%, rgba(255,170,120,0.40) 0%, transparent 55%);
+  --surface: rgba(255,255,255,0.60);
+  --surface-strong: rgba(255,255,255,0.85);
+  --text: #16130f;
+  --text-muted: #6b6459;
+  --border: rgba(255,255,255,0.55);
+  --border-alt: rgba(20,16,12,0.08);
+  --accent: #EC8242;
+  --accent-hover: #d96e2e;
+  --accent-soft: #f4a574;
+  --accent-tint: rgba(236,130,66,0.12);
+  --accent-ring: 0 0 0 3px rgba(236,130,66,0.28);
+  --ok: #3a9d6b;
+  --danger: #d24b3e;
+  --inner-hi: inset 0 1px 0 rgba(255,255,255,0.60);
 
-  /* ---- chart palette ---- */
-  --chart-1: #3355ff;
-  --chart-2: #59f3ff;
-  --chart-3: #f2f2f5;
-  --chart-4: #85859a;
-  --chart-5: #2a2a35;
-
-  /* ---- sidebar (shadcn convention, mirrors base) ---- */
-  --sidebar: #0b0b10;
-  --sidebar-foreground: #f2f2f5;
-  --sidebar-primary: #f2f2f5;
-  --sidebar-primary-foreground: #050507;
-  --sidebar-accent: #3355ff;
-  --sidebar-accent-foreground: #f2f2f5;
-  --sidebar-border: #1a1a22;
-  --sidebar-ring: #3355ff;
-
-  /* ---- fonts ---- */
-  --font-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  /* ===== shared (mode-independent) ===== */
+  --radius: 16px;
+  --blur: blur(20px) saturate(160%);
+  --shadow-soft: 0 8px 32px rgba(20,16,12,0.10);
+  --shadow-nav: 0 4px 16px rgba(20,16,12,0.08);
+  --font-display: 'Geist', 'Space Grotesk Variable', ui-sans-serif, sans-serif;
+  --font-body: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  --font-display: 'Space Grotesk Variable', ui-sans-serif, sans-serif;
-  --font-body: 'Instrument Sans Variable', ui-sans-serif, sans-serif;
+  --weight-thin: 200; --weight-light: 300; --weight-reg: 400;
+  --weight-bold: 700; --weight-black: 900;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 0.3s; --dur-base: 0.6s; --dur-slow: 0.9s;
+  --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px; --space-5:20px; --space-6:24px;
 
-  /* ---- spacing scale (new - neither surface had a real one before) ---- */
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 20px;
-  --space-6: 24px;
-
-  /* ---- per-workspace accents (Experiments nav tile dots + active bars) ---- */
-  --ws01: #3355ff;
-  --ws02: #9ec98f;
-  --ws03: #d8a657;
-  --ws04: #b89ce8;
-  --ws05: #6fc3b2;
-  --ws06: #e08a8a;
-  --ws-accent: #3355ff;
-
-  /* ---- --jms-* aliases - jms.css's existing .jms-btn/.jms-section/.jms-pill/
-     etc. rules reference these names UNCHANGED. Overriding the bare name in a
-     theme block below flows through automatically (see file header). ---- */
-  --jms-bg: var(--background);
-  --jms-bg-raised: var(--card);
-  --jms-fg: var(--foreground);
-  --jms-fg-dim: var(--muted-foreground);
-  --jms-accent: var(--accent);
-  --jms-accent-2: var(--chart-2);
-  --jms-accent-fg: var(--accent-foreground);
-  --jms-border: var(--border);
-  --jms-ok: var(--ok);
-  --jms-danger: var(--destructive-strong);
-  --jms-font-display: var(--font-display);
-  --jms-font-body: var(--font-body);
-  --jms-font-mono: var(--font-mono);
-  --jms-radius: var(--radius);
-  --jms-hover-shadow: var(--glow);
-  /* JMS-only presentation knobs - no Experiments equivalent, no alias needed */
-  --jms-border-w: 1px;
-  --jms-rule-style: solid;
-  --jms-display-weight: 600;
-  --jms-display-tracking: -0.045em;
-  --jms-display-transform: none;
-  --jms-display-glow: none;
-  --jms-card-shadow: none;
-
-  /* ---- --exp-* aliases - global.css's existing .exp-* component classes
-     reference these names UNCHANGED. ---- */
-  --exp-radius: var(--radius);
-  --exp-glow: var(--glow);
-  --exp-accent-tint: var(--accent-tint);
-  --exp-accent-ring: var(--accent-ring);
+  /* ===== aliases so existing classes keep working ===== */
+  --background: var(--bg); --foreground: var(--text);
+  --card: var(--surface); --card-foreground: var(--text);
+  --popover: var(--surface-strong); --popover-foreground: var(--text);
+  --primary: var(--accent); --primary-foreground: #ffffff;
+  --secondary: var(--surface); --secondary-foreground: var(--text);
+  --muted: var(--surface); --muted-foreground: var(--text-muted);
+  --accent-foreground: #ffffff;
+  --destructive: var(--text-muted); --destructive-strong: var(--danger);
+  --input: var(--border-alt); --ring: var(--accent);
+  --font-sans: var(--font-display);
+  --glow: var(--shadow-soft);
+  --chart-1: var(--accent); --chart-2: #6aa0e0; --chart-3: var(--text);
+  --chart-4: var(--text-muted); --chart-5: var(--accent-soft);
+  --sidebar: var(--surface); --sidebar-foreground: var(--text);
+  --sidebar-primary: var(--accent); --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: var(--accent); --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: var(--border-alt); --sidebar-ring: var(--accent);
+  --ws01: var(--accent); --ws02: #6aa0e0; --ws03: #d8a657;
+  --ws04: #b89ce8; --ws05: #6fc3b2; --ws06: #e08a8a; --ws-accent: var(--accent);
+  /* --jms-* aliases (jms.css classes reference these unchanged) */
+  --jms-bg: var(--bg); --jms-bg-raised: var(--surface); --jms-fg: var(--text);
+  --jms-fg-dim: var(--text-muted); --jms-accent: var(--accent); --jms-accent-2: var(--chart-2);
+  --jms-accent-fg: #ffffff; --jms-border: var(--border-alt); --jms-ok: var(--ok);
+  --jms-danger: var(--danger); --jms-font-display: var(--font-display);
+  --jms-font-body: var(--font-body); --jms-font-mono: var(--font-mono);
+  --jms-radius: var(--radius); --jms-hover-shadow: var(--shadow-soft);
+  --jms-border-w: 1px; --jms-rule-style: solid; --jms-display-weight: var(--weight-black);
+  --jms-display-tracking: -0.03em; --jms-display-transform: none; --jms-display-glow: none;
+  --jms-card-shadow: var(--inner-hi);
+  /* --exp-* aliases */
+  --exp-radius: var(--radius); --exp-glow: var(--shadow-soft);
+  --exp-accent-tint: var(--accent-tint); --exp-accent-ring: var(--accent-ring);
 }
 
-[data-ws="01"] { --ws-accent: var(--ws01); }
-[data-ws="02"] { --ws-accent: var(--ws02); }
-[data-ws="03"] { --ws-accent: var(--ws03); }
-[data-ws="04"] { --ws-accent: var(--ws04); }
-[data-ws="05"] { --ws-accent: var(--ws05); }
-[data-ws="06"] { --ws-accent: var(--ws06); }
+.dark {
+  /* ===== glass palette — DARK (derived) ===== */
+  --bg: #0c0a08;
+  --bg-gradient:
+    radial-gradient(at 18% 0%,  rgba(236,130,66,0.20) 0%, transparent 55%),
+    radial-gradient(at 82% 22%, rgba(90,120,180,0.18) 0%, transparent 55%),
+    radial-gradient(at 50% 100%, rgba(236,130,66,0.14) 0%, transparent 60%);
+  --surface: rgba(255,255,255,0.05);
+  --surface-strong: rgba(255,255,255,0.09);
+  --text: #f5f2ec;
+  --text-muted: #9a9082;
+  --border: rgba(255,255,255,0.08);
+  --border-alt: rgba(255,255,255,0.06);
+  --accent: #f4914e;
+  --accent-hover: #ffa361;
+  --accent-soft: #b86a38;
+  --accent-tint: rgba(244,145,78,0.16);
+  --accent-ring: 0 0 0 3px rgba(244,145,78,0.30);
+  --ok: #4fb583;
+  --danger: #e5675a;
+  --inner-hi: inset 0 1px 0 rgba(255,255,255,0.08);
+  --shadow-soft: 0 8px 32px rgba(0,0,0,0.45);
+  --shadow-nav: 0 4px 16px rgba(0,0,0,0.40);
+  --primary-foreground: #0c0a08;
+  --jms-accent-fg: #0c0a08; --accent-foreground: #0c0a08;
+}
 
-/* JMS scope carries no color overrides by default (electric-minimal ==
-   :root) - this rule only supplies the presentation properties every JMS
-   surface needs regardless of theme. */
+/* mobile: cheaper blur (DESIGN.md §8) */
+@media (max-width: 768px) { :root { --blur: blur(8px) saturate(150%); } }
+
+/* JMS scope base — no per-theme overrides anymore; inherits :root/.dark */
 .jms-scope {
   position: relative;
-  color: var(--jms-fg);
-  background-color: var(--jms-bg);
-  font-family: var(--jms-font-body);
+  color: var(--text);
+  font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
   transition: background-color 220ms ease, color 220ms ease;
-}
-
-.jms-scope[data-jms-theme="electric-minimal"] {
-  /* identical to :root - declared so the block provably ships in the bundle */
-}
-
-.jms-scope[data-jms-theme="warm-industrial"] {
-  --background: #111008;
-  --card: #18150b;
-  --foreground: #e8e0d0;
-  --muted-foreground: #9a8e6f;
-  --accent: #ffb000;
-  --chart-2: #e86c3a;
-  --accent-foreground: #111008;
-  --border: #3a3220;
-  --ok: #a3c94a;
-  --destructive-strong: #e5533d;
-  --font-display: 'Archivo Variable', ui-sans-serif, sans-serif;
-  --font-body: 'Archivo Variable', ui-sans-serif, sans-serif;
-  --radius: 3px;
-  --glow: 6px 6px 0 rgba(255, 176, 0, 0.22);
-  --jms-border-w: 2px;
-  --jms-display-weight: 850;
-  --jms-display-tracking: -0.015em;
-  --jms-display-transform: uppercase;
-}
-
-.jms-scope[data-jms-theme="bright-lab"] {
-  --background: #f7f7f4;
-  --card: #ffffff;
-  --card-foreground: #16181d;
-  --popover: #ffffff;
-  --popover-foreground: #16181d;
-  --foreground: #16181d;
-  --muted-foreground: #5c6270;
-  --accent: #6620e0;
-  --chart-2: #00a37a;
-  --accent-foreground: #ffffff;
-  --border: #e4e4dc;
-  --ok: #00a37a;
-  --destructive-strong: #d92d20;
-  --font-display: 'Instrument Sans Variable', ui-sans-serif, sans-serif;
-  --font-body: 'Instrument Sans Variable', ui-sans-serif, sans-serif;
-  --radius: 16px;
-  --glow: 0 2px 4px rgba(22, 24, 29, 0.06), 0 16px 44px rgba(102, 32, 224, 0.16);
-  --jms-display-weight: 650;
-  --jms-display-tracking: -0.035em;
-  --jms-card-shadow: 0 1px 2px rgba(22, 24, 29, 0.05), 0 10px 30px rgba(22, 24, 29, 0.06);
-}
-
-.jms-scope[data-jms-theme="phosphor"] {
-  --background: #0a0f0a;
-  --card: #0d150d;
-  --foreground: #d8ffd8;
-  --muted-foreground: #5f8f66;
-  --accent: #33ff66;
-  --chart-2: #7dffa8;
-  --accent-foreground: #06140a;
-  --border: #1d331f;
-  --ok: #33ff66;
-  --destructive-strong: #ff6b4a;
-  --font-display: var(--jms-font-mono);
-  --font-body: var(--jms-font-mono);
-  --radius: 2px;
-  --glow: 0 0 28px rgba(51, 255, 102, 0.22);
-  --jms-display-weight: 700;
-  --jms-display-tracking: -0.02em;
-  --jms-display-glow: 0 0 16px rgba(51, 255, 102, 0.38), 0 0 2px rgba(51, 255, 102, 0.55);
-}
-/* CRT scanline film - very low opacity, non-interactive */
-.jms-scope[data-jms-theme="phosphor"]::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 30;
-  pointer-events: none;
-  background: repeating-linear-gradient(
-    0deg,
-    rgba(0, 0, 0, 0.16) 0px,
-    rgba(0, 0, 0, 0.16) 1px,
-    transparent 1px,
-    transparent 3px
-  );
-}
-
-.jms-scope[data-jms-theme="print-shop"] {
-  --background: #f4f0e6;
-  --card: #fbf8f0;
-  --card-foreground: #1a1613;
-  --popover: #fbf8f0;
-  --popover-foreground: #1a1613;
-  --foreground: #1a1613;
-  --muted-foreground: #6e6558;
-  --accent: #e03e1f;
-  --chart-2: #2a52a3;
-  --accent-foreground: #fbf8f0;
-  --border: #cfc5ae;
-  --ok: #3a7d44;
-  --destructive-strong: #b3261e;
-  --font-display: 'Instrument Serif', Georgia, serif;
-  --font-body: 'Geist Mono', ui-monospace, monospace;
-  --radius: 2px;
-  --glow: 4px 4px 0 rgba(224, 62, 31, 0.35);
-  --jms-rule-style: dashed;
-  --jms-display-weight: 400;
-  --jms-display-tracking: -0.01em;
-  --jms-card-shadow: 3px 3px 0 rgba(26, 22, 19, 0.10);
 }
