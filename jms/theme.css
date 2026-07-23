@@ -5,16 +5,16 @@
    classes need no edits. Loads before global.css + jms.css (main.jac order). */
 
 /* ---- fonts: display grotesque (heavy) + body (light) + mono ---- */
-@import url('https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&family=Inter:wght@100..900&display=swap');
-@import "@fontsource-variable/space-grotesk";
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&family=Space+Grotesk:wght@300..700&family=Inter:wght@100..900&display=swap');
 
 :root {
   /* ===== glass palette — LIGHT (default) ===== */
   --bg: #faf9f7;
+  /* all-warm mesh (no blue) — orange/peach/amber only */
   --bg-gradient:
     radial-gradient(at 18% 0%,  rgba(255,196,150,0.55) 0%, transparent 50%),
-    radial-gradient(at 82% 22%, rgba(180,210,255,0.45) 0%, transparent 50%),
-    radial-gradient(at 50% 100%, rgba(255,170,120,0.40) 0%, transparent 55%);
+    radial-gradient(at 82% 22%, rgba(255,178,120,0.42) 0%, transparent 52%),
+    radial-gradient(at 50% 100%, rgba(255,158,100,0.40) 0%, transparent 55%);
   --surface: rgba(255,255,255,0.60);
   --surface-strong: rgba(255,255,255,0.85);
   --bar: rgba(255,255,255,0.80);
@@ -86,9 +86,10 @@
 .dark {
   /* ===== glass palette — DARK (derived) ===== */
   --bg: #0c0a08;
+  /* all-warm mesh (no blue) — orange/amber only */
   --bg-gradient:
-    radial-gradient(at 18% 0%,  rgba(236,130,66,0.20) 0%, transparent 55%),
-    radial-gradient(at 82% 22%, rgba(90,120,180,0.18) 0%, transparent 55%),
+    radial-gradient(at 18% 0%,  rgba(236,130,66,0.22) 0%, transparent 55%),
+    radial-gradient(at 82% 22%, rgba(200,110,55,0.16) 0%, transparent 55%),
     radial-gradient(at 50% 100%, rgba(236,130,66,0.14) 0%, transparent 60%);
   --surface: rgba(255,255,255,0.05);
   --surface-strong: rgba(255,255,255,0.09);
