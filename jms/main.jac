@@ -85,7 +85,7 @@ import from jms_llm {
 # mirrors jms_llm's Anthropic pattern) + a unified provider listing
 # (mlx/claude/openai) for the assistant's model picker.
 import from assistant {
-    assistant_providers, set_openai_key, clear_openai_key
+    assistant_providers, set_openai_key, clear_openai_key, assistant_context
 }
 # JMS GENERATE stage, PLAN step: LLM-authored dataset plans (claude via byllm /
 # mlx via the resident model), edit + approve. Consumed by GenerateStage.
