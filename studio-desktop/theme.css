@@ -58,6 +58,8 @@
   --glow: var(--shadow-soft);
   --chart-1: var(--accent); --chart-2: #6aa0e0; --chart-3: var(--text);
   --chart-4: var(--text-muted); --chart-5: var(--accent-soft);
+  --chart-6: #6fc3b2;
+  --label: var(--text-muted);
   --sidebar: var(--surface); --sidebar-foreground: var(--text);
   --sidebar-primary: var(--accent); --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: var(--accent); --sidebar-accent-foreground: #ffffff;
