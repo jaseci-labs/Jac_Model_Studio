@@ -107,40 +107,86 @@ def:pub Inline(text: str) -> JsxElement {
     </span>;
 }
 
-"""Block-level markdown → JSX: headings (#/##/###), bullet lists (- / *),
-blank-line-separated paragraphs. Wrapped lines in a paragraph are joined."""
+"""A GFM table separator row: only |, -, :, spaces, and at least one dash
+(e.g. |---|:--:|). Distinguishes a real table from a line that just has pipes."""
+def _isTableSep(line: str) -> bool {
+    t = line.strip();
+    if "|" not in t or "-" not in t { return False; }
+    for c in t {
+        if c != "|" and c != "-" and c != ":" and c != " " { return False; }
+    }
+    return True;
+}
+
+"""Split a table row into trimmed cells, dropping the empty cells the outer
+leading/trailing pipes produce."""
+def _cells(line: str) -> list {
+    parts = line.split("|");
+    out: list = [];
+    for pp in parts { out.append(pp.strip()); }
+    if len(out) > 0 and out[0] == "" { out = out[1:]; }
+    if len(out) > 0 and out[len(out) - 1] == "" { out = out[:len(out) - 1]; }
+    return out;
+}
+
+"""Block-level markdown → JSX: headings (#/##/###), bullet lists (- / *), GFM
+tables (| a | b | + a |---| separator row), blank-line-separated paragraphs.
+Wrapped lines in a paragraph are joined. Index-based so a table can look ahead."""
 def:pub MarkdownText(text: str) -> JsxElement {
     nl = String.fromCharCode(10);
     lines = str(text).split(nl);
     blocks: list = [];
     para: str = "";
     items: list = [];
-    for raw in lines {
+    i = 0;
+    n = len(lines);
+    while i < n {
+        raw = lines[i];
         stripped = raw.strip();
+        # table: this line has a pipe and the NEXT line is a separator row.
+        isTable = ("|" in stripped) and (i + 1 < n) and _isTableSep(lines[i + 1]);
+        if isTable {
+            if para { blocks.append({"kind": "p", "text": para, "items": [], "rows": []}); para = ""; }
+            if len(items) > 0 { blocks.append({"kind": "ul", "text": "", "items": list(items), "rows": []}); items = []; }
+            head = _cells(stripped);
+            rows: list = [];
+            j = i + 2;
+            while j < n and ("|" in lines[j]) and lines[j].strip() {
+                rows.append(_cells(lines[j]));
+                j += 1;
+            }
+            blocks.append({"kind": "table", "text": "", "items": list(head), "rows": rows});
+            i = j;
+            continue;
+        }
         isBullet = stripped[:2] == "- " or stripped[:2] == "* ";
         h = 0;
         if stripped[:4] == "### " { h = 3; }
         elif stripped[:3] == "## " { h = 2; }
         elif stripped[:2] == "# " { h = 1; }
         if isBullet {
-            if para { blocks.append({"kind": "p", "text": para, "items": []}); para = ""; }
+            if para { blocks.append({"kind": "p", "text": para, "items": [], "rows": []}); para = ""; }
             items.append(stripped[2:]);
+            i += 1;
             continue;
         }
-        if len(items) > 0 { blocks.append({"kind": "ul", "text": "", "items": list(items)}); items = []; }
+        if len(items) > 0 { blocks.append({"kind": "ul", "text": "", "items": list(items), "rows": []}); items = []; }
         if h > 0 {
-            if para { blocks.append({"kind": "p", "text": para, "items": []}); para = ""; }
-            blocks.append({"kind": "h" + str(h), "text": stripped[h + 1:], "items": []});
+            if para { blocks.append({"kind": "p", "text": para, "items": [], "rows": []}); para = ""; }
+            blocks.append({"kind": "h" + str(h), "text": stripped[h + 1:], "items": [], "rows": []});
+            i += 1;
             continue;
         }
         if stripped == "" {
-            if para { blocks.append({"kind": "p", "text": para, "items": []}); para = ""; }
+            if para { blocks.append({"kind": "p", "text": para, "items": [], "rows": []}); para = ""; }
+            i += 1;
             continue;
         }
         para = (para + " " + stripped) if para else stripped;
+        i += 1;
     }
-    if para { blocks.append({"kind": "p", "text": para, "items": []}); }
-    if len(items) > 0 { blocks.append({"kind": "ul", "text": "", "items": list(items)}); }
+    if para { blocks.append({"kind": "p", "text": para, "items": [], "rows": []}); }
+    if len(items) > 0 { blocks.append({"kind": "ul", "text": "", "items": list(items), "rows": []}); }
 
     return <div className="text-sm leading-relaxed text-foreground">
         {for (bi, b) in enumerate(blocks) {
@@ -155,6 +201,29 @@ def:pub MarkdownText(text: str) -> JsxElement {
                             <li key={str(li)}><Inline text={str(it)} /></li>
                         }}
                     </ul>
+                    skip;
+                }}
+                {if b["kind"] == "table" {
+                    <div className="my-2 overflow-x-auto">
+                        <table className="w-full border-collapse text-xs">
+                            <thead>
+                                <tr>
+                                    {for (hi, hc) in enumerate(list(b["items"])) {
+                                        <th key={str(hi)} className="border border-border px-2 py-1 text-left font-semibold"><Inline text={str(hc)} /></th>
+                                    }}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {for (ri, row) in enumerate(list(b["rows"])) {
+                                    <tr key={str(ri)}>
+                                        {for (ci, cell) in enumerate(list(row)) {
+                                            <td key={str(ci)} className="border border-border px-2 py-1"><Inline text={str(cell)} /></td>
+                                        }}
+                                    </tr>
+                                }}
+                            </tbody>
+                        </table>
+                    </div>
                     skip;
                 }}
                 {if b["kind"] == "p" {
