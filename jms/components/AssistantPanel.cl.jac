@@ -41,6 +41,9 @@ sv import from ..jms_llm { set_anthropic_key }
 sv import from ..persistence {
     list_chats, create_chat, get_messages, add_message, delete_chat
 }
+sv import from ..train { start_training }
+sv import from ..evals { create_eval }
+sv import from ..workspace { update_workspace, ui_layout }
 import from ..auth_session { bearerHeaders, handleUnauthorized }
 import from .chat.Thread { Thread }
 import from .chat.Composer { Composer }
@@ -66,6 +69,84 @@ def _providerInfo(providers: list[dict], pid: str) -> dict | None {
     return None;
 }
 
+"""Locate the action JSON object regardless of how the model wrapped it — the
+canonical <<DO>>{...}<</DO>>, a ```DO``` code fence, or a bare {...}. We anchor on
+the '"action"' key, walk back to its enclosing '{', then brace-match forward to the
+close. Returns (start, endExclusive) or (-1, -1). Weak local models drift on the
+exact marker but keep the JSON intact, so anchoring on the JSON is far more robust
+than requiring literal markers."""
+def _actionSpan(s: str) -> list {
+    key = s.find("\"action\"");
+    if key < 0 { return [-1, -1]; }
+    start = s[:key].rfind("{");
+    if start < 0 { return [-1, -1]; }
+    depth = 0;
+    i = start;
+    while i < len(s) {
+        c = s[i];
+        if c == "{" { depth += 1; }
+        elif c == "}" {
+            depth -= 1;
+            if depth == 0 { return [start, i + 1]; }
+        }
+        i += 1;
+    }
+    return [-1, -1];
+}
+
+"""Extract the assistant's action block into a dict (empty if absent/malformed)."""
+def _parseAction(text: str) -> dict {
+    s = str(text);
+    span = _actionSpan(s);
+    if span[0] < 0 { return {}; }
+    try {
+        d = JSON.parse(s[span[0]:span[1]]) as dict;
+        if "action" in d { return d; }
+    } except Exception { }
+    return {};
+}
+
+"""The reply with the action block (and any ``` fence / <<DO>> marker wrapping it)
+removed, so the chat bubble never shows raw JSON. The block is always last, so we
+cut from the earliest wrapper-or-'{' to the end and tidy trailing fence chars."""
+def _stripAction(text: str) -> str {
+    s = str(text);
+    span = _actionSpan(s);
+    if span[0] < 0 { return s; }
+    cut = span[0];
+    for mark in ["<<DO>>", "```DO```", "```DO", "```json", "```"] {
+        p = s.find(mark);
+        if p >= 0 and p < cut { cut = p; }
+    }
+    head = s[:cut];
+    # drop a trailing lone ``` / backticks / whitespace left above the block
+    return head.rstrip().rstrip("`").rstrip();
+}
+
+"""Human label for an action, for the confirm card / nav breadcrumb."""
+def _actionLabel(a: dict) -> str {
+    act = str(a["action"]) if "action" in a else "";
+    if act == "navigate" {
+        parts: list = [];
+        if "surface" in a and a["surface"] { parts.append(str(a["surface"])); }
+        if "workspace" in a and a["workspace"] { parts.append(str(a["workspace"])); }
+        if "stage" in a and a["stage"] { parts.append(str(a["stage"])); }
+        return "Go to " + " · ".join(parts);
+    }
+    if act == "start_training" {
+        md = str(a["mode"]).upper() if "mode" in a else "";
+        nm = str(a["name"]) if "name" in a else "";
+        return "Start " + md + " training: " + nm;
+    }
+    if act == "create_eval" {
+        return "Create eval: " + (str(a["kind"]) if "kind" in a else "");
+    }
+    if act == "set_setting" {
+        return "Update workspace " + (str(a["wid"]) if "wid" in a else "") + " settings";
+    }
+    return act;
+}
+
 def:pub AssistantPanel(pageContext: str = "") -> JsxElement {
     has widgetOpen: bool = False,
         providers: list[dict] = [],
@@ -81,6 +162,8 @@ def:pub AssistantPanel(pageContext: str = "") -> JsxElement {
         keyInput: str = "",
         keyBusy: bool = False,
         keyErr: str = "",
+        pendingAction: dict = {},
+        actionNote: str = "",
         loaded: bool = False;
 
     async def refreshProviders -> list {
@@ -259,6 +342,112 @@ def:pub AssistantPanel(pageContext: str = "") -> JsxElement {
         }
     }
 
+    """Auto-run a navigate action. Cross-surface via location.hash + a synthetic
+    popstate (frontend.cl.jac listens); experiments workspace/stage via the
+    window.__jmsNav bridge AppShell republishes each render, on a short delay so a
+    fresh AppShell (when we just switched onto the experiments surface) has mounted
+    and registered the bridge before we call it. Closes the drawer so the user sees
+    where they landed."""
+    async def runNavigate(a: dict) -> None {
+        w: any = window;
+        ws = str(a["workspace"]) if "workspace" in a else "";
+        stage = str(a["stage"]) if "stage" in a else "";
+        # Normalize the surface: weak models echo the whole enum ("experiments|
+        # jms|hub") or add prose. Ignore piped/garbled values and match by
+        # substring; a workspace/stage with no clean surface implies Experiments.
+        sraw = str(a["surface"]) if "surface" in a else "";
+        surface = "";
+        if "|" not in sraw {
+            sl = sraw.lower();
+            if "experiment" in sl { surface = "experiments"; }
+            elif "jms" in sl { surface = "jms"; }
+            elif "hub" in sl { surface = "hub"; }
+        }
+        if (not surface) and (ws or stage) { surface = "experiments"; }
+        target = surface if (surface == "experiments" or surface == "jms") else "";
+        if surface {
+            # Setting the hash fires a native hashchange; frontend.cl.jac listens
+            # for it and swaps the surface. No synthetic event needed.
+            try { w.location.hash = target; } except Exception { }
+        }
+        if surface == "experiments" {
+            if ws or stage {
+                # Poll for the __jmsNav bridge: a freshly-mounted AppShell (when we
+                # just switched surfaces) only publishes it after its probe+layout
+                # finish (~a few seconds), so a fixed delay would miss it. Give up
+                # after ~9s so a broken bridge can't leak an interval.
+                tries: any = {"n": 0};
+                iv: any = None;
+                iv = setInterval(lambda -> None {
+                    tries["n"] = int(tries["n"]) + 1;
+                    nav: any = w.__jmsNav;
+                    if nav {
+                        if ws { nav.goWorkspace(ws); }
+                        if stage { nav.go(stage); }
+                        clearInterval(float(str(iv)));
+                    } elif int(tries["n"]) > 60 {
+                        clearInterval(float(str(iv)));
+                    }
+                }, 150);
+            }
+        }
+        actionNote = "↪ " + _actionLabel(a);
+        widgetOpen = False;
+    }
+
+    """Execute a confirm-gated action (training / eval / settings) on the user's
+    Confirm click. Reuses the existing server endpoints; set_setting reads the
+    current workspace first and merges so unspecified fields aren't clobbered."""
+    async def runConfirmed -> None {
+        a: dict = pendingAction;
+        if "action" not in a { return; }
+        act = str(a["action"]) if "action" in a else "";
+        actionNote = "running…";
+        try {
+            if act == "start_training" {
+                nm = str(a["name"]) if ("name" in a and a["name"]) else "assistant-run";
+                md = str(a["mode"]) if "mode" in a else "sft";
+                mid = str(a["model_id"]) if ("model_id" in a and a["model_id"]) else modelId;
+                await start_training(nm, md, mid, {}, "");
+                actionNote = "✓ started " + md.upper() + " training '" + nm + "'";
+            } elif act == "create_eval" {
+                kd = str(a["kind"]) if "kind" in a else "";
+                mid = str(a["model_id"]) if ("model_id" in a and a["model_id"]) else "";
+                hd = str(a["holdout"]) if ("holdout" in a and a["holdout"]) else "function";
+                lm = int(a["limit"]) if ("limit" in a and a["limit"]) else 0;
+                r: any = await create_eval(kd, mid, "", "", hd, lm, 0.0);
+                actionNote = ("✓ eval '" + kd + "' created") if r else "✗ eval rejected (bad kind/model)";
+            } elif act == "set_setting" {
+                wid = str(a["wid"]) if "wid" in a else "";
+                ly: any = await ui_layout();
+                cur: dict | None = None;
+                for wsx in list(ly["workspaces"]) {
+                    if str((wsx as dict)["id"]) == wid { cur = wsx as dict; }
+                }
+                if cur is None {
+                    actionNote = "✗ no workspace " + wid;
+                    pendingAction = {};
+                    return;
+                }
+                nl2 = str(a["label"]) if ("label" in a and a["label"]) else str(cur["label"]);
+                nac = str(a["accent"]) if ("accent" in a and a["accent"]) else str(cur["accent"]);
+                ndm = str(a["default_model"]) if ("default_model" in a and a["default_model"]) else str(cur["default_model"]);
+                await update_workspace(wid, nl2, nac, ndm, list(cur["files"]));
+                actionNote = "✓ updated workspace " + wid;
+            } else {
+                actionNote = "✗ unknown action";
+            }
+        } except Exception as e {
+            actionNote = "✗ failed: " + str(e);
+        }
+        pendingAction = {};
+    }
+
+    def cancelAction -> None {
+        pendingAction = {};
+        actionNote = "cancelled";
+    }
+
     async def send(text: str) -> None {
         prompt = text.strip();
         info = _providerInfo(providers, provider);
@@ -268,6 +457,8 @@ def:pub AssistantPanel(pageContext: str = "") -> JsxElement {
         }
         draft = "";
         streaming = True;
+        pendingAction = {};
+        actionNote = "";
 
         cid = chatId;
         try {
@@ -416,18 +607,31 @@ def:pub AssistantPanel(pageContext: str = "") -> JsxElement {
         # Unconditional finalize covers a normal "done" frame, a mid-stream error
         # (errtext set), and an early stop via reader.cancel() (neither done nor
         # error frame arrives) — this is what always clears the streaming flag.
+        # Pull out any ⟦DO⟧ action block; store/display only the stripped prose.
+        act2: dict = _parseAction(acc);
+        disp: str = _stripAction(acc);
         work[ai] = {
-            "role": "assistant", "content": acc, "stats": None,
+            "role": "assistant", "content": disp, "stats": None,
             "modelId": modelId, "pairGroup": "", "streaming": False, "error": errtext
         };
         messages = list(work);
         streaming = False;
 
-        if acc {
+        if disp {
             try {
-                await add_message(cid, "assistant", acc, modelId, "", "");
+                await add_message(cid, "assistant", disp, modelId, "", "");
                 await refreshHistory();
             } except Exception { }
+        }
+        # Dispatch the action: navigate runs immediately (reversible), everything
+        # else waits behind a Confirm click (compute + heavy-job lock).
+        if act2 {
+            if str(act2["action"]) == "navigate" {
+                await runNavigate(act2);
+            } else {
+                pendingAction = act2;
+                actionNote = "";
+            }
         }
     }
 
@@ -555,6 +759,31 @@ def:pub AssistantPanel(pageContext: str = "") -> JsxElement {
 
                     {if not historyOpen and not needsKey {
                         <Thread messages={messages} labels={{}} onSave={None} />
+                        skip;
+                    }}
+                    {if not historyOpen and not needsKey and "action" in pendingAction {
+                        <div className="border-t border-border px-4 py-3">
+                            <p className="stat-line mb-2">⚑ {_actionLabel(pendingAction)}</p>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={lambda e: MouseEvent { runConfirmed(); }}
+                                    className="exp-btn exp-btn-accent"
+                                >CONFIRM & RUN</button>
+                                <button
+                                    onClick={lambda e: MouseEvent { cancelAction(); }}
+                                    className="exp-btn"
+                                >CANCEL</button>
+                            </div>
+                        </div>
+                        skip;
+                    }}
+                    {if not historyOpen and not needsKey and actionNote and "action" not in pendingAction {
+                        <div className="border-t border-border px-4 py-2">
+                            <span className="stat-line">{actionNote}</span>
+                        </div>
+                        skip;
+                    }}
+                    {if not historyOpen and not needsKey {
                         <Composer
                             value={draft} busy={streaming} categories={[]}
                             onSet={updateDraft}

@@ -31,6 +31,141 @@ def _codeParts(content: str) -> list[dict] {
     return out;
 }
 
+# --- lightweight markdown (ponytail: common md only — headings, bold, inline +
+# fenced code (fences handled upstream by _codeParts), bullet lists, links.
+# No tables / nested lists / italics / images; swap in react-markdown if richer
+# docs ever need it). Built as JSX, never dangerouslySetInnerHTML → no XSS. ---
+
+"""Split one line of prose into inline segments: plain / `code` / **bold** /
+[text](url). Longest-prefix scan on the nearest marker; unterminated markers fall
+back to plain text so partial (streaming) markdown never throws."""
+def _inlineSegs(s: str) -> list {
+    out: list = [];
+    rest = str(s);
+    while rest {
+        ic = rest.find("`");
+        ib = rest.find("**");
+        il = rest.find("[");
+        cand: list = [];
+        if ic >= 0 { cand.append(ic); }
+        if ib >= 0 { cand.append(ib); }
+        if il >= 0 { cand.append(il); }
+        if len(cand) == 0 { out.append({"t": "text", "v": rest, "u": ""}); break; }
+        m = min(cand);
+        if m > 0 { out.append({"t": "text", "v": rest[:m], "u": ""}); rest = rest[m:]; continue; }
+        if rest[:1] == "`" {
+            e = rest.find("`", 1);
+            if e < 0 { out.append({"t": "text", "v": rest, "u": ""}); break; }
+            out.append({"t": "code", "v": rest[1:e], "u": ""}); rest = rest[e + 1:];
+        } elif rest[:2] == "**" {
+            e = rest.find("**", 2);
+            if e < 0 { out.append({"t": "text", "v": rest, "u": ""}); break; }
+            out.append({"t": "bold", "v": rest[2:e], "u": ""}); rest = rest[e + 2:];
+        } elif rest[:1] == "[" {
+            rb = rest.find("]");
+            ok = rb >= 0 and rb + 1 < len(rest) and rest[rb + 1:rb + 2] == "(";
+            if not ok { out.append({"t": "text", "v": rest[:1], "u": ""}); rest = rest[1:]; continue; }
+            rp = rest.find(")", rb);
+            if rp < 0 { out.append({"t": "text", "v": rest[:1], "u": ""}); rest = rest[1:]; continue; }
+            out.append({"t": "link", "v": rest[1:rb], "u": rest[rb + 2:rp]}); rest = rest[rp + 1:];
+        } else {
+            out.append({"t": "text", "v": rest[:1], "u": ""}); rest = rest[1:];
+        }
+    }
+    return out;
+}
+
+def _hcls(level: int) -> str {
+    if level == 1 { return "mt-2 mb-1 text-base font-semibold text-foreground"; }
+    if level == 2 { return "mt-2 mb-1 text-sm font-semibold text-foreground"; }
+    return "mt-1.5 mb-0.5 text-sm font-medium text-foreground";
+}
+
+"""Render one prose line's inline markdown."""
+def:pub Inline(text: str) -> JsxElement {
+    return <span>
+        {for (si, sg) in enumerate(_inlineSegs(text)) {
+            <span key={str(si)}>
+                {if sg["t"] == "code" {
+                    <code className="rounded bg-popover px-1 py-0.5 font-mono text-[0.85em]">{str(sg["v"])}</code>
+                    skip;
+                }}
+                {if sg["t"] == "bold" {
+                    <strong className="font-semibold">{str(sg["v"])}</strong>
+                    skip;
+                }}
+                {if sg["t"] == "link" {
+                    <a href={str(sg["u"])} target="_blank" rel="noreferrer" className="text-accent underline">{str(sg["v"])}</a>
+                    skip;
+                }}
+                {if sg["t"] == "text" {
+                    <span className="whitespace-pre-wrap">{str(sg["v"])}</span>
+                    skip;
+                }}
+            </span>
+        }}
+    </span>;
+}
+
+"""Block-level markdown → JSX: headings (#/##/###), bullet lists (- / *),
+blank-line-separated paragraphs. Wrapped lines in a paragraph are joined."""
+def:pub MarkdownText(text: str) -> JsxElement {
+    nl = String.fromCharCode(10);
+    lines = str(text).split(nl);
+    blocks: list = [];
+    para: str = "";
+    items: list = [];
+    for raw in lines {
+        stripped = raw.strip();
+        isBullet = stripped[:2] == "- " or stripped[:2] == "* ";
+        h = 0;
+        if stripped[:4] == "### " { h = 3; }
+        elif stripped[:3] == "## " { h = 2; }
+        elif stripped[:2] == "# " { h = 1; }
+        if isBullet {
+            if para { blocks.append({"kind": "p", "text": para, "items": []}); para = ""; }
+            items.append(stripped[2:]);
+            continue;
+        }
+        if len(items) > 0 { blocks.append({"kind": "ul", "text": "", "items": list(items)}); items = []; }
+        if h > 0 {
+            if para { blocks.append({"kind": "p", "text": para, "items": []}); para = ""; }
+            blocks.append({"kind": "h" + str(h), "text": stripped[h + 1:], "items": []});
+            continue;
+        }
+        if stripped == "" {
+            if para { blocks.append({"kind": "p", "text": para, "items": []}); para = ""; }
+            continue;
+        }
+        para = (para + " " + stripped) if para else stripped;
+    }
+    if para { blocks.append({"kind": "p", "text": para, "items": []}); }
+    if len(items) > 0 { blocks.append({"kind": "ul", "text": "", "items": list(items)}); }
+
+    return <div className="text-sm leading-relaxed text-foreground">
+        {for (bi, b) in enumerate(blocks) {
+            <div key={str(bi)}>
+                {if str(b["kind"])[:1] == "h" {
+                    <div className={_hcls(int(str(b["kind"])[1:]))}><Inline text={str(b["text"])} /></div>
+                    skip;
+                }}
+                {if b["kind"] == "ul" {
+                    <ul className="my-1 ml-4 list-disc space-y-0.5">
+                        {for (li, it) in enumerate(list(b["items"])) {
+                            <li key={str(li)}><Inline text={str(it)} /></li>
+                        }}
+                    </ul>
+                    skip;
+                }}
+                {if b["kind"] == "p" {
+                    <p className="my-1"><Inline text={str(b["text"])} /></p>
+                    skip;
+                }}
+            </div>
+        }}
+    </div>;
+}
+
 # Group consecutive paired assistant messages so the thread can render them 2-up.
 # Each row carries the most recent user prompt ("user") so a saved example can pair
 # the assistant reply with the prompt that produced it.
@@ -102,7 +237,7 @@ def:pub Bubble(msg: dict, label: str, paired: bool, userText: str, onSave: any) 
                     skip;
                 }}
                 {if part["kind"] == "text" {
-                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">{str(part["text"])}</p>
+                    <MarkdownText text={str(part["text"])} />
                     skip;
                 }}
             </div>

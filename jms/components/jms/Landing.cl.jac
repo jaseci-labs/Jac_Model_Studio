@@ -9,6 +9,7 @@ mode is inherited from `:root`/`.dark` via the `<ThemeSwitcher/>` — no
 per-jms-theme lock."""
 
 import from ..ThemeSwitcher { ThemeSwitcher }
+import from ..AssistantPanel { AssistantPanel }
 
 def:pub Landing(onPick: any = None) -> JsxElement {
     return <div className="jms-scope relative flex h-screen w-screen flex-col overflow-hidden">
@@ -54,5 +55,7 @@ def:pub Landing(onPick: any = None) -> JsxElement {
         <div className="jms-footer reveal stagger-5">
             <span className="jms-stat">local-first · your models, your data</span>
         </div>
+
+        <AssistantPanel pageContext="Hub landing page — the user can go to the Experiments lab or the JMS product." />
     </div>;
 }

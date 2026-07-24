@@ -53,6 +53,20 @@ def _isWorkspaceId(layout: any, w: str) -> bool {
     return False;
 }
 
+"""Resolve a workspace id OR label (case-insensitive) to its id, so the assistant
+can say "SFT/DPO" or "04" and land the same place. Empty string if no match."""
+def _resolveWs(layout: any, x: str) -> str {
+    if layout is None or not x { return ""; }
+    want = x.strip().lower();
+    for ws in list(layout["workspaces"]) {
+        wd = ws as dict;
+        if str(wd["id"]).lower() == want or str(wd["label"]).lower() == want {
+            return str(wd["id"]);
+        }
+    }
+    return "";
+}
+
 """Flatten workspace × section mounts for a single JSX iteration pass."""
 def _allSlots(layout: any) -> list[dict] {
     out: list[dict] = [];
@@ -164,6 +178,21 @@ def:pub AppShell(onHub: any = None) -> JsxElement {
     if online == -1 or layout is None {
         return <div className="h-screen bg-background" />;
     }
+
+    # Nav bridge for the assistant widget: re-published every render so the
+    # closures always capture the LATEST layout/workspace/sections (no React
+    # stale-closure). The widget calls window.__jmsNav.goWorkspace/go to drive
+    # experiments navigation; label→id resolution happens here where layout lives.
+    try {
+        wbridge: any = window;
+        wbridge.__jmsNav = {
+            "goWorkspace": lambda(x: str) -> None {
+                rid = _resolveWs(layout, x);
+                if rid { goWorkspace(rid); }
+            },
+            "go": go
+        };
+    } except Exception { }
 
     return <div className="flex h-screen flex-col overflow-hidden" data-ws={workspace}>
         <WorkspaceBar

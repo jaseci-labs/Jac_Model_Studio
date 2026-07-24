@@ -111,7 +111,13 @@ def:pub app -> JsxElement {
         wp: any = window;
         onPop = lambda(_e: any) { surface = _hashSurface(); };
         wp.addEventListener("popstate", onPop);
-        return lambda { wp.removeEventListener("popstate", onPop); };
+        # hashchange too: the assistant widget navigates by setting location.hash
+        # directly (no synthetic popstate), which fires only hashchange natively.
+        wp.addEventListener("hashchange", onPop);
+        return lambda {
+            wp.removeEventListener("popstate", onPop);
+            wp.removeEventListener("hashchange", onPop);
+        };
     }, []);
 
     # Still resolving local_mode()/local_session() — hold a blank frame so we
