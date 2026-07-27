@@ -277,13 +277,13 @@ def:pub WorkspaceSettings(
     return <div className="fixed inset-0 z-50 flex">
         <div
             className="flex-1 bg-black/60"
-            onClick={lambda e: MouseEvent { onClose(); }}
+            onClick={lambda (e: MouseEvent) { onClose(); }}
         />
         <aside className="flex h-full w-[28rem] shrink-0 flex-col border-l border-border bg-card">
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
                 <span className="micro-label">WORKSPACES</span>
                 <button
-                    onClick={lambda e: MouseEvent { onClose(); }}
+                    onClick={lambda (e: MouseEvent) { onClose(); }}
                     className="text-muted-foreground hover:text-foreground"
                 >✕</button>
             </div>
@@ -295,7 +295,7 @@ def:pub WorkspaceSettings(
                         wid = str(w["id"]);
                         <button
                             key={wid}
-                            onClick={lambda e: MouseEvent { selected = wid; }}
+                            onClick={lambda (e: MouseEvent) { selected = wid; }}
                             className={"exp-hoverable flex w-full items-center gap-2 rounded-lg border border-transparent px-2 py-1.5 text-left font-mono text-[10px] tracking-wider " + (
                                 "border-border bg-accent/15 text-foreground" if wid == selected
                                 else "text-muted-foreground hover:bg-popover"
@@ -311,7 +311,7 @@ def:pub WorkspaceSettings(
 
                 <Field label="NEW WORKSPACE">
                     <div className="flex gap-2">
-                        <TextInput value={newWsLabel} onSet={lambda v: str { newWsLabel = v; }} placeholder="Label" mono={False} />
+                        <TextInput value={newWsLabel} onSet={lambda (v: str) { newWsLabel = v; }} placeholder="Label" mono={False} />
                         <button
                             onClick={addWorkspace}
                             disabled={busy}
@@ -323,15 +323,15 @@ def:pub WorkspaceSettings(
                 {if wd {
                     <div className="space-y-3">
                         <Field label="LABEL">
-                            <TextInput value={label} onSet={lambda v: str { label = v; }} placeholder="Workspace label" mono={False} />
+                            <TextInput value={label} onSet={lambda (v: str) { label = v; }} placeholder="Workspace label" mono={False} />
                         </Field>
                         <Field label="ACCENT CSS VAR">
-                            <TextInput value={accent} onSet={lambda v: str { accent = v; }} placeholder="ws01" mono={True} />
+                            <TextInput value={accent} onSet={lambda (v: str) { accent = v; }} placeholder="ws01" mono={True} />
                         </Field>
                         <Field label="DEFAULT MODEL">
                             <select
                                 value={defaultModel}
-                                onChange={lambda e: ChangeEvent { defaultModel = e.target.value; }}
+                                onChange={lambda (e: ChangeEvent) { defaultModel = e.target.value; }}
                                 className="exp-input"
                             >
                                 {for m in models {
@@ -340,7 +340,7 @@ def:pub WorkspaceSettings(
                             </select>
                         </Field>
                         <Field label="FILES (comma-separated)">
-                            <TextInput value={filesStr} onSet={lambda v: str { filesStr = v; }} placeholder="01-sft-dpo" mono={True} />
+                            <TextInput value={filesStr} onSet={lambda (v: str) { filesStr = v; }} placeholder="01-sft-dpo" mono={True} />
                         </Field>
                         <div className="flex gap-2">
                             <button onClick={saveWorkspace} disabled={busy} className="exp-btn">SAVE</button>
@@ -361,10 +361,10 @@ def:pub WorkspaceSettings(
                     sc = secComponent(sid, str(sd["component"]));
                     <div key={sid} className="exp-panel !bg-background p-2 space-y-2">
                         <div className="font-mono text-[10px] text-muted-foreground">{sid}</div>
-                        <TextInput value={sl} onSet={lambda v: str { setSecLabel(sid, v); }} placeholder="LABEL" mono={False} />
+                        <TextInput value={sl} onSet={lambda (v: str) { setSecLabel(sid, v); }} placeholder="LABEL" mono={False} />
                         <select
                             value={sc}
-                            onChange={lambda e: ChangeEvent { setSecComponent(sid, e.target.value); }}
+                            onChange={lambda (e: ChangeEvent) { setSecComponent(sid, e.target.value); }}
                             className="exp-input"
                         >
                             {for st in secTypes {
@@ -391,11 +391,11 @@ def:pub WorkspaceSettings(
 
                 <Field label="ADD SECTION">
                     <div className="space-y-2">
-                        <TextInput value={newSecSid} onSet={lambda v: str { newSecSid = v; }} placeholder="section id" mono={True} />
-                        <TextInput value={newSecLabel} onSet={lambda v: str { newSecLabel = v; }} placeholder="LABEL (optional)" mono={False} />
+                        <TextInput value={newSecSid} onSet={lambda (v: str) { newSecSid = v; }} placeholder="section id" mono={True} />
+                        <TextInput value={newSecLabel} onSet={lambda (v: str) { newSecLabel = v; }} placeholder="LABEL (optional)" mono={False} />
                         <select
                             value={newSecComponent}
-                            onChange={lambda e: ChangeEvent { newSecComponent = e.target.value; }}
+                            onChange={lambda (e: ChangeEvent) { newSecComponent = e.target.value; }}
                             className="exp-input"
                         >
                             {for st in secTypes {

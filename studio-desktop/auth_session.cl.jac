@@ -3,12 +3,17 @@
 `local_session()` runs once on mount in frontend.cl.jac; mid-session JWT expiry
 otherwise 401s every call with no recovery. This module centralizes proactive
 refresh (local desktop re-mint) and reactive recovery (401 → re-mint or logout
-+ `jac-auth-expired` event so the shell bounces to <Login/>)."""
++ `jac-auth-expired` event so the shell bounces to <Login/>).
+
+All helpers are `:pub` — the cl compiler only emits JS `export` for public
+symbols; without that, importers (frontend / Chat / AppShell) fail at runtime
+with `does not provide an export named '…'` and the UI never paints.
+"""
 
 import from "@jac/runtime" { jacIsLoggedIn, jacLogout, __setLocalStorage }
 sv import from .auth { local_mode, local_session, session_alive }
 
-glob AUTH_EVENT: str = "jac-auth-expired";
+glob:pub AUTH_EVENT: str = "jac-auth-expired";
 
 # glob does not cross the compiled-module boundary; expose via accessor.
 def:pub authEventName() -> str { return AUTH_EVENT; }
@@ -27,7 +32,20 @@ def:pub bearerHeaders() -> dict {
     return hdrs;
 }
 
-"""Re-mint the implicit local-desktop JWT. No-op (returns False) in prod."""
+"""True when *tok* looks like a usable session token (non-empty string)."""
+def _usableToken(tok: any) -> bool {
+    if tok is None { return False; }
+    s = str(tok).strip();
+    if not s or s == "None" or s == "null" { return False; }
+    # Reject accidental object stringifications from a bad RPC unwrap.
+    if s.startswith("{") or s.startswith("[") { return False; }
+    return True;
+}
+
+"""Re-mint the implicit local-desktop JWT. No-op (returns False) in prod.
+
+Drops any stale token before re-minting so a token from a prior server process
+cannot strand the gate on <Login/> in a 401 storm."""
 async def:pub refreshLocalSession() -> bool {
     lm: bool = False;
     try {
@@ -38,10 +56,16 @@ async def:pub refreshLocalSession() -> bool {
     if not lm {
         return False;
     }
+    # Drop the stale JWT from a prior server process (secret rotates on
+    # restart → 401 storms) before asking for a fresh one.
     try {
+        jacLogout();
+    } except Exception {}
+    try {
+        tok: any = None;
         tok = await local_session();
-        if tok {
-            __setLocalStorage("jac_token", tok);
+        if _usableToken(tok) {
+            __setLocalStorage("jac_token", str(tok).strip());
             return True;
         }
     } except Exception {}
@@ -49,7 +73,7 @@ async def:pub refreshLocalSession() -> bool {
 }
 
 """Clear session and notify the auth gate to re-render into <Login/>."""
-def signalExpired() {
+def:pub signalExpired() {
     jacLogout();
     try {
         w: any = window;

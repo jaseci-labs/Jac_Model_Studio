@@ -405,12 +405,12 @@ def:pub Chat(workspace: str, defaultModel: str) -> JsxElement {
                 loadedId={loadedId} loadingId={loadingId} loadElapsed={loadElapsed}
                 loadError={loadError}
                 onPick={loadModel}
-                onPickCompare={lambda id: str { compareId = id; }}
+                onPickCompare={lambda (id: str) { compareId = id; }}
             />
             <Thread messages={messages} labels={labelMap()} onSave={saveExample} />
             <Composer
                 value={draft} busy={streaming} categories={prompts}
-                onSet={lambda v: str { draft = v; }}
+                onSet={lambda (v: str) { draft = v; }}
                 onSend={send}
                 onStop={stop}
                 onChip={pickChip}
@@ -420,10 +420,10 @@ def:pub Chat(workspace: str, defaultModel: str) -> JsxElement {
             prompts={prompts}
             temperature={temperature} topP={topP} maxTokens={maxTokens} lastStats={lastStats}
             collapsed={railCollapsed}
-            onPick={lambda p: str { draft = p; }}
-            onTemp={lambda v: float { temperature = v; }}
-            onTopP={lambda v: float { topP = v; }}
-            onMaxTokens={lambda v: float { maxTokens = int(v); }}
+            onPick={lambda (p: str) { draft = p; }}
+            onTemp={lambda (v: float) { temperature = v; }}
+            onTopP={lambda (v: float) { topP = v; }}
+            onMaxTokens={lambda (v: float) { maxTokens = int(v); }}
             onToggle={lambda { railCollapsed = not railCollapsed; }}
         />
     </div>;

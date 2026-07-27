@@ -98,7 +98,7 @@ def _pivot(p: str) -> dict {
     def _rk(row: dict) -> int {
         return workspace.rung_order().index(str(row["rung"])) if str(row["rung"]) in workspace.rung_order() else 99;
     }
-    out_cells.sort(key=lambda r: r and (str(r["model"]), _rk(r), str(r["cond"])));
+    out_cells.sort(key=lambda (r) { return r and (str(r["model"]), _rk(r), str(r["cond"])); });
     return {"cells": out_cells, "curve": curve, "curve_keys": sorted(keys), "families": sorted(fams), "count": len(out_cells)};
 }
 

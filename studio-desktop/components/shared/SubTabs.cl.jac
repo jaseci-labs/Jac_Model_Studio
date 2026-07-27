@@ -6,7 +6,7 @@ def:pub SubTabs(tabs: list[str], active: str, onTab: Callable[([str], None)]) ->
             <span key={t} className="flex items-center">
                 {i > 0 and <span className="micro-label px-2 text-muted-foreground/60">·</span>}
                 <button
-                    onClick={lambda e: MouseEvent { onTab(t); }}
+                    onClick={lambda (e: MouseEvent) { onTab(t); }}
                     className={"micro-label pb-1 transition-colors hover:text-foreground/80 " + (
                         "border-b-2 border-accent text-foreground" if active == t
                         else "text-muted-foreground/80"

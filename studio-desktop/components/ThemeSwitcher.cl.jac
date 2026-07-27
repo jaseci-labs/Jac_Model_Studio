@@ -39,7 +39,7 @@ def:pub ThemeSwitcher(up: bool = True) -> JsxElement {
             {for t in THEMES {
                 <button
                     key={t}
-                    onClick={lambda e: MouseEvent { apply(t); }}
+                    onClick={lambda (e: MouseEvent) { apply(t); }}
                     className={"exp-chip " + (
                         "exp-chip-active" if t == theme
                         else ""
@@ -50,7 +50,7 @@ def:pub ThemeSwitcher(up: bool = True) -> JsxElement {
             }}
         </div>}
         <button
-            onClick={lambda e: MouseEvent { open = not open; }}
+            onClick={lambda (e: MouseEvent) { open = not open; }}
             className="micro-label px-2 transition-colors hover:text-foreground/80"
         >
             THEME · {theme}

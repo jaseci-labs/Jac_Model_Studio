@@ -231,7 +231,7 @@ def list_evals() -> dict {
         _refresh(r);
         out.append(r.to_view(""));
     }
-    out.sort(key=lambda v: EvalView -> str { return v.started; }, reverse=True);
+    out.sort(key=lambda (v: EvalView) -> str { return v.started; }, reverse=True);
     return {"evals": out};
 }
 

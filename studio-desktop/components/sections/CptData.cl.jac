@@ -204,7 +204,7 @@ def:pub CptData -> JsxElement {
             {_gate()}
             <div className="flex flex-wrap items-center gap-2">
                 <span className="micro-label text-muted-foreground/80">SOURCE</span>
-                <Segmented options={sourceOpts} value={cptSource} onSet={lambda v: str { switchSource(v); }} />
+                <Segmented options={sourceOpts} value={cptSource} onSet={lambda (v: str) { switchSource(v); }} />
             </div>
             <RowBrowser
                 files={files} path={path} rows={rows} offset={offset}

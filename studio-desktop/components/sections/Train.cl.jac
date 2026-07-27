@@ -457,7 +457,7 @@ def:pub Train(active: bool) -> JsxElement {
                             bid = str(b["id"]);
                             <button
                                 key={bid}
-                                onClick={lambda e: MouseEvent { formBackend = bid; }}
+                                onClick={lambda (e: MouseEvent) { formBackend = bid; }}
                                 className={"exp-chip !text-xs " + (
                                     "exp-chip-active" if formBackend == bid
                                     else ""
@@ -471,28 +471,28 @@ def:pub Train(active: bool) -> JsxElement {
                 </Field>}
 
                 {formMode == "sft" and <Field label="BASE MODEL (HF ID)">
-                    <TextInput value={formModelId} onSet={lambda v: str { updateForm("modelId", v); }} placeholder="org/model" mono={True} />
+                    <TextInput value={formModelId} onSet={lambda (v: str) { updateForm("modelId", v); }} placeholder="org/model" mono={True} />
                 </Field>}
 
                 <Field label="SHORT NAME">
-                    <TextInput value={formName} onSet={lambda v: str { updateForm("name", v); }} placeholder="qwen" mono={True} />
+                    <TextInput value={formName} onSet={lambda (v: str) { updateForm("name", v); }} placeholder="qwen" mono={True} />
                 </Field>
 
                 <Field label="MODE">
-                    <Segmented options={["sft", "dpo"]} value={formMode} onSet={lambda v: str { updateForm("mode", v); }} />
+                    <Segmented options={["sft", "dpo"]} value={formMode} onSet={lambda (v: str) { updateForm("mode", v); }} />
                 </Field>
 
                 {for key in optKeys {
                     <Field key={key} label={key}>
-                        <TextInput value={str(opts[key]) if key in opts else ""} onSet={lambda v: str { updateOpt(key, v); }} placeholder={key} mono={True} />
+                        <TextInput value={str(opts[key]) if key in opts else ""} onSet={lambda (v: str) { updateOpt(key, v); }} placeholder={key} mono={True} />
                     </Field>
                 }}
 
                 <p className="stat-line mt-1 text-muted-foreground">heavy workload · one training at a time, runs detached</p>
 
                 <div className="mt-2 flex gap-2">
-                    <button onClick={lambda e: MouseEvent { doStart(); }} disabled={isRunning} className={btn + "text-foreground"}>▶ START {formMode.upper()}</button>
-                    <button onClick={lambda e: MouseEvent { doStop(); }} disabled={not isRunning} className={btn + "text-muted-foreground"}>■ STOP</button>
+                    <button onClick={lambda (e: MouseEvent) { doStart(); }} disabled={isRunning} className={btn + "text-foreground"}>▶ START {formMode.upper()}</button>
+                    <button onClick={lambda (e: MouseEvent) { doStop(); }} disabled={not isRunning} className={btn + "text-muted-foreground"}>■ STOP</button>
                 </div>
 
                 {error and <p className="stat-line mt-1 text-muted-foreground">{error}</p>}
@@ -542,7 +542,7 @@ def:pub Train(active: bool) -> JsxElement {
                     {for s in running {
                         <button
                             key={str(s["name"]) + "|" + str(s["mode"])}
-                            onClick={lambda e: MouseEvent { pickSession(str(s["name"]), str(s["mode"])); }}
+                            onClick={lambda (e: MouseEvent) { pickSession(str(s["name"]), str(s["mode"])); }}
                             className={"exp-hoverable rounded-lg border px-3 py-1 font-mono text-[10px] tracking-widest transition-colors " + (
                                 "border-accent bg-accent/15 text-foreground" if (selName == str(s["name"]) and selMode == str(s["mode"]))
                                 else "border-input text-muted-foreground hover:text-foreground/80"
@@ -587,7 +587,7 @@ def:pub Train(active: bool) -> JsxElement {
                         {for name in mdls {
                             <button
                                 key={name}
-                                onClick={lambda e: MouseEvent { pickHistory(name, selModeH); }}
+                                onClick={lambda (e: MouseEvent) { pickHistory(name, selModeH); }}
                                 className={"exp-hoverable rounded-lg border px-4 py-1.5 font-mono text-xs transition-colors " + (
                                     "border-accent bg-accent/15 text-foreground" if selModel == name
                                     else "border-border text-muted-foreground hover:border-ring hover:text-foreground"
@@ -606,7 +606,7 @@ def:pub Train(active: bool) -> JsxElement {
                             <button
                                 key={mode}
                                 disabled={not (_hasRun(pastSessions, selModel, mode) if selModel != "" else True)}
-                                onClick={lambda e: MouseEvent { pickHistory(selModel if selModel != "" else mdls[0], mode); }}
+                                onClick={lambda (e: MouseEvent) { pickHistory(selModel if selModel != "" else mdls[0], mode); }}
                                 className={"exp-hoverable rounded-lg border px-4 py-1.5 font-mono text-xs uppercase tracking-widest transition-colors disabled:opacity-30 " + (
                                     ("border-[#b89ce8]/50 bg-secondary text-[#b89ce8]" if mode == "dpo" else "border-[#7aa2f7]/50 bg-secondary text-[#7aa2f7]") if selModeH == mode
                                     else "border-border text-muted-foreground hover:border-ring hover:text-foreground"
@@ -631,7 +631,7 @@ def:pub Train(active: bool) -> JsxElement {
         hasData = compare is not None and len(list(compare["names"])) > 0;
         return <>
             <div className="flex items-center gap-3">
-                <Segmented options={["sft", "dpo"]} value={compareMode} onSet={lambda v: str { compareMode = v; }} />
+                <Segmented options={["sft", "dpo"]} value={compareMode} onSet={lambda (v: str) { compareMode = v; }} />
             </div>
             {not hasData and <div className="flex flex-1 items-center justify-center"><span className="micro-label">NO PAST RUNS</span></div>}
             {hasData and <>
@@ -649,7 +649,7 @@ def:pub Train(active: bool) -> JsxElement {
         pastSessions: list = [s for s in sessions if str(s["status"]) != "running"];
         return <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto p-4">
             <div className="flex flex-wrap items-center gap-3">
-                <Segmented options={["runs", "compare"]} value={historyView} onSet={lambda v: str { historyView = v; }} />
+                <Segmented options={["runs", "compare"]} value={historyView} onSet={lambda (v: str) { historyView = v; }} />
                 <span className="stat-line text-muted-foreground/80">{"inspect one finished run in detail" if historyView == "runs" else "overlay every run of one stage"}</span>
             </div>
             {historyView == "runs" and _historyRuns({"pastSessions": pastSessions})}
@@ -662,7 +662,7 @@ def:pub Train(active: bool) -> JsxElement {
             <SubTabs tabs={TABS} active={tab.upper()} onTab={onTab} />
             <div className="flex items-center gap-2">
                 <button
-                    onClick={lambda e: MouseEvent { handleUpdate(); }}
+                    onClick={lambda (e: MouseEvent) { handleUpdate(); }}
                     disabled={updateState == "updating"}
                     className={"exp-btn " + (
                         "text-foreground" if updateState == "confirm" else "text-muted-foreground"

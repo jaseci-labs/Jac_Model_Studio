@@ -186,7 +186,7 @@ def:pub Evals -> JsxElement {
             <div className="flex flex-col gap-4">
                 <Field label="KIND">
                     <div className="flex flex-col gap-1">
-                        <Segmented options={["probe", "idiom"]} value={kind} onSet={lambda v: str { kind = v; }} />
+                        <Segmented options={["probe", "idiom"]} value={kind} onSet={lambda (v: str) { kind = v; }} />
                         <span className="stat-line text-muted-foreground/80">{
                             "behavioral test-pass on holdout" if kind == "probe"
                             else "ROUGE vs transpile judge: idiomatic similarity score"
@@ -199,7 +199,7 @@ def:pub Evals -> JsxElement {
                             {for m in avail {
                                 <button
                                     key={str(m.id)}
-                                    onClick={lambda e: MouseEvent { modelId = m.id; modelPath = ""; }}
+                                    onClick={lambda (e: MouseEvent) { modelId = m.id; modelPath = ""; }}
                                     className={"exp-chip !text-xs " + (
                                         "exp-chip-active" if (modelId == m.id and not modelPath)
                                         else ""
@@ -211,26 +211,26 @@ def:pub Evals -> JsxElement {
                         </div>}
                         <TextInput
                             value={modelPath}
-                            onSet={lambda v: str { modelPath = v; if v { modelId = ""; } }}
+                            onSet={lambda (v: str) { modelPath = v; if v { modelId = ""; } }}
                             placeholder="or model path (models/...)"
                             mono={True}
                         />
                     </div>
                 </Field>
                 <Field label="ADAPTER (optional)">
-                    <TextInput value={adapter} onSet={lambda v: str { adapter = v; }} placeholder="e.g. model-experiments/01-sft-dpo/adapters/qwen-probe" mono={True} />
+                    <TextInput value={adapter} onSet={lambda (v: str) { adapter = v; }} placeholder="e.g. model-experiments/01-sft-dpo/adapters/qwen-probe" mono={True} />
                 </Field>
                 <Field label="HOLDOUT">
-                    <Segmented options={["function", "graph"]} value={holdout} onSet={lambda v: str { holdout = v; }} />
+                    <Segmented options={["function", "graph"]} value={holdout} onSet={lambda (v: str) { holdout = v; }} />
                 </Field>
                 <Field label="LIMIT">
-                    <TextInput value={limit} onSet={lambda v: str { limit = v; }} placeholder="all" mono={True} />
+                    <TextInput value={limit} onSet={lambda (v: str) { limit = v; }} placeholder="all" mono={True} />
                 </Field>
                 {kind == "idiom" and <Field label="SIM THRESHOLD">
-                    <TextInput value={simThreshold} onSet={lambda v: str { simThreshold = v; }} placeholder="0.7" mono={True} />
+                    <TextInput value={simThreshold} onSet={lambda (v: str) { simThreshold = v; }} placeholder="0.7" mono={True} />
                 </Field>}
                 <button
-                    onClick={lambda e: MouseEvent { start(); }}
+                    onClick={lambda (e: MouseEvent) { start(); }}
                     disabled={busy}
                     className="exp-btn exp-btn-accent mt-1 w-full"
                 >
@@ -277,7 +277,7 @@ def:pub Evals -> JsxElement {
                             </span>
                         </div>
                         {str(run.status) == "running" and <button
-                            onClick={lambda e: MouseEvent { stopActive(); }}
+                            onClick={lambda (e: MouseEvent) { stopActive(); }}
                             className="exp-btn shrink-0"
                         >
                             STOP
@@ -317,7 +317,7 @@ def:pub Evals -> JsxElement {
                             {for r in history {
                                 <tr
                                     key={str(r.id)}
-                                    onClick={lambda e: MouseEvent { openEval(str(r.id)); }}
+                                    onClick={lambda (e: MouseEvent) { openEval(str(r.id)); }}
                                     className="cursor-pointer border-b border-border text-muted-foreground transition-colors hover:bg-popover hover:text-foreground"
                                 >
                                     <td className="py-1.5 pr-3 font-mono text-muted-foreground">{str(r.id)}</td>
@@ -329,7 +329,7 @@ def:pub Evals -> JsxElement {
                                     <td className="py-1.5 pr-3"><StatusGlyph status={str(r.status)} showLabel={False} /></td>
                                     <td className="py-1.5">
                                         <button
-                                            onClick={lambda e: MouseEvent { e.stopPropagation(); removeEval(str(r.id)); }}
+                                            onClick={lambda (e: MouseEvent) { e.stopPropagation(); removeEval(str(r.id)); }}
                                             className="micro-label text-muted-foreground/80 transition-colors hover:text-foreground/80"
                                         >
                                             DEL

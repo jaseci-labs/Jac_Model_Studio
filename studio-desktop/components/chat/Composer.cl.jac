@@ -26,7 +26,7 @@ def:pub Composer(
             {for cat in categories {
                 <button
                     key={str(cat["id"])}
-                    onClick={lambda e: MouseEvent { onChip(str(cat["id"])); }}
+                    onClick={lambda (e: MouseEvent) { onChip(str(cat["id"])); }}
                     className="exp-chip"
                 >{str(cat["id"])}</button>
             }}
@@ -34,8 +34,8 @@ def:pub Composer(
         <div className="flex items-end gap-2 rounded-xl border border-input bg-popover p-2 focus-within:border-ring">
             <textarea
                 value={value}
-                onChange={lambda e: ChangeEvent { onSet(str(e.target.value)); }}
-                onKeyDown={lambda e: KeyboardEvent {
+                onChange={lambda (e: ChangeEvent) { onSet(str(e.target.value)); }}
+                onKeyDown={lambda (e: KeyboardEvent) {
                     if e.key == "Enter" and not e.shiftKey {
                         e.preventDefault();
                         onSend(value);
@@ -46,7 +46,7 @@ def:pub Composer(
                 className="max-h-48 flex-1 resize-none bg-transparent px-2 py-1 text-sm text-foreground outline-none placeholder:text-muted-foreground/80"
             />
             <button
-                onClick={lambda e: MouseEvent { if busy { onStop(); } else { onSend(value); } }}
+                onClick={lambda (e: MouseEvent) { if busy { onStop(); } else { onSend(value); } }}
                 disabled={(not busy) and not value.strip()}
                 className="exp-btn"
             >

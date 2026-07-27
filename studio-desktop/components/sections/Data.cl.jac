@@ -201,7 +201,7 @@ def:pub Data -> JsxElement {
                         {for stage in list(group["stages"]) {
                             <div key={str(stage)}>
                                 <div
-                                    onClick={lambda e: MouseEvent { selectStage(str(stage)); }}
+                                    onClick={lambda (e: MouseEvent) { selectStage(str(stage)); }}
                                     className={"exp-hoverable flex cursor-pointer items-center gap-2 rounded-lg border px-2 py-1 " + (
                                         "border-border bg-accent/15" if selectedStage == str(stage) else "border-transparent hover:text-foreground"
                                     )}
@@ -210,7 +210,7 @@ def:pub Data -> JsxElement {
                                     <span className="flex-1 truncate font-mono text-xs text-muted-foreground">{str(stage)}</span>
                                     <button
                                         disabled={_statusOf(str(stage)) == "running"}
-                                        onClick={lambda e: MouseEvent { e.stopPropagation(); runStage(str(stage)); }}
+                                        onClick={lambda (e: MouseEvent) { e.stopPropagation(); runStage(str(stage)); }}
                                         className="micro-label rounded border border-input px-1.5 py-0.5 text-muted-foreground transition-colors hover:border-ring hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
                                     >
                                         RUN
@@ -231,17 +231,17 @@ def:pub Data -> JsxElement {
         return <div className="relative exp-panel p-3 pt-4">
             <span className="micro-label absolute -top-2 left-3 bg-background px-2">ADD.EXAMPLES</span>
             <div className="flex flex-col gap-3">
-                <Segmented options={["sft", "dpo"]} value={addTarget} onSet={lambda v: str { addTarget = v; }} />
+                <Segmented options={["sft", "dpo"]} value={addTarget} onSet={lambda (v: str) { addTarget = v; }} />
                 <textarea
                     rows={6}
                     value={addText}
-                    onChange={lambda e: ChangeEvent { addText = e.target.value; }}
+                    onChange={lambda (e: ChangeEvent) { addText = e.target.value; }}
                     placeholder={ph}
                     className="exp-input resize-none"
                 ></textarea>
                 <button
                     disabled={addBusy or (not addText.strip())}
-                    onClick={lambda e: MouseEvent { submitExamples(); }}
+                    onClick={lambda (e: MouseEvent) { submitExamples(); }}
                     className="micro-label self-start rounded border border-input px-3 py-1.5 text-foreground/80 transition-colors hover:border-ring hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
                 >
                     {"APPENDING…" if addBusy else "APPEND"}

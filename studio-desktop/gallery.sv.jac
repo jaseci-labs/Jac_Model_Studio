@@ -74,7 +74,7 @@ def:pub gallery_images(rel_dir: str) -> list[dict] {
     for f in d.iterdir() {
         if f.is_file() and _is_img(f) { files.append(f); }
     }
-    files.sort(key=lambda p: Path -> str { return p.name; });
+    files.sort(key=lambda (p: Path) -> str { return p.name; });
     n = 0;
     for f in files {
         if n >= MAX_IMAGES { break; }
@@ -87,7 +87,8 @@ def:pub gallery_images(rel_dir: str) -> list[dict] {
                 continue;
             }
             raw = f.read_bytes();
-            out.append({"name": f.name, "mime": _mime(f), "b64": base64.b64encode(raw).decode(), "note": ""});
+            b64 = str(base64.b64encode(raw), "ascii");
+            out.append({"name": f.name, "mime": _mime(f), "b64": b64, "note": ""});
         } except Exception {
             out.append({"name": f.name, "mime": "", "b64": "", "note": "unreadable"});
         }

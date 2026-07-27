@@ -100,7 +100,7 @@ def:pub CodeBlock(label: str, code: str, lang: str) -> JsxElement {
     return <div className="relative mt-3 mb-1 exp-panel !bg-popover">
         <span className="micro-label absolute -top-2 left-3 bg-background px-2">{tab}</span>
         <button
-            onClick={lambda e: MouseEvent { _copy(); }}
+            onClick={lambda (e: MouseEvent) { _copy(); }}
             className="absolute right-2 top-2 font-mono text-[9px] text-muted-foreground hover:text-foreground"
         >
             {"COPIED" if copied else "COPY"}

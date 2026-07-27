@@ -94,7 +94,7 @@ def:pub RlData -> JsxElement {
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
             <div className="flex flex-wrap items-center gap-2">
                 <span className="micro-label text-muted-foreground/80">SOURCE</span>
-                <Segmented options={sources} value={rlSource} onSet={lambda v: str { switchSource(v); }} />
+                <Segmented options={sources} value={rlSource} onSet={lambda (v: str) { switchSource(v); }} />
             </div>
             <div className="stat-line text-muted-foreground/80">RL training data (read-only) — SFT gold · GRPO reward tasks · python→jac · synthetic · splits. See RL_FINDINGS.md.</div>
             <RowBrowser

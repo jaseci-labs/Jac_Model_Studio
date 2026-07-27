@@ -47,7 +47,7 @@ def:pub RowBrowser(
             {for f in files {
                 <button
                     key={str(f.path)}
-                    onClick={lambda e: MouseEvent { onOpen(str(f.path)); }}
+                    onClick={lambda (e: MouseEvent) { onOpen(str(f.path)); }}
                     className={"exp-chip !px-2.5 !py-0.5 !text-[10px] " + (
                         "exp-chip-active" if str(f.path) == path else ""
                     )}
@@ -70,7 +70,7 @@ def:pub RowBrowser(
                 {for row in rows {
                     <div key={str(row["idx"])}>
                         <div
-                            onClick={lambda e: MouseEvent { onToggle(int(row["idx"])); }}
+                            onClick={lambda (e: MouseEvent) { onToggle(int(row["idx"])); }}
                             className="grid cursor-pointer grid-cols-[2rem_1fr_3rem_3rem_5rem_1fr] gap-2 rounded px-0.5 py-1 font-mono text-xs hover:bg-secondary"
                         >
                             <span className="text-muted-foreground/80">{str(row["idx"])}</span>
@@ -85,9 +85,9 @@ def:pub RowBrowser(
                 }}
             </div>
             {(total > 0) and <div className="mt-3 flex items-center justify-center gap-3 stat-line">
-                <button disabled={not canPrev} onClick={lambda e: MouseEvent { onPrev(); }} className="disabled:opacity-30 hover:text-foreground transition-colors">← PREV</button>
+                <button disabled={not canPrev} onClick={lambda (e: MouseEvent) { onPrev(); }} className="disabled:opacity-30 hover:text-foreground transition-colors">← PREV</button>
                 <span>{str(offset + 1)} to {str(offset + len(rows))} of {str(total)}</span>
-                <button disabled={not canNext} onClick={lambda e: MouseEvent { onNext(); }} className="disabled:opacity-30 hover:text-foreground transition-colors">NEXT →</button>
+                <button disabled={not canNext} onClick={lambda (e: MouseEvent) { onNext(); }} className="disabled:opacity-30 hover:text-foreground transition-colors">NEXT →</button>
             </div>}
         </div>}
         {(not path) and <div className="stat-line py-6 text-center">select a file above</div>}

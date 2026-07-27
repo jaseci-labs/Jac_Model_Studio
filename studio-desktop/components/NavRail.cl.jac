@@ -79,7 +79,7 @@ def:pub NavRail(
                 sid = str(sd["id"]);
                 <button
                     key={sid}
-                    onClick={lambda e: MouseEvent { onSection(sid); }}
+                    onClick={lambda (e: MouseEvent) { onSection(sid); }}
                     className={"exp-hoverable relative flex h-9 items-center gap-3 rounded-lg border px-3 " + (
                         "border-border bg-accent/15 text-foreground" if sid == section
                         else "border-transparent text-muted-foreground/80 hover:text-foreground"

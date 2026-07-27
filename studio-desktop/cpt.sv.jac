@@ -130,7 +130,7 @@ def cpt_manifest() -> dict {
         pctp = (passed * 100) // files if files > 0 else 0;
         gate.append({"repo": repo, "files": files, "passed": passed, "pct": pctp});
     }
-    gate.sort(key=lambda d: dict -> int { return int(d["files"]); }, reverse=True);
+    gate.sort(key=lambda (d: dict) -> int { return int(d["files"]); }, reverse=True);
 
     decon_raw = m.get("decontam", {});
     decontam: list = [];

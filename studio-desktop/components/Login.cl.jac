@@ -4,11 +4,17 @@ shell's auth tick so it re-renders into <AppShell/>.
 
 Auth helpers come from @jac/runtime: jacLogin (async -> bool), jacSignup
 (async -> dict {"success": bool, ...}). Signup does NOT establish a session, so it
-is always followed by a jacLogin with the same credentials — see jac-cl-auth. Every
-var that holds an `await` result is pre-declared (let-scoping in compiled JS would
-otherwise leave the post-await if-checks with a ReferenceError)."""
+is always followed by a jacLogin with the same credentials — see jac-cl-auth.
+
+On local desktop (`local_mode()` True) the webview cannot reach `/user/login`
+over HTTP, so the form routes through `refreshLocalSession()` (native bridge →
+in-process register/login) instead of `jacLogin`. Every var that holds an
+`await` result is pre-declared (let-scoping in compiled JS would otherwise leave
+the post-await if-checks with a ReferenceError)."""
 
 import from "@jac/runtime" { jacLogin, jacSignup }
+sv import from ..auth { local_mode }
+import from ..auth_session { refreshLocalSession }
 import from .shared.Field { Field }
 
 def _heading(mode: str) -> str {
@@ -30,13 +36,40 @@ def:pub Login(onDone: Callable[([], None)]) -> JsxElement {
 
     async def submit() -> None {
         if busy { return; }
+        busy = True;
+        error = "";
+
+        # Local desktop: mint via the native bridge. Ignore the form fields —
+        # the server uses fixed local credentials (see auth.LOCAL_*).
+        lm: bool = False;
+        try {
+            lm = await local_mode();
+        } except Exception {
+            lm = False;
+        }
+        if lm {
+            okLocal: bool = False;
+            try {
+                okLocal = await refreshLocalSession();
+            } except Exception {
+                okLocal = False;
+            }
+            if okLocal {
+                busy = False;
+                onDone();
+                return;
+            }
+            error = "local session failed — is the desktop backend running?";
+            busy = False;
+            return;
+        }
+
         em = email.strip();
         if not em or not password {
             error = "email and password are required";
+            busy = False;
             return;
         }
-        busy = True;
-        error = "";
 
         if mode == "signup" {
             res: dict | None = None;
@@ -59,6 +92,7 @@ def:pub Login(onDone: Callable[([], None)]) -> JsxElement {
                 busy = False;
                 return;
             }
+            busy = False;
             onDone();
             return;
         }
@@ -76,6 +110,7 @@ def:pub Login(onDone: Callable[([], None)]) -> JsxElement {
             busy = False;
             return;
         }
+        busy = False;
         onDone();
     }
 
@@ -93,11 +128,11 @@ def:pub Login(onDone: Callable[([], None)]) -> JsxElement {
 
             <div className="mb-5 flex gap-1.5">
                 <button
-                    onClick={lambda e: MouseEvent { onMode("login"); }}
+                    onClick={lambda (e: MouseEvent) { onMode("login"); }}
                     className={"exp-chip " + ("exp-chip-active" if mode == "login" else "")}
                 >SIGN IN</button>
                 <button
-                    onClick={lambda e: MouseEvent { onMode("signup"); }}
+                    onClick={lambda (e: MouseEvent) { onMode("signup"); }}
                     className={"exp-chip " + ("exp-chip-active" if mode == "signup" else "")}
                 >CREATE</button>
             </div>
@@ -107,7 +142,7 @@ def:pub Login(onDone: Callable[([], None)]) -> JsxElement {
                     <input
                         type="text"
                         value={email}
-                        onChange={lambda e: ChangeEvent { email = e.target.value; }}
+                        onChange={lambda (e: ChangeEvent) { email = e.target.value; }}
                         placeholder="you@example.com"
                         className={inputCls}
                     />
@@ -116,10 +151,10 @@ def:pub Login(onDone: Callable[([], None)]) -> JsxElement {
                     <input
                         type="password"
                         value={password}
-                        onChange={lambda e: ChangeEvent { password = e.target.value; }}
+                        onChange={lambda (e: ChangeEvent) { password = e.target.value; }}
                         placeholder="password"
                         className={inputCls}
-                        onKeyDown={lambda e: KeyboardEvent {
+                        onKeyDown={lambda (e: KeyboardEvent) {
                             if e.key == "Enter" { submit(); }
                         }}
                     />
@@ -129,7 +164,7 @@ def:pub Login(onDone: Callable[([], None)]) -> JsxElement {
             {error and <p className="mt-3 font-mono text-xs text-red-400">{error}</p>}
 
             <button
-                onClick={lambda e: MouseEvent { submit(); }}
+                onClick={lambda (e: MouseEvent) { submit(); }}
                 disabled={busy}
                 className="exp-btn exp-btn-accent mt-6 w-full !py-2.5 !text-[11px]"
             >

@@ -31,12 +31,14 @@ import from .components.jms.JmsShell { JmsShell }
 def:pub app -> JsxElement {
     has authTick: int = 0,
         checking: bool = True,
+        loggedIn: bool = False,
         surface: str = "",
         jmsTheme: str = "";
 
     """On mount: read local_mode() once. Local desktop mints an in-process
     session token (see module docstring); prod falls through to <Login/> when
-    no session is present."""
+    no session is present. Retries briefly — the native host can 401 pub
+    endpoints for a beat while the in-process server finishes booting."""
     async can with entry {
         # Restore the persisted JMS theme before anything renders.
         w: any = window;
@@ -47,27 +49,44 @@ def:pub app -> JsxElement {
             jmsTheme = "electric-minimal";
         }
         lm: bool = False;
-        try {
-            lm = await local_mode();
-        } except Exception {
-            lm = False;
-        }
-        if lm {
+        ok: bool = False;
+        attempt: int = 0;
+        while attempt < 10 {
+            attempt = attempt + 1;
             try {
-                await refreshLocalSession();
-            } except Exception { }
+                lm = await local_mode();
+            } except Exception {
+                lm = False;
+            }
+            if lm {
+                try {
+                    ok = await refreshLocalSession();
+                } except Exception {
+                    ok = False;
+                }
+                if ok {
+                    break;
+                }
+            } elif jacIsLoggedIn() {
+                ok = True;
+                break;
+            }
         }
+        loggedIn = ok or jacIsLoggedIn();
         checking = False;
     }
 
     useEffect(lambda {
-        if not jacIsLoggedIn() {
+        if not (loggedIn or jacIsLoggedIn()) {
             return lambda { };
         }
         touchSession();
         iv: any = None;
         iv = setInterval(lambda { touchSession(); }, 240000);
-        handler = lambda(_e: any) { authTick = authTick + 1; };
+        handler = lambda(_e: any) {
+            loggedIn = jacIsLoggedIn();
+            authTick = authTick + 1;
+        };
         w: any = window;
         evtName = authEventName();
         w.addEventListener(evtName, handler);
@@ -77,7 +96,7 @@ def:pub app -> JsxElement {
             }
             w.removeEventListener(evtName, handler);
         };
-    }, [authTick]);
+    }, [authTick, loggedIn]);
 
     # Still resolving local_mode()/local_session() — hold a blank frame so we
     # never flash the login screen (which local users should never see).
@@ -96,7 +115,7 @@ def:pub app -> JsxElement {
     # "" = hub landing, "jms" = new product shell, "experiments" = the existing
     # AppShell — its WorkspaceBar's "‹ EXPERIMENTS" button calls onHub directly,
     # so no separate overlay button is needed here anymore.
-    if jacIsLoggedIn() {
+    if loggedIn or jacIsLoggedIn() {
         if surface == "jms" {
             return <JmsShell
                 onHub={lambda { surface = ""; }}
@@ -114,5 +133,10 @@ def:pub app -> JsxElement {
         />;
     }
     # Production gate for logged-out visitors (or expired session).
-    return <Login onDone={lambda { authTick = authTick + 1; }} />;
+    return <Login
+        onDone={lambda {
+            loggedIn = True;
+            authTick = authTick + 1;
+        }}
+    />;
 }

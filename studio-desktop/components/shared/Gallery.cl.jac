@@ -56,7 +56,7 @@ def:pub Gallery(prefix: str = "") -> JsxElement {
             {for g in dirs {
                 <Chip
                     key={str(g["dir"])}
-                    onClick={lambda e: MouseEvent { openDir(str(g["dir"])); }}
+                    onClick={lambda (e: MouseEvent) { openDir(str(g["dir"])); }}
                     selected={selected == str(g["dir"])}
                     className="px-2 font-mono text-[10px]"
                 >
@@ -78,7 +78,7 @@ def:pub Gallery(prefix: str = "") -> JsxElement {
                                 src={"data:" + str(im["mime"]) + ";base64," + str(im["b64"])}
                                 alt={str(im["name"])}
                                 title={str(im["name"]) + " · click to enlarge"}
-                                onClick={lambda e: MouseEvent { zoom = im; }}
+                                onClick={lambda (e: MouseEvent) { zoom = im; }}
                                 className="exp-hoverable w-full cursor-zoom-in rounded-lg border border-border bg-white"
                             />
                             skip;
@@ -95,7 +95,7 @@ def:pub Gallery(prefix: str = "") -> JsxElement {
         }}
         <div className="stat-line mt-3 text-muted-foreground/70">source: {selected} · rendered exactly as saved by the training/eval scripts</div>
         {zoom and <div
-            onClick={lambda e: MouseEvent { zoom = None; }}
+            onClick={lambda (e: MouseEvent) { zoom = None; }}
             className="fixed inset-0 z-50 flex cursor-zoom-out items-center justify-center bg-background/90 p-8"
         >
             <div className="flex max-h-full max-w-5xl flex-col gap-2">
