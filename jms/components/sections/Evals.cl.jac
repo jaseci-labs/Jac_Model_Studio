@@ -9,6 +9,7 @@ every 2.5s while it is running via a setInterval re-armed whenever `current` cha
 Errors render gray (text-foreground), never red — matches the monochrome theme.
 """
 
+import from react { useEffect }
 sv import from ...evals { create_eval, list_evals, get_eval, stop_eval, delete_eval, EvalView }
 sv import from ...models { list_models, ModelView }
 import from ..shared.Field { Field, TextInput, Segmented }
@@ -82,12 +83,16 @@ def:pub Evals -> JsxElement {
         history: list = [],
         current: any = None,
         error: str = "",
-        busy: bool = False,
-        pollId: any = None;
+        loaded: bool = False,
+        busy: bool = False;
 
     async def _refreshList -> None {
-        r = await list_evals();
-        history = list(r["evals"]);
+        try {
+            r = await list_evals();
+            history = list(r["evals"]);
+        } except Exception as e {
+            error = "history load failed · " + str(e);
+        }
     }
 
     async def _poll(cid: str) -> None {
@@ -102,28 +107,34 @@ def:pub Evals -> JsxElement {
     }
 
     async can with entry {
-        ms = await list_models();
-        models = ms;
-        for m in ms {
-            if m.available { modelId = m.id; break; }
+        try {
+            ms = await list_models();
+            models = ms;
+            for m in ms {
+                if m.available { modelId = m.id; break; }
+            }
+            await _refreshList();
+        } except Exception as e {
+            # Unguarded, this rejected into the void and the panel sat on its
+            # empty initial state, looking like a slow load forever.
+            error = "eval section failed to load · " + str(e);
         }
-        await _refreshList();
+        loaded = True;
     }
 
-    # Re-arm the poll timer whenever the active run changes. Clearing the prior
-    # interval first acts as the effect cleanup (this fires on every `current` set).
-    can with [current] entry {
-        if pollId { clearInterval(float(str(pollId))); pollId = None; }
+    # Re-arm the poll timer whenever the active run changes. The id is
+    # effect-LOCAL and cleared from the effect's own cleanup: the previous
+    # `can with exit` closed over `pollId` from the first render (still None),
+    # so it never cleared anything and every remount leaked a 2.5s poller.
+    useEffect(lambda {
+        iv: any = None;
         c: any = current;
         if c and str(c.status) == "running" {
             cid = str(c.id);
-            pollId = setInterval(lambda -> None { _poll(cid); }, 2500);
+            iv = setInterval(lambda { _poll(cid); }, 2500);
         }
-    }
-
-    can with exit {
-        if pollId { clearInterval(float(str(pollId))); }
-    }
+        return lambda { if iv is not None { clearInterval(float(str(iv))); } };
+    }, [current]);
 
     async def start -> None {
         busy = True;
@@ -150,7 +161,7 @@ def:pub Evals -> JsxElement {
                 await _refreshList();
             }
         } except Exception as e {
-            error = "launch failed";
+            error = "launch failed · " + str(e);
         }
         busy = False;
     }
@@ -158,22 +169,34 @@ def:pub Evals -> JsxElement {
     async def stopActive -> None {
         c: any = current;
         if not c { return; }
-        await stop_eval(str(c.id));
-        d = await get_eval(str(c.id));
-        current = d;
+        try {
+            await stop_eval(str(c.id));
+            d = await get_eval(str(c.id));
+            current = d;
+        } except Exception as e {
+            error = "stop failed · " + str(e);
+        }
         await _refreshList();
     }
 
     async def removeEval(id: str) -> None {
-        await delete_eval(id);
-        c: any = current;
-        if c and str(c.id) == id { current = None; }
+        try {
+            await delete_eval(id);
+            c: any = current;
+            if c and str(c.id) == id { current = None; }
+        } except Exception as e {
+            error = "delete failed · " + str(e);
+        }
         await _refreshList();
     }
 
     async def openEval(id: str) -> None {
-        d = await get_eval(id);
-        current = d;
+        try {
+            d = await get_eval(id);
+            current = d;
+        } except Exception as e {
+            error = "could not open eval " + id + " · " + str(e);
+        }
     }
 
     def _launch -> JsxElement {
@@ -264,11 +287,11 @@ def:pub Evals -> JsxElement {
         return <div className="relative exp-panel p-4 pt-5">
             <span className="micro-label absolute -top-2 left-3 bg-background px-2">EVAL.RUN</span>
             {if not run {
-                <span className="micro-label text-muted-foreground/80">NO ACTIVE EVAL</span>
+                <span key="if1" className="micro-label text-muted-foreground/80">NO ACTIVE EVAL</span>
                 skip;
             }}
             {if run {
-                <div className="flex flex-col gap-4">
+                <div key="if2" className="flex flex-col gap-4">
                     <div className="flex items-center justify-between gap-3">
                         <div className="flex min-w-0 items-center gap-3">
                             <StatusGlyph status={str(run.status)} showLabel={True} />
@@ -295,11 +318,13 @@ def:pub Evals -> JsxElement {
         return <div className="relative exp-panel p-4 pt-5">
             <span className="micro-label absolute -top-2 left-3 bg-background px-2">EVAL.HISTORY</span>
             {if len(history) == 0 {
-                <span className="micro-label text-muted-foreground/80">no evals yet</span>
+                <span key="if3" className="micro-label text-muted-foreground/80">{
+                    ("no evals yet" if loaded else "loading…") if not error else error
+                }</span>
                 skip;
             }}
             {if len(history) > 0 {
-                <div className="overflow-x-auto">
+                <div key="if4" className="overflow-x-auto">
                     <table className="w-full text-xs">
                         <thead>
                             <tr className="border-b border-border text-muted-foreground/80">
@@ -317,7 +342,16 @@ def:pub Evals -> JsxElement {
                             {for r in history {
                                 <tr
                                     key={str(r.id)}
+                                    role="button"
+                                    tabIndex={0}
+                                    aria-label={"open eval " + str(r.id)}
                                     onClick={lambda (e: MouseEvent) { openEval(str(r.id)); }}
+                                    onKeyDown={lambda (e: KeyboardEvent) {
+                                        if e.key == "Enter" or e.key == " " {
+                                            e.preventDefault();
+                                            openEval(str(r.id));
+                                        }
+                                    }}
                                     className="cursor-pointer border-b border-border text-muted-foreground transition-colors hover:bg-popover hover:text-foreground"
                                 >
                                     <td className="py-1.5 pr-3 font-mono text-muted-foreground">{str(r.id)}</td>
@@ -438,6 +472,7 @@ def:pub Evals -> JsxElement {
     return <div className="flex h-full min-w-0 flex-1 flex-col">
         <div className="section-header flex items-center justify-between border-b border-border px-4 py-2.5">
             <span className="micro-label">RESULTS · EVAL RUNS</span>
+            {error and <span key="everr" className="stat-line" style={{"color": "var(--danger)"}}>{error}</span>}
         </div>
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
             <div className="grid gap-4" style={{"gridTemplateColumns": "360px 1fr"}}>

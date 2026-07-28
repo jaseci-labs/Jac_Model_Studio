@@ -12,6 +12,7 @@ def:pub Gallery(prefix: str = "") -> JsxElement {
         selected: str = "",
         images: list = [],
         loading: bool = False,
+        loadedOnce: bool = False,
         zoom: any = None;
 
     async def openDir(d: str) -> None {
@@ -37,16 +38,27 @@ def:pub Gallery(prefix: str = "") -> JsxElement {
                 await openDir(str(mine[0]["dir"]));
             }
         } except Exception { }
+        loadedOnce = True;
     }
 
     def _short(d: str) -> str {
         return d[len(prefix):].lstrip("/") if prefix and d.startswith(prefix) else d;
     }
 
+    # `dirs` is empty on the very first render too (the mount fetch has not
+    # resolved yet) — without loadedOnce this flashed "NO SAVED FIGURES" at
+    # every mount before the real answer arrived.
     if len(dirs) == 0 {
         return <div className="relative exp-panel p-3 pt-4">
             <span className="micro-label absolute -top-2 left-3 bg-background px-2">FIGURES · from repo</span>
-            <EmptyState label="NO SAVED FIGURES" hint={"no image dirs under " + (prefix if prefix else "the artifact roots")} />
+            {if not loadedOnce {
+                <EmptyState key="pending" label="LOADING FIGURES" pulse={True} />
+                skip;
+            }}
+            {if loadedOnce {
+                <EmptyState key="empty" label="NO SAVED FIGURES" hint={"no image dirs under " + (prefix if prefix else "the artifact roots")} />
+                skip;
+            }}
         </div>;
     }
 
@@ -78,13 +90,19 @@ def:pub Gallery(prefix: str = "") -> JsxElement {
                                 src={"data:" + str(im["mime"]) + ";base64," + str(im["b64"])}
                                 alt={str(im["name"])}
                                 title={str(im["name"]) + " · click to enlarge"}
+                                role="button"
+                                tabIndex={0}
                                 onClick={lambda (e: MouseEvent) { zoom = im; }}
-                                className="exp-hoverable w-full cursor-zoom-in rounded-lg border border-border bg-white"
+                                onKeyDown={lambda (e: KeyboardEvent) {
+                                    if e.key == "Enter" or e.key == " " { e.preventDefault(); zoom = im; }
+                                }}
+                                style={{"background": "var(--surface-strong)"}}
+                                className="exp-hoverable w-full cursor-zoom-in rounded-lg border border-border"
                             />
                             skip;
                         }}
                         {if not str(im["b64"]) {
-                            <div key="stub" className="stat-line rounded border border-dashed border-input p-3">{str(im["name"])} · {str(im["note"])}</div>
+                            <div key="stub" className="stat-line rounded-md border border-dashed border-input p-3">{str(im["name"])} · {str(im["note"])}</div>
                             skip;
                         }}
                         <span className="stat-line truncate">{str(im["name"])}</span>
@@ -95,11 +113,17 @@ def:pub Gallery(prefix: str = "") -> JsxElement {
         }}
         <div className="stat-line mt-3 text-muted-foreground/70">source: {selected} · rendered exactly as saved by the training/eval scripts</div>
         {zoom and <div
+            role="button"
+            tabIndex={0}
+            aria-label="close figure"
             onClick={lambda (e: MouseEvent) { zoom = None; }}
+            onKeyDown={lambda (e: KeyboardEvent) {
+                if e.key == "Enter" or e.key == " " or e.key == "Escape" { e.preventDefault(); zoom = None; }
+            }}
             className="fixed inset-0 z-50 flex cursor-zoom-out items-center justify-center bg-background/90 p-8"
         >
             <div className="flex max-h-full max-w-5xl flex-col gap-2">
-                <img src={"data:" + str(zoom["mime"]) + ";base64," + str(zoom["b64"])} alt={str(zoom["name"])} className="max-h-[85vh] w-auto rounded border border-border bg-white object-contain" />
+                <img src={"data:" + str(zoom["mime"]) + ";base64," + str(zoom["b64"])} alt={str(zoom["name"])} style={{"background": "var(--surface-strong)"}} className="max-h-[85vh] w-auto rounded-md border border-border object-contain" />
                 <span className="stat-line text-center">{str(zoom["name"])} · click anywhere to close</span>
             </div>
         </div>}

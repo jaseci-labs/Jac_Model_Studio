@@ -10,7 +10,12 @@ On local desktop (`local_mode()` True) the webview cannot reach `/user/login`
 over HTTP, so the form routes through `refreshLocalSession()` (native bridge →
 in-process register/login) instead of `jacLogin`. Every var that holds an
 `await` result is pre-declared (let-scoping in compiled JS would otherwise leave
-the post-await if-checks with a ReferenceError)."""
+the post-await if-checks with a ReferenceError).
+
+The two inputs carry their own `aria-label`; they also declare `autoComplete` so
+password managers fill them (`username` + `current-password`/`new-password` by
+mode). The error line is `var(--danger)` (palette) rather than a Tailwind colour
+utility."""
 
 import from "@jac/runtime" { jacLogin, jacSignup }
 sv import from ..auth { local_mode }
@@ -145,6 +150,8 @@ def:pub Login(onDone: Callable[([], None)]) -> JsxElement {
                         onChange={lambda (e: ChangeEvent) { email = e.target.value; }}
                         placeholder="you@example.com"
                         className={inputCls}
+                        aria-label="Email"
+                        autoComplete="username"
                     />
                 </Field>
                 <Field label="PASSWORD">
@@ -154,6 +161,8 @@ def:pub Login(onDone: Callable[([], None)]) -> JsxElement {
                         onChange={lambda (e: ChangeEvent) { password = e.target.value; }}
                         placeholder="password"
                         className={inputCls}
+                        aria-label="Password"
+                        autoComplete={"new-password" if mode == "signup" else "current-password"}
                         onKeyDown={lambda (e: KeyboardEvent) {
                             if e.key == "Enter" { submit(); }
                         }}
@@ -161,7 +170,7 @@ def:pub Login(onDone: Callable[([], None)]) -> JsxElement {
                 </Field>
             </div>
 
-            {error and <p className="mt-3 font-mono text-xs text-red-400">{error}</p>}
+            {error and <p className="mt-3 font-mono text-xs" role="alert" style={{"color": "var(--danger)"}}>{error}</p>}
 
             <button
                 onClick={lambda (e: MouseEvent) { submit(); }}

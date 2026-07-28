@@ -22,9 +22,10 @@ import json;
 import re;
 import auth;
 import train;
+import metrics;
 import paths;
 import from pathlib { Path }
-import from data { FileRefView, DataRowView }
+import from data { FileRefView, DataRowView, _count_lines_cached }
 
 glob _ROOT: str = "model-experiments/04-cpt-sft";
 
@@ -65,6 +66,31 @@ glob _DPO_REL: str = "model-experiments/04-cpt-sft/dataset/fresh/releases/dpo_tr
 
 def _abs(rel: str) -> Path {
     return paths.resolve(rel, "workspace");
+}
+
+# --------------------------------------------------------- stats memoization ---
+# cptsft_stats() JSON-parses every row of sft_train.jsonl + dpo_train.jsonl and
+# reads all 6 holdouts. The pool is FROZEN (dataset/shared/pool_hashes.json), so
+# the answer only ever changes when one of those 8 files changes on disk. Cache
+# key = the (abs path, st_mtime_ns, st_size) triple of each input file joined —
+# any rebuild/edit misses the cache. Paths are workspace-absolute (shared, not
+# per-user data), so one entry serves every caller; the cache is cleared before
+# each insert so it can never hold more than the current signature.
+glob _STATS_CACHE: dict[str, dict] = {};
+
+"""Cache signature over *rels*: path + mtime_ns + size of each, missing -> "missing"."""
+def _sig(rels: list[str]) -> str {
+    parts: list[str] = [];
+    for rel in rels {
+        p = _abs(rel);
+        try {
+            st = p.stat();
+            parts.append(str(p) + ":" + str(st.st_mtime_ns) + ":" + str(st.st_size));
+        } except Exception {
+            parts.append(str(p) + ":missing");
+        }
+    }
+    return "|".join(parts);
 }
 
 def _allowed(rel: str) -> bool {
@@ -166,6 +192,15 @@ composition (both pct as per-mille 0-1000 so the client avoids float math), and
 carved holdout counts. `categories`/`axes` double as the client's filter-option
 source for the SFT/DPO row-level filters (see cptsft_rows)."""
 def cptsft_stats() -> dict {
+    inputs: list[str] = [_SFT_REL, _DPO_REL];
+    for hp in _HOLDOUT_FILES { inputs.append(hp[0]); }
+    key = _sig(inputs);
+    hit = _STATS_CACHE.get(key);
+    # ponytail: the memo hands back the SAME dict object on a hit. Every caller
+    # (cptsft_plan_status, the RPC serializer) treats it read-only; nothing in the
+    # app mutates a stats result, so no defensive copy.
+    if hit is not None { return hit; }
+
     sft_lines = _read_lines(_SFT_REL);
     sft_total = len(sft_lines);
     counts: dict = {};
@@ -228,12 +263,12 @@ def cptsft_stats() -> dict {
     holdouts: list = [];
     htotal = 0;
     for pair in _HOLDOUT_FILES {
-        n = len(_read_lines(pair[0]));
+        n = _count_lines_cached(_abs(pair[0]));
         holdouts.append({"name": pair[1], "count": n});
         htotal += n;
     }
 
-    return {
+    out: dict = {
         "sft_total": sft_total,
         "dpo_pairs": dpo_total,
         "categories": categories,
@@ -241,13 +276,16 @@ def cptsft_stats() -> dict {
         "holdouts": holdouts,
         "holdout_total": htotal
     };
+    _STATS_CACHE.clear();
+    _STATS_CACHE[key] = out;
+    return out;
 }
 
 """All allowlisted browsable files with line counts."""
 def cptsft_files() -> list[FileRefView] {
     out: list[FileRefView] = [];
     for pair in _FILES {
-        out.append(FileRefView(path=pair[0], label=pair[1], count=len(_read_lines(pair[0]))));
+        out.append(FileRefView(path=pair[0], label=pair[1], count=_count_lines_cached(_abs(pair[0]))));
     }
     return out;
 }
@@ -335,10 +373,50 @@ def _train_status_for(runs: list, tag: str) -> str {
     return "not started";
 }
 
+"""Eval state of ONE run directory, read off the caller's real results tree the
+same way _train_status_for reads the training side.
+
+The eval an arm gets is the holdout probe, and the probe writes its scores into the
+run dir as idiom-metrics.jsonl / graph-idiom*.jsonl — exactly the artifacts
+metrics.idiom_summary already picks up for the Train HISTORY view. A row carrying
+`avg_sim` means a probe genuinely ran and scored; nothing on disk means nothing has
+been evaluated yet. "finished" matches list_sessions' own vocabulary for a job that
+is no longer running (train.list_sessions maps idle -> "finished")."""
+def _eval_state_of_run(name: str, mode: str) -> str {
+    try {
+        rdir = auth.user_results_dir() / name;
+        if not rdir.exists() { return "not started"; }
+        if metrics.idiom_summary(rdir, mode, "function") { return "finished"; }
+        if metrics.idiom_summary(rdir, mode, "graph") { return "finished"; }
+    } except Exception {
+        return "unknown";
+    }
+    return "not started";
+}
+
+"""Real eval state for the arm whose run name carries *tag*. No matching run at all
+-> "not started" (nothing can have been evaluated). Mirrors _train_status_for's
+first-match-wins lookup and its vocabulary."""
+def _eval_status_for(runs: list, tag: str) -> str {
+    for r in runs {
+        if tag in str(r["name"]).lower() {
+            return _eval_state_of_run(str(r["name"]), str(r["mode"]));
+        }
+    }
+    return "not started";
+}
+
 """Live three-arm protocol status: reads real on-disk state (fresh build counts,
 whether post_cptv2 / the CPT-v2 base adapter exist, pool freeze metadata) and
 cross-checks the caller's results tree for any Arm A/B/C run. Nothing fabricated —
-pending is reported as pending."""
+pending is reported as pending, and anything this function cannot determine from
+disk is reported as "unknown" rather than guessed.
+
+The `base` / `dataset` / `train`-for-Incumbent strings are protocol DESCRIPTIONS
+(what each arm is defined to be), not measured state. Every state cell — the arms'
+`train` and `eval` — is derived from the results tree on each call. Note this is
+deliberately NOT covered by cptsft_stats' memo: the dataset pool is frozen, run and
+eval state are not."""
 def cptsft_plan_status() -> dict {
     stats = cptsft_stats();
     sft_total = int(stats["sft_total"]);
@@ -368,25 +446,30 @@ def cptsft_plan_status() -> dict {
         {
             "arm": "Incumbent", "base": "588-ex conversion checkpoint",
             "dataset": "conversion-only (n=588)", "train": "reference (eval-only)",
-            "eval": "not started"
+            # The incumbent is a reference checkpoint, not an Arm run — no run name
+            # in the results tree identifies it, so its eval state is genuinely not
+            # derivable here. Say "unknown" rather than assert a confident
+            # "not started" this function cannot actually know.
+            "eval": "unknown"
         },
         {
             "arm": "A", "base": "pre-CPT base (qwen-q4)",
             "dataset": post_ds,
             "train": _train_status_for(runs, "arm-a") if runs else "not started",
-            "eval": "not started"
+            "eval": _eval_status_for(runs, "arm-a") if runs else "not started"
         },
         {
             "arm": "B", "base": cptv2_base,
             "dataset": post_pending,
             "train": _train_status_for(runs, "arm-b") if post_cptv2_exists else blocked,
-            "eval": "not started"
+            # dataset pending blocks the eval exactly as it blocks the train.
+            "eval": _eval_status_for(runs, "arm-b") if post_cptv2_exists else blocked
         },
         {
             "arm": "C", "base": "pre-CPT base (qwen-q4)",
             "dataset": post_pending,
             "train": _train_status_for(runs, "arm-c") if post_cptv2_exists else blocked,
-            "eval": "not started"
+            "eval": _eval_status_for(runs, "arm-c") if post_cptv2_exists else blocked
         }
     ];
 

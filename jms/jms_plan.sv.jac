@@ -12,6 +12,9 @@ Two provider paths:
     `propose_plan ... by _plan_llm()`. The `by` clause evaluates `_plan_llm()`
     at call time, so `_PLAN_CFG` (a module glob mutated in place — no `global`
     needed, same trick as inference.sv `_S`) carries the runtime key/model in.
+    Because that glob is process-wide, the write AND the propose_plan call are
+    held under `_PLAN_LOCK` (inference.sv `_S["lock"]` pattern) so two tenants
+    drafting at once cannot swap keys mid-call.
   • "mlx" — the resident local model (inference.stream_chat), prompted to reply
     ONLY JSON matching the schema, json-parsed with one retry on a parse miss.
 
@@ -27,6 +30,7 @@ LLM-visible surface with `sem`, not docstrings.
 
 import json;
 import os;
+import threading;
 import datetime;
 import inference;
 import models;
@@ -79,8 +83,17 @@ sem DatasetPlan.system_prompt = "The system prompt that every synthesized traini
 sem DatasetPlan.grounding_notes = "Concrete notes tying the plan to the source samples: key APIs, patterns, idioms, or file kinds the examples should reflect.";
 
 """Runtime wiring for the per-call plan Model. Mutated IN PLACE by _draft_claude
-before propose_plan runs; read back by _plan_llm() from inside the `by` clause."""
+before propose_plan runs; read back by _plan_llm() from inside the `by` clause.
+
+MODULE-LEVEL and therefore SHARED BY EVERY REQUEST THREAD: the write and the
+`by`-clause call that reads it back MUST both happen under _PLAN_LOCK, or two
+concurrent drafts interleave and user A's Anthropic key/model is used for (and
+billed to) user B's call. The key is also zeroed on the way out so it does not
+sit in module state between requests."""
 glob _PLAN_CFG: dict[str, str] = {"model_name": "", "api_key": ""};
+
+"""Guards _PLAN_CFG for the whole write→propose_plan→return window."""
+glob _PLAN_LOCK: any = threading.Lock();
 
 """Build the Model the `by` clause delegates to — dynamic model_name + api_key
 from _PLAN_CFG. Anthropic models are LiteLLM-routed via the 'anthropic/' prefix
@@ -235,17 +248,30 @@ def _normalize_plan(raw: dict) -> dict {
 
 # ============================================================ claude path ======
 """Draft via byllm/Anthropic. Wires _PLAN_CFG then runs propose_plan by _plan_llm.
-Returns {ok, plan, error}."""
+Returns {ok, plan, error}.
+
+The _PLAN_CFG write and the propose_plan call are ONE critical section under
+_PLAN_LOCK — _PLAN_CFG is module state and `by _plan_llm()` reads it back at
+call time, so an unguarded interleave bills user A's Anthropic key for user B's
+draft. ponytail: a plain mutex, so concurrent claude drafts are SERIALIZED
+(~30-60s each). Ceiling = one in-flight Anthropic plan draft per process; the
+correct fix is threading key/model through propose_plan, but byllm puts every
+parameter into the prompt, which would leak the API key to the model."""
 def _draft_claude(p: JmsProject, model: str, grounding: str) -> dict {
     key = jms_llm.resolved_anthropic_key();
     if not key { return {"ok": False, "plan": {}, "error": "no Anthropic key configured — set one in the key modal"}; }
-    _PLAN_CFG["model_name"] = "anthropic/" + model;
-    _PLAN_CFG["api_key"] = key;
+    _PLAN_LOCK.acquire();
     try {
+        _PLAN_CFG["model_name"] = "anthropic/" + model;
+        _PLAN_CFG["api_key"] = key;
         dp = propose_plan(p.use_case, grounding);
         return {"ok": True, "plan": _dp_to_dict(dp), "error": ""};
     } except Exception as e {
         return {"ok": False, "plan": {}, "error": "claude plan failed: " + str(e)[:240]};
+    } finally {
+        _PLAN_CFG["model_name"] = "";
+        _PLAN_CFG["api_key"] = "";
+        _PLAN_LOCK.release();
     }
 }
 

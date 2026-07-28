@@ -123,7 +123,17 @@ def get_rl_corrected() -> dict {
     if not os.path.exists(p) {
         return empty;
     }
-    return json.loads(Path(p).read_text());
+    # A truncated/half-written corrected_summary.json used to 500 the endpoint.
+    # ponytail: any read/parse failure degrades to `empty` — the client renders
+    # the "no corrected results" state. Ceiling: the specific parse error is not
+    # surfaced to the UI, only the empty shape.
+    try {
+        parsed: any = json.loads(Path(p).read_text());
+    } except Exception {
+        return empty;
+    }
+    if not isinstance(parsed, dict) { return empty; }
+    return dict(parsed);
 }
 
 def rl_generate(prompt: str, k: int = 8) -> dict {

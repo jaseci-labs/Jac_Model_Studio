@@ -38,26 +38,37 @@ def:pub CptData -> JsxElement {
         rows: list = [],
         offset: int = 0,
         total: int = 0,
-        expanded: int = -1;
+        expanded: int = -1,
+        loadErr: str = "";
 
     async def _fetch(p: str, off: int) -> None {
-        r = await cpt_rows(p, off, 25);
-        rows = list(r["rows"]);
-        total = int(r["total"]);
+        try {
+            r = await cpt_rows(p, off, 25);
+            rows = list(r["rows"]);
+            total = int(r["total"]);
+        } except Exception as e {
+            rows = []; total = 0;
+            loadErr = "rows failed · " + str(e);
+        }
     }
 
     # `src` passed explicitly — reading cptSource right after setting it returns
     # the stale value (React writes are async), same as RlData._loadSource.
     async def _loadSource(src: str) -> None {
-        fs = await cpt_files(src);
-        files = fs;
-        expanded = -1;
-        offset = 0;
-        if len(list(fs)) > 0 {
-            path = str(fs[0].path);
-            await _fetch(str(fs[0].path), 0);
-        } else {
-            path = ""; rows = []; total = 0;
+        try {
+            fs = await cpt_files(src);
+            files = fs;
+            expanded = -1;
+            offset = 0;
+            if len(list(fs)) > 0 {
+                path = str(fs[0].path);
+                await _fetch(str(fs[0].path), 0);
+            } else {
+                path = ""; rows = []; total = 0;
+            }
+        } except Exception as e {
+            files = []; path = ""; rows = []; total = 0;
+            loadErr = "file list failed · " + str(e);
         }
     }
 
@@ -96,26 +107,35 @@ def:pub CptData -> JsxElement {
     }
 
     async can with entry {
-        m = await cpt_manifest();
-        # tag each source with its ramp shade up front so the render loops never
-        # need an index (enumerate/.index() are awkward in the JSX .map() compile).
-        opts: list = ["all"];
-        if m["ok"] {
-            srcs = list(m["sources"]);
-            idx = 0;
-            for s in srcs {
-                s["shade"] = SHADES[idx % len(SHADES)];
-                opts.append(str(s["name"]));
-                idx += 1;
+        try {
+            m = await cpt_manifest();
+            # tag each source with its ramp shade up front so the render loops never
+            # need an index (enumerate/.index() are awkward in the JSX .map() compile).
+            opts: list = ["all"];
+            if m["ok"] {
+                srcs = list(m["sources"]);
+                idx = 0;
+                for s in srcs {
+                    s["shade"] = SHADES[idx % len(SHADES)];
+                    opts.append(str(s["name"]));
+                    idx += 1;
+                }
             }
+            man = m;
+            sourceOpts = opts;
+            await _loadSource(cptSource);
+        } except Exception as e {
+            # Without this the compiled async IIFE rejects unhandled and `man`
+            # stays None, so the panel reads "loading…" forever.
+            loadErr = "CPT manifest failed · " + str(e);
         }
-        man = m;
-        sourceOpts = opts;
-        await _loadSource(cptSource);
     }
 
     def _tiles() -> JsxElement {
         if not man or not man["ok"] {
+            if loadErr {
+                return <span className="micro-label" style={{"color": "var(--danger)"}}>{loadErr}</span>;
+            }
             return <span className="micro-label">loading…</span>;
         }
         srcs: list = list(man["sources"]);
@@ -198,6 +218,9 @@ def:pub CptData -> JsxElement {
             <span className="micro-label">DATA · CPT CORPUS (read-only)</span>
             <span className="micro-label text-muted-foreground/80">03-new/dataset/cpt</span>
         </div>
+        {loadErr and <div key="cpterr" className="border-b border-border px-4 py-1.5">
+            <span className="stat-line" style={{"color": "var(--danger)"}}>{loadErr}</span>
+        </div>}
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
             {_tiles()}
             {_composition()}

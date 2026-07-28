@@ -12,10 +12,17 @@ sv import from ...cptsft { cptsft_plan_status }
 import from ..shared.StatTile { StatTile }
 
 def:pub CptSftPlan -> JsxElement {
-    has status: any = None;
+    has status: any = None,
+        loadErr: str = "";
 
     async can with entry {
-        status = await cptsft_plan_status();
+        try {
+            status = await cptsft_plan_status();
+        } except Exception as e {
+            # Unguarded this was an un-.catch()ed async IIFE: the rejection went
+            # nowhere and `status` stayed None, so the page said "loading…" forever.
+            loadErr = "plan status failed · " + str(e);
+        }
     }
 
     def _glyph(ok: bool) -> str {
@@ -24,6 +31,9 @@ def:pub CptSftPlan -> JsxElement {
 
     def _tiles() -> JsxElement {
         if not status {
+            if loadErr {
+                return <span className="micro-label" style={{"color": "var(--danger)"}}>{loadErr}</span>;
+            }
             return <span className="micro-label">loading…</span>;
         }
         s: any = status;

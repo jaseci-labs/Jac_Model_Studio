@@ -10,7 +10,8 @@ limit (0 = all holdout rows), then SCORE ON HOLDOUT. The project's evals list
 (eid · run · metric · status dot · n · mean · pass% · elapsed); selecting one shows
 summary StatTiles + a paginated row browser (prompt excerpt, reference vs
 generated stacked, score chip, rationale). Polls list_jms_evals/eval_status every
-2s while a run is going (the TrainStage poll + `can with exit` cleanup pattern).
+2s ONLY while `active` (this stage is the visible one) — the interval id is
+effect-local so the cleanup can actually see it (Cloud.cl.jac pattern).
 
 CHAT: pick a completed run, then a minimal in-memory chat (cleared on unmount — no
 persistence, YAGNI) that streams from jms_chat_stream via the SAME raw SSE fetch
@@ -19,6 +20,7 @@ reader Chat.cl.jac uses (bearer + 401 recovery). Temperature slider + STOP.
 `project` is the get_project() dict; `onRefresh` re-pulls it. Handlers are named
 start.../select.../pick.../send.../stop... — never set<HasVar>."""
 
+import from react { useEffect, useRef }
 sv import from ....jms_eval { start_eval, eval_status, eval_rows, list_jms_evals, stop_eval_run }
 sv import from ....jms_train { list_train_runs }
 sv import from ....jms_llm { llm_status }
@@ -44,7 +46,7 @@ def _pct(v: any) -> str {
     except Exception { return "0%"; }
 }
 
-def:pub EvalStage(project: any = None, onRefresh: any = None) -> JsxElement {
+def:pub EvalStage(project: any = None, onRefresh: any = None, active: bool = True) -> JsxElement {
     has subtab: str = "eval",
         runs: list = [],
         keyConfigured: bool = False,
@@ -61,14 +63,17 @@ def:pub EvalStage(project: any = None, onRefresh: any = None) -> JsxElement {
         startBusy: bool = False,
         startErr: str = "",
         startNote: str = "",
-        pollId: any = None,
         chatRunRid: str = "",
         chatMessages: list = [],
         chatDraft: str = "",
         chatStreaming: bool = False,
         chatStopReq: bool = False,
-        chatReader: any = None,
         chatTemp: float = 0.2;
+
+    # The SSE reader lives in a ref, not in `has` state: an unmount cleanup closes
+    # over the FIRST render's value of a state var (always None) and so could never
+    # cancel the stream. A ref is the same object on every render.
+    chatReaderRef: any = useRef(None);
 
     def _pid -> str {
         if project { return str(project["pid"]); }
@@ -129,20 +134,32 @@ def:pub EvalStage(project: any = None, onRefresh: any = None) -> JsxElement {
         } except Exception { keyConfigured = False; }
     }
 
-    async can with entry {
-        await reloadKey();
-        await refreshRuns();
-        await refreshEvals();
-        pollId = setInterval(lambda -> None { refreshEvals(); }, 2000);
-    }
-
-    can with exit {
-        if pollId is not None { clearInterval(float(str(pollId))); }
-        r: any = chatReader;
+    def _cancelReader -> None {
+        r: any = chatReaderRef.current;
+        chatReaderRef.current = None;
         if r {
             try { r.cancel(); } except Exception {}
         }
     }
+
+    async can with entry {
+        await reloadKey();
+        await refreshRuns();
+    }
+
+    # Effect-local interval id + `active` gate: a `can with exit` cleanup closes over
+    # the first-render (None) value of a `has` var, so it never cleared anything.
+    useEffect(lambda {
+        iv: any = None;
+        if active {
+            refreshEvals();
+            iv = setInterval(lambda { refreshEvals(); }, 2000);
+        }
+        return lambda { if iv is not None { clearInterval(float(str(iv))); } };
+    }, [active]);
+
+    # Unmount-only: kill any in-flight chat stream (reads the ref, so it actually sees it).
+    useEffect(lambda { return lambda { _cancelReader(); }; }, []);
 
     # -------------------------------------------------------------- eval ------
     async def loadRows(eid: str, off: int) -> None {
@@ -249,7 +266,7 @@ def:pub EvalStage(project: any = None, onRefresh: any = None) -> JsxElement {
                 return;
             }
             reader: any = resp.body.getReader();
-            chatReader = reader;
+            chatReaderRef.current = reader;
             dec: any = new(TextDecoder);
             nl = String.fromCharCode(10);
             sep = nl + nl;
@@ -299,7 +316,7 @@ def:pub EvalStage(project: any = None, onRefresh: any = None) -> JsxElement {
         } except Exception {
             errtext = "stream failed";
         }
-        chatReader = None;
+        chatReaderRef.current = None;
         work[ai] = {"role": "assistant", "content": acc, "streaming": False, "error": errtext};
         chatMessages = list(work);
         chatStreaming = False;
@@ -307,7 +324,7 @@ def:pub EvalStage(project: any = None, onRefresh: any = None) -> JsxElement {
 
     async def stopChat -> None {
         chatStopReq = True;
-        r: any = chatReader;
+        r: any = chatReaderRef.current;
         if r {
             try { await r.cancel(); } except Exception {}
         }
@@ -331,6 +348,7 @@ def:pub EvalStage(project: any = None, onRefresh: any = None) -> JsxElement {
                 {len(cr) == 0 and <span className="jms-mono-dim" style={{"color": "var(--jms-danger)"}}>No completed local-mlx run with an adapter yet — train one in the TRAIN stage.</span>}
                 {len(cr) > 0 and <select
                     className="jms-input" style={{"width": "auto", "minWidth": "260px"}}
+                    aria-label="completed run to evaluate"
                     value={evalRunRid}
                     onChange={lambda e: any { evalRunRid = str(e.target.value); }}
                 >
@@ -358,6 +376,7 @@ def:pub EvalStage(project: any = None, onRefresh: any = None) -> JsxElement {
                 <div className="flex flex-col gap-1.5">
                     <span className="jms-label">ROW LIMIT (0 = all)</span>
                     <input className="jms-input" style={{"width": "110px"}} type="number"
+                        aria-label="row limit (0 = all)"
                         value={limitStr} onChange={lambda e: any { limitStr = str(e.target.value); }} />
                 </div>
                 <button
@@ -415,15 +434,18 @@ def:pub EvalStage(project: any = None, onRefresh: any = None) -> JsxElement {
             {len(rows) > 0 and <div className="flex flex-col gap-2">
                 <span className="jms-label">ROWS</span>
                 {for row in rows {
-                    <div key={_g(row, "idx", "")} className="flex flex-col gap-1 rounded border border-neutral-800 p-2">
-                        <div
-                            className="flex cursor-pointer items-center gap-2"
+                    <div key={_g(row, "idx", "")} className="flex flex-col gap-1 rounded border border-border p-2">
+                        <button
+                            className="flex cursor-pointer items-center gap-2 text-left"
+                            style={{"background": "transparent", "border": "none", "padding": "0", "width": "100%"}}
+                            aria-expanded={expanded == _toInt(_g(row, "idx", "0"))}
+                            aria-label={"toggle eval row " + _g(row, "idx", "")}
                             onClick={lambda e: MouseEvent { toggleRow(_toInt(_g(row, "idx", "0"))); }}
                         >
                             <span className="jms-chip">#{_g(row, "idx", "")}</span>
                             <span className="jms-chip" style={{"color": "var(--jms-accent)"}}>score {_g(row, "score", "0")}/5</span>
                             <span className="jms-mono-dim truncate flex-1">{_g(row, "prompt_excerpt", "")}</span>
-                        </div>
+                        </button>
                         {expanded == _toInt(_g(row, "idx", "0")) and <div className="flex flex-col gap-2">
                             {_g(row, "rationale", "") and <div className="jms-mono-dim" style={{"fontSize": "11px"}}>▸ {_g(row, "rationale", "")}</div>}
                             <div className="flex flex-col gap-1">
@@ -462,6 +484,7 @@ def:pub EvalStage(project: any = None, onRefresh: any = None) -> JsxElement {
                     {len(cr) == 0 and <span className="jms-mono-dim" style={{"color": "var(--jms-danger)"}}>No completed local-mlx run yet.</span>}
                     {len(cr) > 0 and <select
                         className="jms-input" style={{"width": "auto", "minWidth": "260px"}}
+                        aria-label="completed run to chat with"
                         value={chatRunRid}
                         onChange={lambda e: any { chatRunRid = str(e.target.value); clearChat(); }}
                     >
@@ -473,6 +496,7 @@ def:pub EvalStage(project: any = None, onRefresh: any = None) -> JsxElement {
                 <div className="flex flex-col gap-1.5">
                     <span className="jms-label">TEMPERATURE {_r2(chatTemp)}</span>
                     <input type="range" min="0" max="1" step="0.05"
+                        aria-label="temperature"
                         value={str(chatTemp)}
                         onChange={lambda e: any { chatTemp = float(str(e.target.value)); }}
                         style={{"width": "160px"}} />
@@ -497,6 +521,7 @@ def:pub EvalStage(project: any = None, onRefresh: any = None) -> JsxElement {
             <div className="flex items-end gap-2">
                 <textarea
                     className="jms-textarea flex-1"
+                    aria-label="chat message"
                     value={chatDraft}
                     placeholder="Ask the adapter…"
                     onChange={lambda e: any { chatDraft = str(e.target.value); }}

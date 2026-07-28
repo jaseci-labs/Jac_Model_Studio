@@ -1,12 +1,35 @@
-"""PLAN section (workspace 03 CPT) — the CPT→SFT/DPO→GRPO roadmap.
+"""PLAN section — renders the hand-maintained plan doc for the workspace it
+belongs to, and an honest empty state everywhere else.
 
-Static render of 03-new/docs/workflow.md: the 9 phases with a status glyph each
-(P1 done — corpus built; everything downstream idle/gated) + the 12-item
-checklist. Status is hardcoded to on-disk reality; workflow.md is the source of
-truth. No sv imports.
+WORKSPACE-SCOPED. This component is mounted by every workspace whose layout has
+a PLAN section, but the only plan document transcribed here is workspace
+PLAN_WS's (03 · CPT). PHASES/CHECKLIST describe THAT experiment and nothing
+else, so on any other workspace this renders "no plan doc" rather than showing
+CPT content under an unrelated experiment. Do not add content for another
+workspace unless you are transcribing that workspace's real doc.
+
+STATIC DOCUMENT, NOT LIVE STATE. There is no `sv import` in this file: PHASES and
+CHECKLIST below are hand-transcribed from 03-new/docs/workflow.md and are only as
+current as AS_OF. They are rendered with a STATIC · HAND-MAINTAINED tag and the
+AS_OF date in the header so nobody mistakes them for something the system read.
+
+To make this live later, follow `cptsft.sv.jac:cptsft_plan_status` — it derives
+plan status from the real results tree, and CptSftPlan.cl.jac renders it. Doing
+that here needs a new sv endpoint plus a main.jac registration.
 """
 
 import from ..shared.StatusGlyph { StatusGlyph }
+import from ..shared.EmptyState { EmptyState }
+
+# The ONE workspace whose plan doc is transcribed below (wid from workspace.sv.jac
+# `_SEED_WORKSPACES`: 01 SFT/DPO, 02 RL/GRPO, 03 CPT, 04 CPT-SFT — 04 has its own
+# live component, CptSftPlan.cl.jac).
+glob PLAN_WS: str = "03";
+glob PLAN_SOURCE: str = "03-new/docs/workflow.md";
+
+# Date the hardcoded PHASES/CHECKLIST content below reflects. BUMP THIS whenever
+# you edit either list — it is what the header shows the user.
+glob AS_OF: str = "2026-07-14";
 
 glob PHASES: list[dict] = [
     {"id": "P0", "status": "idle", "title": "Base eval (checkpoint 0)", "note": "unmodified Qwen3-Coder-30B-A3B through both eval tracks — the floor every checkpoint is read against."},
@@ -35,11 +58,38 @@ glob CHECKLIST: list[dict] = [
     {"done": False, "t": "Phase 8 ablation table built, hypothesis confirmed/killed"}
 ];
 
-def:pub Plan -> JsxElement {
+def:pub Plan(workspace: str = "") -> JsxElement {
+    # ponytail: one transcribed doc, one workspace. Everything else gets the
+    # empty state rather than a fabricated roadmap. A real multi-workspace PLAN
+    # needs the docs read server-side (see module docstring) — out of scope here.
+    if workspace != PLAN_WS {
+        return <div className="flex h-full min-w-0 flex-1 flex-col">
+            <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
+                <span className="micro-label">PLAN</span>
+                <span className="micro-label text-muted-foreground/80">
+                    {("WORKSPACE " + workspace) if workspace else "NO WORKSPACE"}
+                </span>
+            </div>
+            <div className="flex flex-1 items-center justify-center p-4">
+                <div className="w-full max-w-md text-center">
+                    <EmptyState
+                        label="NO PLAN DOC FOR THIS WORKSPACE"
+                        hint={"PLAN renders a hand-transcribed plan document. None has been written for this workspace — the only one that exists lives on workspace " + PLAN_WS + " (" + PLAN_SOURCE + ")."}
+                    />
+                </div>
+            </div>
+        </div>;
+    }
     return <div className="flex h-full min-w-0 flex-1 flex-col">
         <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
             <span className="micro-label">PLAN · CPT → SFT/DPO → GRPO</span>
-            <span className="micro-label text-muted-foreground/80">03-new/docs/workflow.md</span>
+            <div className="flex items-center gap-2">
+                <span className="micro-label rounded border border-input px-1.5 py-0.5 text-muted-foreground">STATIC · HAND-MAINTAINED</span>
+                <span className="micro-label text-muted-foreground/80">{PLAN_SOURCE}</span>
+            </div>
+        </div>
+        <div className="border-b border-border px-4 py-1.5">
+            <span className="stat-line text-muted-foreground">Not live status. This page is a hand-transcribed copy of {PLAN_SOURCE} (workspace {PLAN_WS} · CPT) as of {AS_OF} — it does not read the system and will not update as experiments move on.</span>
         </div>
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
             <div className="relative exp-panel p-3 pt-4">
@@ -69,7 +119,7 @@ def:pub Plan -> JsxElement {
                         </div>
                     }}
                 </div>
-                <div className="stat-line mt-3 text-muted-foreground/80">status hardcoded to on-disk reality · source of truth: 03-new/docs/workflow.md</div>
+                <div className="stat-line mt-3 text-muted-foreground/80">hand-transcribed as of {AS_OF} · not read from the system · source of truth: {PLAN_SOURCE}</div>
             </div>
         </div>
     </div>;

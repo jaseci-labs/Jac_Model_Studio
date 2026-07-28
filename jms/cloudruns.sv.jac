@@ -198,6 +198,22 @@ def _read_status(run_dir: Path) -> dict {
     }
 }
 
+"""One-way control file recording a server-side direct VM teardown
+(terminate_run_vm). status.json is OWNED by remote/supervisor.py, which rewrites
+it wholesale on every heartbeat — a server-side read-modify-write of that file
+races the supervisor and clobbers phase/heartbeat/cost. So the terminate signal
+goes in its own file that only this module writes and only _view reads, the same
+one-way pattern as control.json.
+ponytail: the file's mere existence is the signal (its body is informational).
+Ceiling — no timestamp is surfaced to the client; the audit log has the when."""
+def _vm_terminated_file(run_dir: Path) -> Path {
+    return run_dir / "vm-terminated.json";
+}
+
+def _vm_terminated_signal(run_dir: Path) -> bool {
+    return _vm_terminated_file(run_dir).exists();
+}
+
 def _hb_epoch(hb: str) -> float {
     try {
         dt: any = datetime.datetime.strptime(hb, "%Y-%m-%dT%H:%M:%SZ");
@@ -271,7 +287,9 @@ def _view(r: CloudRun, tail_n: int = 40) -> dict {
     if status in ["done", "failed", "stopped"] and r.status != status {
         r.status = status;
     }
-    vm_terminated = bool(st.get("vm_terminated", False)) if has_st else False;
+    # Either the supervisor recorded the teardown in status.json, or the server
+    # tore the VM down itself via terminate_run_vm (one-way control file).
+    vm_terminated = (bool(st.get("vm_terminated", False)) if has_st else False) or _vm_terminated_signal(rd);
     if vm_terminated {
         # Supervisor deleted the VM via the API directly — release the budget
         # guard's reservation node (idempotent).
@@ -532,15 +550,16 @@ def terminate_run_vm(run_id: str) -> dict {
     res = spheron.destroy_gpu_instance(r.deployment_id);
     audit.log("cloudrun_terminate_vm", {"run_id": run_id, "ok": bool(res["ok"])});
     if not bool(res["ok"]) { return _err(str(res["error"])); }
-    # Record the terminate in status.json so billing_alert clears even though
-    # no supervisor is alive to write it.
+    # Record the terminate so billing_alert clears even though no supervisor is
+    # alive to write it. This used to read-modify-write status.json — a file
+    # remote/supervisor.py OWNS and rewrites every heartbeat, so a live
+    # supervisor's phase/heartbeat/cost got clobbered by our stale copy. Write a
+    # separate one-way control file instead (same pattern as control.json) and
+    # let _view OR it into vm_terminated.
     rd = _run_dir(r.name);
-    st = _read_status(rd);
-    if len(st) > 0 {
-        st["vm_terminated"] = True;
-        try {
-            (rd / "status.json").write_text(json.dumps(st, indent=2));
-        } except Exception {}
-    }
+    try {
+        rd.mkdir(parents=True, exist_ok=True);
+        _vm_terminated_file(rd).write_text(json.dumps({"vm_terminated": True, "at": _now()}));
+    } except Exception {}
     return {"ok": True, "run": _view(r), "error": ""};
 }

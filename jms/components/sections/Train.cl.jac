@@ -7,9 +7,13 @@ HISTORY: runs (pick model+stage → RunDetail) | compare (table + overlay charts
 Backed by train.sv.jac (start/stop/status/sessions) + runs.sv.jac (get_run/compare).
 Polling uses manual `useEffect` + setInterval so the interval is re-established when
 its deps change (avoids stale-closure reads); cross-tick stall tracking lives in an
-effect-local dict (mutated by reference, never via React state). The ⟳ UPDATE APP
-button is a client-only placeholder — no system-update endpoint exists yet, so it
-runs the confirm→reload state machine without a backend call (NOTE).
+effect-local dict (mutated by reference, never via React state).
+
+(There used to be a ⟳ UPDATE APP button here. It had no backend at all — it
+showed a "restarting · reloads in ~20s" banner and then just reloaded the page,
+plus leaked two uncleaned setTimeouts that fired from an unmounted section. A
+control that lies about restarting the app is worse than no control, so it is
+gone; add it back only alongside a real /system/update endpoint.)
 """
 
 import from react { useEffect }
@@ -23,10 +27,12 @@ import from ..shared.LogView { LogView }
 import from ..shared.StatTile { StatTile }
 import from ..shared.MonoChart { MonoChart }
 import from ..shared.MultiLineChart { MultiLineChart }
+import from ...lib.chartkit { chartColor }
 
 glob TABS: list[str] = ["LAUNCH", "MONITOR", "HISTORY"];
-glob CC: dict = {"loss": "#d8a657", "lr": "#7aa2f7", "tps": "#6fc3b2", "acc": "#9ec98f"};
-glob COLORS: list[str] = ["#7aa2f7", "#d8a657", "#9ec98f", "#b89ce8", "#6fc3b2", "#e08a8a"];
+# Chart accents are chartkit palette SLOTS, not hex — the old literals were
+# dark-theme-only and washed out on the cream light background.
+glob CC: dict = {"loss": 0, "lr": 1, "tps": 5, "acc": 4};
 glob MODE_DESC: dict = {
     "sft": "supervised finetune · teaches the model to write Jac",
     "dpo": "preference tuning · pushes outputs toward idiomatic Jac"
@@ -55,12 +61,18 @@ def _backendDesc(backends: list, backendId: str) -> str {
 def _optKeysFor(backends: list, backendId: str, mode: str) -> list {
     for b in backends {
         if str(b["id"]) != backendId { continue; }
-        details = b.get("method_details");
-        if not isinstance(details, dict) { return []; }
-        md = details.get(mode);
-        if not isinstance(md, dict) { return []; }
-        raw = md.get("env_keys");
-        if isinstance(raw, list) { return [str(k) for k in (raw as list)]; }
+        # NOT isinstance(): a JSON-derived plain object has constructor.name
+        # "Object", so `isinstance(x, dict)` lowers to _tagSubclass("Object",
+        # "dict") == False and this always returned []. `k in obj` is the
+        # idiom that actually works on server dicts (see doStart's `k in opts`).
+        if "method_details" not in b { return []; }
+        details = b["method_details"];
+        if details is None or mode not in details { return []; }
+        md = details[mode];
+        if md is None or "env_keys" not in md { return []; }
+        raw = md["env_keys"];
+        if raw is None { return []; }
+        return [str(k) for k in raw];
     }
     return [];
 }
@@ -123,10 +135,10 @@ def:pub RunDetail(metrics: any, live: bool) -> JsxElement {
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-            <MonoChart title="LOSS · train + val" data={train} secondary={val} live={live} accent={str(CC["loss"])} expY={False} />
-            <MonoChart title="LEARNING.RATE" data={lr} secondary={[]} live={False} accent={str(CC["lr"])} expY={True} />
-            <MonoChart title="TOKENS/SEC" data={tps} secondary={[]} live={False} accent={str(CC["tps"])} expY={False} />
-            <MonoChart title="ACCURACY · TEST-PASS%" data={curve} secondary={[]} live={live} accent={str(CC["acc"])} expY={False} />
+            <MonoChart title="LOSS · train + val" data={train} secondary={val} live={live} accent={chartColor(int(str(CC["loss"])))} expY={False} />
+            <MonoChart title="LEARNING.RATE" data={lr} secondary={[]} live={False} accent={chartColor(int(str(CC["lr"])))} expY={True} />
+            <MonoChart title="TOKENS/SEC" data={tps} secondary={[]} live={False} accent={chartColor(int(str(CC["tps"])))} expY={False} />
+            <MonoChart title="ACCURACY · TEST-PASS%" data={curve} secondary={[]} live={live} accent={chartColor(int(str(CC["acc"])))} expY={False} />
         </div>
 
         <LogView text={str(metrics["log_tail"])} maxH="12rem" />
@@ -191,7 +203,7 @@ def _compareTable(headline: list) -> JsxElement {
                 <tr>
                     <th className="micro-label py-2 pr-4 text-left font-normal">METRIC</th>
                     {for (i, nm) in enumerate(names) {
-                        <th key={nm} className="py-2 px-4 text-right font-normal" style={{"color": COLORS[i % len(COLORS)]}}>{str(nm).upper()}</th>
+                        <th key={nm} className="py-2 px-4 text-right font-normal" style={{"color": chartColor(i)}}>{str(nm).upper()}</th>
                     }}
                 </tr>
             </thead>
@@ -237,8 +249,6 @@ def:pub Train(active: bool) -> JsxElement {
     has histName: str = "";
     has histMode: str = "sft";
     has historyMetrics: any = None;
-    has updateState: str = "idle";
-    has timer: any = None;
 
     # ---- async fetchers (set state only; logic params passed explicitly) ----
     async def _loadBackends() -> None {
@@ -419,28 +429,6 @@ def:pub Train(active: bool) -> JsxElement {
             error = "stop failed";
         }
     }
-    def _reload() -> None {
-        w: any = window;
-        w.location.reload();
-    }
-    def handleUpdate() -> None {
-        if updateState == "idle" {
-            updateState = "confirm";
-            timer = setTimeout(lambda { updateState = "idle"; }, 4000);
-        } elif updateState == "confirm" {
-            if timer is not None { clearTimeout(float(str(timer))); }
-            updateState = "updating";
-            # NOTE: no /system/update backend endpoint exists — placeholder reload only.
-            setTimeout(lambda { _reload(); }, 20000);
-        }
-    }
-
-    def _updateLabel() -> str {
-        if updateState == "confirm" { return "CONFIRM RESTART?"; }
-        if updateState == "updating" { return "UPDATING…"; }
-        return "⟳ UPDATE APP";
-    }
-
     # ---- LAUNCH tab ----
     def _launch() -> JsxElement {
         isRunning = job is not None and str(job["status"]) == "running";
@@ -561,6 +549,12 @@ def:pub Train(active: bool) -> JsxElement {
     }
 
     # ---- HISTORY tab ----
+    # Stage accent from the theme palette (was `border-[#b89ce8]` / `text-[#7aa2f7]`
+    # arbitrary-value Tailwind — dark-only, unreadable on the cream light page).
+    def _stageColor(mode: str) -> str {
+        return chartColor(4) if mode == "dpo" else chartColor(1);
+    }
+
     def _hasRun(pool: list, nm: str, md: str) -> bool {
         for s in pool {
             if str(s["name"]) == nm and str(s["mode"]) == md { return True; }
@@ -608,9 +602,10 @@ def:pub Train(active: bool) -> JsxElement {
                                 disabled={not (_hasRun(pastSessions, selModel, mode) if selModel != "" else True)}
                                 onClick={lambda (e: MouseEvent) { pickHistory(selModel if selModel != "" else mdls[0], mode); }}
                                 className={"exp-hoverable rounded-lg border px-4 py-1.5 font-mono text-xs uppercase tracking-widest transition-colors disabled:opacity-30 " + (
-                                    ("border-[#b89ce8]/50 bg-secondary text-[#b89ce8]" if mode == "dpo" else "border-[#7aa2f7]/50 bg-secondary text-[#7aa2f7]") if selModeH == mode
+                                    "bg-secondary" if selModeH == mode
                                     else "border-border text-muted-foreground hover:border-ring hover:text-foreground"
                                 )}
+                                style={{"borderColor": _stageColor(mode), "color": _stageColor(mode)} if selModeH == mode else {}}
                             >
                                 {mode}
                             </button>
@@ -661,22 +656,9 @@ def:pub Train(active: bool) -> JsxElement {
         <div className="section-header flex items-center justify-between border-b border-border px-4 py-2.5">
             <SubTabs tabs={TABS} active={tab.upper()} onTab={onTab} />
             <div className="flex items-center gap-2">
-                <button
-                    onClick={lambda (e: MouseEvent) { handleUpdate(); }}
-                    disabled={updateState == "updating"}
-                    className={"exp-btn " + (
-                        "text-foreground" if updateState == "confirm" else "text-muted-foreground"
-                    )}
-                >
-                    {_updateLabel()}
-                </button>
                 <span className="micro-label text-muted-foreground/80">TRAIN.CTL</span>
             </div>
         </div>
-
-        {updateState == "updating" and <div className="border-b border-border px-4 py-1">
-            <span className="stat-line text-muted-foreground">restarting · page reloads in ~20s</span>
-        </div>}
 
         <div className="min-h-0 flex-1 overflow-y-auto">
             {tab == "launch" and _launch()}

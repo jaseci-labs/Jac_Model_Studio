@@ -56,38 +56,47 @@ def:pub Chat(workspace: str, defaultModel: str) -> JsxElement {
         todayIso: str = "",
         prompts: list = [],
         lastStats: any = None,
+        bootError: str = "",
         railCollapsed: bool = False;
 
     async can with entry {
-        ms = await list_models();
-        models = ms;
-        # Prefer this workspace's default model if it's on disk; else first available.
-        pick = "";
-        for m in ms {
-            if m.available {
-                if m.id == defaultModel {
-                    pick = m.id;
-                    break;
-                }
-                if not pick {
-                    pick = m.id;
+        try {
+            ms = await list_models();
+            models = ms;
+            # Prefer this workspace's default model if it's on disk; else first available.
+            pick = "";
+            for m in ms {
+                if m.available {
+                    if m.id == defaultModel {
+                        pick = m.id;
+                        break;
+                    }
+                    if not pick {
+                        pick = m.id;
+                    }
                 }
             }
+            modelId = pick;
+            ramGb = float(await system_ram());
+            todayIso = await today_utc();
+            cs = await list_chats(workspace=workspace);
+            chats = cs;
+            pr = await list_prompts();
+            prompts = list(pr["categories"]);
+            await refreshLoaded();
+        } except Exception as e {
+            # Unguarded this rejected into the void and the pane stayed on its
+            # blank initial state — visually identical to a slow load.
+            bootError = "chat failed to load · " + str(e);
         }
-        modelId = pick;
-        ramGb = float(await system_ram());
-        todayIso = await today_utc();
-        cs = await list_chats(workspace=workspace);
-        chats = cs;
-        pr = await list_prompts();
-        prompts = list(pr["categories"]);
-        await refreshLoaded();
     }
 
     async def refreshLoaded -> None {
-        li = await loaded_model();
-        loadedId = str(li["id"]);
-        residentGb = float(str(li["resident_gb"]));
+        try {
+            li = await loaded_model();
+            loadedId = str(li["id"]);
+            residentGb = float(str(li["resident_gb"]));
+        } except Exception { }
     }
 
     def labelMap -> dict {
@@ -106,26 +115,34 @@ def:pub Chat(workspace: str, defaultModel: str) -> JsxElement {
 
     async def openChat(id: str) -> None {
         chatId = id;
-        rows = await get_messages(id);
-        ms: list[dict] = [];
-        for r in rows {
-            st: any = JSON.parse(r.stats_json) if r.stats_json else None;
-            ms.append({
-                "role": r.role, "content": r.content, "stats": st,
-                "modelId": r.model_id, "pairGroup": r.pair_group,
-                "streaming": False, "error": ""
-            });
+        try {
+            rows = await get_messages(id);
+            ms: list[dict] = [];
+            for r in rows {
+                st: any = JSON.parse(r.stats_json) if r.stats_json else None;
+                ms.append({
+                    "role": r.role, "content": r.content, "stats": st,
+                    "modelId": r.model_id, "pairGroup": r.pair_group,
+                    "streaming": False, "error": ""
+                });
+            }
+            messages = ms;
+        } except Exception as e {
+            bootError = "could not open chat · " + str(e);
         }
-        messages = ms;
     }
 
     async def removeChat(id: str) -> None {
-        await delete_chat(id);
-        cs = await list_chats(workspace=workspace);
-        chats = cs;
-        if id == chatId {
-            chatId = "";
-            messages = [];
+        try {
+            await delete_chat(id);
+            cs = await list_chats(workspace=workspace);
+            chats = cs;
+            if id == chatId {
+                chatId = "";
+                messages = [];
+            }
+        } except Exception as e {
+            bootError = "delete failed · " + str(e);
         }
     }
 
@@ -147,12 +164,21 @@ def:pub Chat(workspace: str, defaultModel: str) -> JsxElement {
             cur: any = Date;
             loadElapsed = int((float(str(cur.now())) - t0) / 1000.0);
         }, 500);
-        r = await warm_model(id);
-        clearInterval(int(str(tid)));
-        loadingId = "";
-        loadElapsed = 0;
-        if r["error"] {
-            loadError = str(r["error"]);
+        try {
+            r = await warm_model(id);
+            if r["error"] {
+                loadError = str(r["error"]);
+            }
+        } except Exception as e {
+            loadError = "load failed · " + str(e);
+        } finally {
+            # Unconditional: a throw from warm_model used to skip the
+            # clearInterval, leaking the 500ms timer AND stranding loadingId so
+            # the pill read "loading …s" forever. `float(str(...))` matches the
+            # house rule used everywhere else (was int(str(...)) here).
+            clearInterval(float(str(tid)));
+            loadingId = "";
+            loadElapsed = 0;
         }
         await refreshLoaded();
     }
@@ -327,12 +353,6 @@ def:pub Chat(workspace: str, defaultModel: str) -> JsxElement {
         draft = "";
         streaming = True;
         stopRequested = False;
-        cid = chatId;
-        if not cid {
-            c = await create_chat(prompt[:40], workspace);
-            cid = c.id;
-            chatId = cid;
-        }
         cmp = compareId;
         pg = _uuid() if cmp else "";
 
@@ -352,20 +372,35 @@ def:pub Chat(workspace: str, defaultModel: str) -> JsxElement {
             "modelId": "", "pairGroup": "", "streaming": False, "error": ""
         });
         messages = list(work);
-        await add_message(cid, "user", prompt, "", "", "");
 
-        # Everything below can throw (network hiccup, backend restart mid-stream); an
-        # empty catch here is what guarantees `streaming` always gets released instead of
-        # sticking True forever and permanently blocking the composer.
+        # create_chat/add_message USED TO SIT OUTSIDE this try: a failure in
+        # either left `streaming` True forever with no error shown, permanently
+        # blocking the composer. They are inside now, and `finally` — not a
+        # trailing statement — is what actually guarantees the release.
         try {
+            cid = chatId;
+            if not cid {
+                c = await create_chat(prompt[:40], workspace);
+                cid = c.id;
+                chatId = cid;
+            }
+            await add_message(cid, "user", prompt, "", "", "");
             await runLeg(work, histBase, prompt, modelId, cid, pg);
             if cmp and not stopRequested {
                 await runLeg(work, histBase, prompt, cmp, cid, pg);
             }
             cs = await list_chats(workspace=workspace);
             chats = cs;
-        } except Exception { }
-        streaming = False;
+        } except Exception as e {
+            work.append({
+                "role": "assistant", "content": "", "stats": None,
+                "modelId": modelId, "pairGroup": pg, "streaming": False,
+                "error": "send failed · " + str(e)
+            });
+            messages = list(work);
+        } finally {
+            streaming = False;
+        }
         await refreshLoaded();
     }
 
@@ -378,7 +413,11 @@ def:pub Chat(workspace: str, defaultModel: str) -> JsxElement {
             {"role": "user", "content": userText},
             {"role": "assistant", "content": asstText}
         ]});
-        await add_examples(target="sft", jsonl=rec);
+        try {
+            await add_examples(target="sft", jsonl=rec);
+        } except Exception as e {
+            bootError = "save-as-example failed · " + str(e);
+        }
     }
 
     def pickChip(catId: str) -> None {
@@ -407,6 +446,9 @@ def:pub Chat(workspace: str, defaultModel: str) -> JsxElement {
                 onPick={loadModel}
                 onPickCompare={lambda (id: str) { compareId = id; }}
             />
+            {bootError and <div key="chaterr" className="border-b border-border px-4 py-1.5">
+                <span className="stat-line" style={{"color": "var(--danger)"}}>{bootError}</span>
+            </div>}
             <Thread messages={messages} labels={labelMap()} onSave={saveExample} />
             <Composer
                 value={draft} busy={streaming} categories={prompts}

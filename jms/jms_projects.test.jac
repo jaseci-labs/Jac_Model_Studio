@@ -146,3 +146,197 @@ test "get_project on an unknown pid is empty" {
     _isolate_ws();
     assert get_project("no-such-pid") == {};
 }
+
+# ===================================== project lifecycle (rename / clone / export)
+
+"""Materialize dataset/<which>.jsonl for *slug* with *n* one-field JSON rows.
+Returns the file path so a test can stat it."""
+def _seed_dataset(slug: str, which: str, n: int) -> str {
+    d = jms_project_dir(slug) / "dataset";
+    d.mkdir(parents=True, exist_ok=True);
+    f = d / (which + ".jsonl");
+    rows = [f'{{"i": {i}, "text": "row {i}"}}' for i in range(n)];
+    f.write_text("\n".join(rows) + "\n");
+    return str(f);
+}
+
+test "rename_project changes the display name and NEVER the slug or directory" {
+    _isolate_ws();
+    p = create_project("Before Name", "x");
+    olddir = jms_project_dir(p.slug);
+    assert olddir.is_dir(), str(olddir);
+    v = rename_project(p.pid, "  After Name  ");
+    assert v.name == "After Name", v.name;
+    assert v.slug == "before-name", "slug is the immutable fs identity";
+    assert jms_project_dir(v.slug) == olddir and olddir.is_dir(), "directory untouched";
+    # get_project + the on-disk snapshot both reflect the new name.
+    assert get_project(p.pid)["name"] == "After Name";
+    snap: any = open(str(olddir / "project.json"), "r");
+    body = snap.read();
+    snap.close();
+    assert "After Name" in body, body;
+}
+
+test "rename_project rejects blank names and unknown pids" {
+    _isolate_ws();
+    p = create_project("Keep Me", "x");
+    assert rename_project(p.pid, "   ").name == "Keep Me", "blank rename is a no-op";
+    assert rename_project("no-such-pid", "X").pid == "", "unknown pid → blank view";
+    # 120-char cap.
+    assert len(rename_project(p.pid, "z" * 500).name) == 120;
+}
+
+test "duplicate_project clones config + sources + plan, and NO dataset by default" {
+    _isolate_ws();
+    a = create_project("Original", "convert python to jac");
+    update_project(a.pid, {"provider": "mlx", "model": "qwen3", "group_id": "ws02"});
+    tree = _make_tree();
+    add_source(a.pid, "code", tree);
+    src_node = _find_project(a.pid);
+    (src_node ++> JmsGenPlan(version=4, status="approved", provider="mlx",
+                             model="qwen3", plan_json='{"target_rows": 500}'))[0];
+    _seed_dataset(a.slug, "train", 50);
+
+    r = duplicate_project(a.pid);
+    assert "error" not in r, r;
+    assert r["name"] == "Original copy", r;
+    assert r["slug"] == "original-copy", r;
+    assert r["pid"] != a.pid, "fresh pid";
+    assert r["use_case"] == "convert python to jac" and r["provider"] == "mlx", r;
+    assert r["model"] == "qwen3" and r["group_id"] == "ws02", r;
+    assert r["source_count"] == 1, r;
+    assert r["plan_copied"] == True, r;
+    assert r["copied_bytes"] == 0 and r["copied_files"] == [], "no dataset copied by default";
+    # The clone's own dataset dir is empty — the original's rows are untouched.
+    clone_dir = jms_project_dir(str(r["slug"]));
+    assert clone_dir.is_dir() and not (clone_dir / "dataset" / "train.jsonl").exists();
+    assert (jms_project_dir(a.slug) / "dataset" / "train.jsonl").exists(), "source untouched";
+    # Clone's graph carries the scanned source + the approved plan (renumbered v1).
+    full = get_project(str(r["pid"]));
+    assert len(full["sources"]) == 1 and full["sources"][0]["files"] == 4, full["sources"];
+    assert full["stage_state"]["sources"] == "done", full["stage_state"];
+    assert full["stage_state"]["generate"] == "done", full["stage_state"];
+    assert full["plans"][0]["version"] == 1 and full["plans"][0]["target_rows"] == 500, full["plans"];
+    # …and NOT the runs/jobs history.
+    assert full["gen_jobs"] == [] and full["train_runs"] == [] and full["evals"] == [];
+    # Original still listed, unmodified.
+    assert len([p for p in list_projects() if p.pid == a.pid]) == 1;
+}
+
+test "duplicate_project opt-in copy_curated streams train + holdout only" {
+    _isolate_ws();
+    a = create_project("Copyme", "x");
+    _seed_dataset(a.slug, "train", 100);
+    _seed_dataset(a.slug, "holdout", 10);
+    r = duplicate_project(a.pid, "Copyme Full", True);
+    assert "error" not in r, r;
+    assert r["slug"] == "copyme-full", r;
+    files = [str(f["file"]) for f in r["copied_files"]];
+    assert files == ["train.jsonl", "holdout.jsonl"], files;
+    assert r["copied_bytes"] > 0, r;
+    cd = jms_project_dir("copyme-full") / "dataset";
+    assert (cd / "train.jsonl").exists() and (cd / "holdout.jsonl").exists();
+    # Byte-identical + no leftover .tmp sibling.
+    assert (cd / "train.jsonl").read_text() == (jms_project_dir(a.slug) / "dataset" / "train.jsonl").read_text();
+    assert not (cd / "train.jsonl.tmp").exists(), "atomic write cleaned up";
+    assert get_project(str(r["pid"]))["row_stats"]["curated"] == 100;
+}
+
+test "duplicate_project with a custom name, no dataset, and an unknown pid" {
+    _isolate_ws();
+    a = create_project("Bare", "x");
+    r = duplicate_project(a.pid, "Renamed Clone", True);
+    assert r["name"] == "Renamed Clone" and r["slug"] == "renamed-clone", r;
+    assert r["copied_files"] == [] and "no materialized dataset" in str(r["note"]), r;
+    assert r["plan_copied"] == False, r;
+    assert "error" in duplicate_project("no-such-pid"), "unknown pid rejected";
+    # Duplicating twice de-dupes the slug rather than colliding on disk.
+    r2 = duplicate_project(a.pid, "Renamed Clone");
+    assert r2["slug"] == "renamed-clone-2", r2;
+}
+
+test "dataset_export_info reports sizes + the response budget" {
+    _isolate_ws();
+    a = create_project("Sized", "x");
+    info0 = dataset_export_info(a.pid);
+    assert info0["train"]["exists"] == False and info0["train"]["lines"] == 0, info0;
+    _seed_dataset(a.slug, "train", 25);
+    info = dataset_export_info(a.pid);
+    assert info["train"]["exists"] == True and info["train"]["lines"] == 25, info;
+    assert info["train"]["bytes"] > 0 and info["total_bytes"] == info["train"]["bytes"], info;
+    assert info["max_response_bytes"] == _EXPORT_MAX_BYTES, info;
+    assert "error" in dataset_export_info("no-such-pid");
+}
+
+test "export_dataset paginates under the line budget and says so" {
+    _isolate_ws();
+    a = create_project("Exportme", "x");
+    n = _EXPORT_MAX_LINES + 37;
+    _seed_dataset(a.slug, "train", n);
+    pg1 = export_dataset(a.pid, "train");
+    assert pg1["count"] == _EXPORT_MAX_LINES, pg1["count"];
+    assert pg1["eof"] == False and pg1["truncated"] == True, pg1;
+    assert pg1["note"], "a capped page must say it was capped";
+    assert pg1["bytes"] <= _EXPORT_MAX_BYTES, pg1["bytes"];
+    assert pg1["filename"] == "exportme-train.jsonl", pg1["filename"];
+    pg2 = export_dataset(a.pid, "train", int(str(pg1["next_offset"])));
+    assert pg2["count"] == 37, pg2["count"];
+    assert pg2["eof"] == True and pg2["truncated"] == False, pg2;
+    # Nothing lost, nothing duplicated across the page boundary.
+    allrows = list(pg1["lines"]) + list(pg2["lines"]);
+    assert len(allrows) == n, len(allrows);
+    assert allrows[0] == '{"i": 0, "text": "row 0"}', allrows[0];
+    assert allrows[n - 1] == f'{{"i": {n - 1}, "text": "row {n - 1}"}}', allrows[n - 1];
+}
+
+test "export_dataset validates pid / which / materialization" {
+    _isolate_ws();
+    a = create_project("Guarded", "x");
+    assert "error" in export_dataset("no-such-pid");
+    assert "error" in export_dataset(a.pid, "adapters"), "only train|holdout";
+    assert "error" in export_dataset(a.pid, "holdout"), "not materialized yet";
+    _seed_dataset(a.slug, "holdout", 3);
+    ok = export_dataset(a.pid, "holdout");
+    assert ok["count"] == 3 and ok["eof"] == True, ok;
+}
+
+test "export_summary renders JSON and Markdown with counts + stage state" {
+    _isolate_ws();
+    a = create_project("Summed", "make it good at jac");
+    add_source(a.pid, "code", _make_tree());
+    _seed_dataset(a.slug, "train", 12);
+    j = export_summary(a.pid);
+    assert j["filename"] == "summed-summary.json" and j["mime"] == "application/json", j["filename"];
+    assert j["truncated"] == False and j["bytes"] == len(str(j["content"])), j["bytes"];
+    parsed = json.loads(str(j["content"]));
+    assert parsed["project"]["slug"] == "summed", parsed["project"];
+    assert parsed["counts"]["sources"] == 1 and parsed["counts"]["curated_rows"] == 12, parsed["counts"];
+    assert parsed["stage_state"]["curate"] == "done", parsed["stage_state"];
+
+    m = export_summary(a.pid, "md");
+    assert m["filename"] == "summed-summary.md" and m["mime"] == "text/markdown", m["filename"];
+    body = str(m["content"]);
+    assert body.startswith("# Summed"), body[:40];
+    assert "| curated_rows | 12 |" in body, body;
+    assert "## Train runs" in body and "_none_" in body, body;
+    assert "error" in export_summary("no-such-pid");
+    assert "error" in export_summary(a.pid, "pdf"), "only json|md";
+}
+
+test "export_summary caps long lists instead of truncating silently" {
+    _isolate_ws();
+    a = create_project("Many Evals", "x");
+    node_a = _find_project(a.pid);
+    over = _SUMMARY_MAX_ITEMS + 5;
+    for i in range(over) {
+        (node_a ++> JmsEvalRun(eid=f"e{i}", run_rid="r1", status="completed",
+                               n=1, started=f"2026-01-01T00:00:{i % 60:02d}Z"))[0];
+    }
+    j = export_summary(a.pid);
+    parsed = json.loads(str(j["content"]));
+    assert parsed["counts"]["evals"] == over, parsed["counts"];
+    assert len(parsed["evals"]) == _SUMMARY_MAX_ITEMS, len(parsed["evals"]);
+    joined = " ".join([str(x) for x in parsed["notes"]]);
+    assert "evals" in joined and "capped" in joined, parsed["notes"];
+    assert int(j["bytes"]) <= _EXPORT_MAX_BYTES, j["bytes"];
+}

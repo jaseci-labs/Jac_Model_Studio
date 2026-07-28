@@ -43,23 +43,23 @@ def:pub ModelPill(
                     className="exp-btn"
                 >
                     {if loadingId {
-                        <span>{"loading " + _label(models, loadingId) + "… " + str(loadElapsed) + "s"}</span>
+                        <span key="if1">{"loading " + _label(models, loadingId) + "… " + str(loadElapsed) + "s"}</span>
                         skip;
                     }}
                     {if not loadingId {
-                        <span>{_label(models, modelId)} <span className="text-muted-foreground">▾</span></span>
+                        <span key="if2">{_label(models, modelId)} <span className="text-muted-foreground">▾</span></span>
                         skip;
                     }}
                 </button>
                 {if pickerOpen {
-                    <div className="fixed inset-0 z-10" onClick={lambda (e: MouseEvent) { pickerOpen = False; }} />
-                    <div className="absolute left-0 top-full z-20 mt-1 w-56 exp-panel !bg-popover p-1">
+                    <div key="if3" className="fixed inset-0 z-10" onClick={lambda (e: MouseEvent) { pickerOpen = False; }} />
+                    <div key="panel" className="absolute left-0 top-full z-20 mt-1 w-56 exp-panel !bg-popover p-1">
                         {for m in models {
                             <button
                                 key={str(m.id)}
                                 disabled={not m.available}
                                 onClick={lambda (e: MouseEvent) { onPick(str(m.id)); pickerOpen = False; }}
-                                className="flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-xs text-foreground/80 hover:bg-accent/10 disabled:opacity-40"
+                                className="flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-left text-xs text-foreground/80 hover:bg-accent/10 disabled:opacity-40"
                             >
                                 <span>{str(m.label)}</span>
                                 <span className="font-mono text-[9px] text-muted-foreground">
@@ -80,17 +80,17 @@ def:pub ModelPill(
                 className="micro-label hover:text-foreground/80"
             >{"⇄ COMPARE" + (" ·ON" if compareId else "")}</button>
             {if cmpOpen {
-                <div className="fixed inset-0 z-10" onClick={lambda (e: MouseEvent) { cmpOpen = False; }} />
-                <div className="absolute right-0 top-full z-20 mt-1 w-56 exp-panel !bg-popover p-1">
+                <div key="if4" className="fixed inset-0 z-10" onClick={lambda (e: MouseEvent) { cmpOpen = False; }} />
+                <div key="panel" className="absolute right-0 top-full z-20 mt-1 w-56 exp-panel !bg-popover p-1">
                     <button
                         onClick={lambda (e: MouseEvent) { onPickCompare(""); cmpOpen = False; }}
-                        className="w-full rounded px-2 py-1.5 text-left text-xs text-muted-foreground hover:bg-accent/10"
+                        className="w-full rounded-sm px-2 py-1.5 text-left text-xs text-muted-foreground hover:bg-accent/10"
                     >off</button>
                     {for m in _cmp_opts(models, modelId) {
                         <button
                             key={str(m.id)}
                             onClick={lambda (e: MouseEvent) { onPickCompare(str(m.id)); cmpOpen = False; }}
-                            className="w-full rounded px-2 py-1.5 text-left text-xs text-foreground/80 hover:bg-accent/10"
+                            className="w-full rounded-sm px-2 py-1.5 text-left text-xs text-foreground/80 hover:bg-accent/10"
                         >{str(m.label)}</button>
                     }}
                 </div>

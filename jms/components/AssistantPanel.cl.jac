@@ -32,8 +32,24 @@ model_id.
 
 Reuses `chat/Thread` for the bubble list and `chat/Composer` for the input —
 both already glass-styled and theme-aware — rather than hand-rolling either.
+
+Two things deliberately live in `useRef`, not `has` (useState), because both are
+read immediately after being written in the same tick — the repo's most-repeated
+bug class:
+  * `loadedRef` — the `loadOnce` re-entrancy guard. As a `has` var two fast
+    toggles both read the stale `False` and double-ran the provider fetch.
+  * `navIvRef` — the __jmsNav poller's interval id. It also has to survive into
+    the unmount cleanup, and `can with exit` compiles to `useEffect(…, [])`, so a
+    `has` var would be captured at its mount-time value (null) and never cleared.
+
+Drawer a11y: `role="dialog" aria-modal="true"`, Escape closes (document keydown,
+removed in the effect cleanup), focus moves onto the drawer on open and returns
+to the ✦ launcher on close.
+# ponytail: no focus trap — Tab can still leave the drawer. Escape + initial
+focus + restore is the accessible floor without a shared hook module.
 """
 
+import from react { useEffect, useRef }
 sv import from ..assistant {
     assistant_providers, assistant_context, set_openai_key
 }
@@ -163,8 +179,24 @@ def:pub AssistantPanel(pageContext: str = "") -> JsxElement {
         keyBusy: bool = False,
         keyErr: str = "",
         pendingAction: dict = {},
-        actionNote: str = "",
-        loaded: bool = False;
+        actionNote: str = "";
+
+    # Refs, not state — see the module docstring. Written and read back in the
+    # same tick, and `navIvRef` must be readable from the unmount cleanup.
+    loadedRef: any = useRef(False);
+    navIvRef: any = useRef(None);
+
+    """Stop the __jmsNav poller if one is running (idempotent)."""
+    def stopNavPoll -> None {
+        if navIvRef.current is not None {
+            clearInterval(float(str(navIvRef.current)));
+            navIvRef.current = None;
+        }
+    }
+
+    can with exit {
+        stopNavPoll();
+    }
 
     async def refreshProviders -> list {
         try {
@@ -186,10 +218,12 @@ def:pub AssistantPanel(pageContext: str = "") -> JsxElement {
     }
 
     async def loadOnce -> None {
-        if loaded {
+        # Ref, not state: a useState flag is still `False` on the very next line
+        # (and for the rest of this tick), so two fast toggles both got through.
+        if loadedRef.current {
             return;
         }
-        loaded = True;
+        loadedRef.current = True;
         # Pick from the RETURNED local list — the `providers` state set inside
         # refreshProviders is not yet visible in this closure (useState is async).
         plist: list = await refreshProviders();
@@ -375,18 +409,20 @@ def:pub AssistantPanel(pageContext: str = "") -> JsxElement {
                 # Poll for the __jmsNav bridge: a freshly-mounted AppShell (when we
                 # just switched surfaces) only publishes it after its probe+layout
                 # finish (~a few seconds), so a fixed delay would miss it. Give up
-                # after ~9s so a broken bridge can't leak an interval.
+                # after ~9s so a broken bridge can't leak an interval — and the id
+                # lives in a ref so `can with exit` can kill it on unmount too
+                # (the self-bound ~60 ticks are NOT unmount cleanup).
+                stopNavPoll();
                 tries: any = {"n": 0};
-                iv: any = None;
-                iv = setInterval(lambda -> None {
+                navIvRef.current = setInterval(lambda -> None {
                     tries["n"] = int(tries["n"]) + 1;
                     nav: any = w.__jmsNav;
                     if nav {
                         if ws { nav.goWorkspace(ws); }
                         if stage { nav.go(stage); }
-                        clearInterval(float(str(iv)));
+                        stopNavPoll();
                     } elif int(tries["n"]) > 60 {
-                        clearInterval(float(str(iv)));
+                        stopNavPoll();
                     }
                 }, 150);
             }
@@ -635,6 +671,22 @@ def:pub AssistantPanel(pageContext: str = "") -> JsxElement {
         }
     }
 
+    useEffect(lambda {
+        if not widgetOpen { return lambda { }; }
+        doc: any = document;
+        prev: any = doc.activeElement;
+        onKey = lambda(e: any) {
+            if str(e.key) == "Escape" { widgetOpen = False; }
+        };
+        doc.addEventListener("keydown", onKey);
+        panel: any = doc.getElementById("assistant-drawer");
+        if panel { panel.focus(); }
+        return lambda {
+            doc.removeEventListener("keydown", onKey);
+            if prev { prev.focus(); }
+        };
+    }, [widgetOpen]);
+
     curModels: list[str] = _modelsFor(providers, provider);
     curInfo: dict | None = _providerInfo(providers, provider);
     needsKey: bool = bool(curInfo and bool(curInfo["requires_key"]) and not bool(curInfo["configured"]));
@@ -656,16 +708,23 @@ def:pub AssistantPanel(pageContext: str = "") -> JsxElement {
         {if widgetOpen {
             <div className="fixed inset-0 z-50 flex">
                 <div
-                    className="flex-1 bg-black/60"
+                    className="flex-1 g-scrim reveal-fade"
                     onClick={closeWidget}
                 />
-                <aside className="exp-panel g-overlay flex h-full w-[34rem] max-w-[92vw] shrink-0 flex-col !rounded-none !border-y-0 !border-r-0">
+                <aside
+                    id="assistant-drawer"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label="AI assistant"
+                    tabIndex={-1}
+                    className="exp-panel g-overlay reveal-scale flex h-full w-[34rem] max-w-[92vw] shrink-0 flex-col !rounded-none !border-y-0 !border-r-0"
+                >
                     <div className="flex items-center justify-between border-b border-border px-4 py-3">
                         <span className="micro-label">✦ ASSISTANT</span>
                         <div className="flex items-center gap-2">
                             <button
                                 onClick={lambda e: MouseEvent { toggleHistory(); }}
-                                className={"exp-btn " + ("exp-chip-active" if historyOpen else "")}
+                                className={"exp-btn " + ("exp-btn-active" if historyOpen else "")}
                             >⧉ HISTORY</button>
                             <button
                                 onClick={closeWidget}
@@ -688,7 +747,7 @@ def:pub AssistantPanel(pageContext: str = "") -> JsxElement {
                                 <div key={str(c.id)} className="mb-1 flex items-center gap-2">
                                     <button
                                         onClick={lambda e: MouseEvent { openChat(str(c.id)); }}
-                                        className={"exp-btn flex-1 truncate text-left " + ("exp-chip-active" if str(c.id) == chatId else "")}
+                                        className={"exp-btn flex-1 truncate text-left " + ("exp-btn-active" if str(c.id) == chatId else "")}
                                     >{str(c.title) if c.title else "untitled"}</button>
                                     <button
                                         onClick={lambda e: MouseEvent { removeChat(str(c.id)); }}
@@ -719,6 +778,7 @@ def:pub AssistantPanel(pageContext: str = "") -> JsxElement {
                         <div className="border-b border-border px-4 py-2">
                             <select
                                 value={modelId}
+                                aria-label="Assistant model"
                                 onChange={lambda e: ChangeEvent { pickModel(str(e.target.value)); }}
                                 className="exp-input w-full"
                             >
@@ -744,6 +804,8 @@ def:pub AssistantPanel(pageContext: str = "") -> JsxElement {
                                 type="password"
                                 className="exp-input w-full"
                                 value={keyInput}
+                                aria-label={connectLabel + " API key"}
+                                autoComplete="off"
                                 placeholder="sk-…"
                                 onChange={lambda e: ChangeEvent { keyInput = str(e.target.value); keyErr = ""; }}
                             />

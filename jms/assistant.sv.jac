@@ -13,15 +13,16 @@ is the single point the plaintext key exists (same discipline as
 """
 
 import os;
+import time;
 import datetime;
+import auth;
 import crypto;
 import models;
 import inference;
 import from jms_llm { resolved_anthropic_key, llm_status }
 import from workspace { ui_layout }
 import from jms_workspaces { jms_ui_layout }
-import from jms_projects { list_projects, get_project }
-import from jms_train { list_train_runs }
+import from jms_projects { JmsProjectView, list_projects, get_project }
 import from jms_eval { list_jms_evals }
 import from runs { list_runs }
 import from evals { list_evals }
@@ -177,12 +178,43 @@ def _clip(s: str, limit: int) -> str {
 
 """Best-effort `list_projects()` — used by every per-project section below so
 one bad project (or an empty graph) can't kill the others."""
-def _safe_projects() -> list {
+def _safe_projects() -> list[JmsProjectView] {
     try {
         return list_projects();
     } except Exception {
         return [];
     }
+}
+
+"""Every project's `get_project(pid)` detail, fetched ONCE for the whole digest:
+pid -> {"detail": dict, "err": str}.
+
+This is the cheap node-fields-only path. It replaces two per-project fan-outs that
+each re-derived data get_project already carries: `_sec_jms_projects` called
+get_project itself, and `_sec_jms_train_runs` called `jms_train.list_train_runs`,
+which runs `train_status` per run — a FULL `metrics.parse_train_log` + 40-line tail
+read of every run log (and a `cloudruns.run_status` poll for spheron runs). With
+~10 projects x ~5 runs that was dozens of full log parses per chat message, for a
+digest that only prints rid/backend/base_model/status/adapter_ready/started/
+finished — all of which `jms_projects._train_run_dict` supplies from node fields.
+
+TRADE-OFF (the only behavior change): `status` is now the node's stored status
+rather than train_status's live re-resolution from the job file. No field is
+dropped. The node is written by `_sync_terminal` on every train_status call, and
+the TrainStage UI polls that constantly, so the node is current in practice; the
+window where this differs is a run that terminated and has not been polled since.
+Ordering is unchanged — get_project sorts train_runs by `started` descending,
+exactly as list_train_runs did."""
+def _project_details(projects: list[JmsProjectView]) -> dict[str, dict] {
+    out: dict[str, dict] = {};
+    for pv in projects {
+        try {
+            out[pv.pid] = {"detail": get_project(pv.pid), "err": ""};
+        } except Exception as e {
+            out[pv.pid] = {"detail": {}, "err": str(e)};
+        }
+    }
+    return out;
 }
 
 def _sec_exp_workspaces() -> str {
@@ -227,52 +259,58 @@ list_projects(), plus stage_state + row_stats + source/plan/gen_job/train_run/
 eval counts from get_project(pid) for each. A per-project failure (rare —
 get_project is a pure graph read) only drops that project's detail line, not
 the whole section."""
-def _sec_jms_projects() -> str {
+def _sec_jms_projects(projects: list[JmsProjectView], details: dict[str, dict]) -> str {
     lines: list[str] = ["=== JMS PROJECTS ==="];
-    projects = _safe_projects();
     if not projects { lines.append("(none)"); }
     for pv in projects {
-        try {
-            grp = pv.group_id if pv.group_id else "(none)";
-            block: list[str] = [
-                f"- {pv.name} (pid={pv.pid}) use_case={pv.use_case} "
-                f"provider/model={pv.provider}/{pv.model} sources={pv.source_count} "
-                f"group={grp}"
-            ];
-            detail = get_project(pv.pid);
-            if detail {
-                stage_state = detail.get("stage_state", {});
-                row_stats = detail.get("row_stats", {});
-                block.append(
-                    f"    stage_state={stage_state} row_stats={row_stats} "
-                    f"sources={len(detail.get('sources', []))} "
-                    f"plans={len(detail.get('plans', []))} "
-                    f"gen_jobs={len(detail.get('gen_jobs', []))} "
-                    f"train_runs={len(detail.get('train_runs', []))} "
-                    f"evals={len(detail.get('evals', []))}"
-                );
-            }
-            lines.append(_clip("\n".join(block), _PER_FILE_CHARS));
-        } except Exception as e {
-            lines.append(f"- {pv.name} (pid={pv.pid}) (detail unavailable: {e})");
+        entry: dict = dict(details.get(pv.pid, {}));
+        derr = str(entry.get("err", ""));
+        if derr {
+            lines.append(f"- {pv.name} (pid={pv.pid}) (detail unavailable: {derr})");
+            continue;
         }
+        grp = pv.group_id if pv.group_id else "(none)";
+        block: list[str] = [
+            f"- {pv.name} (pid={pv.pid}) use_case={pv.use_case} "
+            f"provider/model={pv.provider}/{pv.model} sources={pv.source_count} "
+            f"group={grp}"
+        ];
+        detail: dict = dict(entry.get("detail", {}));
+        if detail {
+            stage_state = detail.get("stage_state", {});
+            row_stats = detail.get("row_stats", {});
+            block.append(
+                f"    stage_state={stage_state} row_stats={row_stats} "
+                f"sources={len(detail.get('sources', []))} "
+                f"plans={len(detail.get('plans', []))} "
+                f"gen_jobs={len(detail.get('gen_jobs', []))} "
+                f"train_runs={len(detail.get('train_runs', []))} "
+                f"evals={len(detail.get('evals', []))}"
+            );
+        }
+        lines.append(_clip("\n".join(block), _PER_FILE_CHARS));
     }
     return _clip("\n".join(lines), _PER_FILE_CHARS * 6);
 }
 
 """JMS TRAIN RUNS across every project: rid/backend/base_model/status/
-adapter_ready/started/finished from `list_train_runs(pid)`."""
-def _sec_jms_train_runs() -> str {
+adapter_ready/started/finished — same fields as before, now read off the
+already-fetched `get_project(pid)["train_runs"]` (node fields, newest-first) so
+the digest no longer pays a full training-log parse per run. See
+`_project_details` for the one behavioral trade-off (node vs live status)."""
+def _sec_jms_train_runs(projects: list[JmsProjectView], details: dict[str, dict]) -> str {
     lines: list[str] = ["=== JMS TRAIN RUNS ==="];
     any_rows = False;
-    for pv in _safe_projects() {
-        try {
-            run_rows = list_train_runs(pv.pid);
-        } except Exception as e {
-            lines.append(f"- [{pv.name}] (unavailable: {e})");
+    for pv in projects {
+        entry: dict = dict(details.get(pv.pid, {}));
+        derr = str(entry.get("err", ""));
+        if derr {
+            lines.append(f"- [{pv.name}] (unavailable: {derr})");
             continue;
         }
-        for r in run_rows {
+        detail: dict = dict(entry.get("detail", {}));
+        for raw in list(detail.get("train_runs", [])) {
+            r: dict = dict(raw);
             any_rows = True;
             lines.append(
                 f"- [{pv.name}] rid={r.get('rid', '')} backend={r.get('backend', '')} "
@@ -288,10 +326,10 @@ def _sec_jms_train_runs() -> str {
 
 """JMS EVALS across every project: eid/metric/status/n/mean_score/pass_rate
 from `list_jms_evals(pid)`."""
-def _sec_jms_evals() -> str {
+def _sec_jms_evals(projects: list[JmsProjectView]) -> str {
     lines: list[str] = ["=== JMS EVALS ==="];
     any_rows = False;
-    for pv in _safe_projects() {
+    for pv in projects {
         try {
             eval_rows = list_jms_evals(pv.pid);
         } except Exception as e {
@@ -413,23 +451,54 @@ def _sec_llm_providers() -> str {
     }
 }
 
+# Per-user digest memo. The digest is rebuilt on EVERY assistant message and every
+# assistant_context() poll, and assembling it fans out across the whole app. Key =
+# `auth.uid()` (the caller's own root jid) — never a bare filename or any key two
+# tenants could share, so one user can never be served another's digest. TTL is
+# deliberately short (10s): the digest is a live grounding snapshot, so it must go
+# stale in seconds, not minutes. uid() is request-context only; if it is
+# unavailable (e.g. a plain `jac run` script) the memo is bypassed entirely.
+glob _CTX_TTL_S: float = 10.0;
+glob _CTX_CACHE: dict[str, dict] = {};
+glob _CTX_CACHE_CAP: int = 64;
+
 """Assemble the full-app-state grounding digest: every source above,
-labeled + best-effort, joined and hard-capped at `_MAX_GROUND_CHARS`."""
+labeled + best-effort, joined and hard-capped at `_MAX_GROUND_CHARS`.
+
+Memoized per user for `_CTX_TTL_S` seconds. `list_projects()` + each project's
+`get_project()` are also fetched once per assembly and shared by the per-project
+sections (they each used to re-scan on their own)."""
 def _collect_assistant_context() -> str {
+    ukey = "";
+    try { ukey = auth.uid(); } except Exception { ukey = ""; }
+    now = time.time();
+    if ukey {
+        hit = _CTX_CACHE.get(ukey);
+        if hit is not None and (now - float(str(hit["at"]))) < _CTX_TTL_S {
+            return str(hit["digest"]);
+        }
+    }
+
+    projects = _safe_projects();
+    details = _project_details(projects);
     sections: list[str] = [
         _sec_exp_workspaces(),
         _sec_jms_workspaces(),
-        _sec_jms_projects(),
-        _sec_jms_train_runs(),
-        _sec_jms_evals(),
+        _sec_jms_projects(projects, details),
+        _sec_jms_train_runs(projects, details),
+        _sec_jms_evals(projects),
         _sec_classic_runs(),
         _sec_standalone_evals(),
         _sec_cloud_runs(),
         _sec_chat_history(),
         _sec_llm_providers()
     ];
-    digest = "\n\n".join(sections);
-    return _clip(digest, _MAX_GROUND_CHARS);
+    digest = _clip("\n\n".join(sections), _MAX_GROUND_CHARS);
+    if ukey {
+        if len(_CTX_CACHE) > _CTX_CACHE_CAP { _CTX_CACHE.clear(); }
+        _CTX_CACHE[ukey] = {"at": now, "digest": digest};
+    }
+    return digest;
 }
 
 """Debug endpoint for the full-app-state grounding digest the assistant is

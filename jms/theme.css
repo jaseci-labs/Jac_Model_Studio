@@ -1,5 +1,7 @@
 /* theme.css — the ONE canonical token source for the whole Studio.
-   Light-glass :root + dark-glass .dark override. Orange accent #EC8242.
+   FLAT theme: pure-white :root + true-black .dark. No mesh gradient, no grain, no
+   warm tint — orange (#EC8242 light / #f4914e dark) is the ONLY chromatic element,
+   used for buttons, highlights, active states and focus.
    Both product surfaces (Experiments .exp-*, JMS .jms-*) read these tokens;
    --jms-*, --exp-*, and shadcn names below are thin aliases so existing component
    classes need no edits. Loads before global.css + jms.css (main.jac order). */
@@ -8,39 +10,44 @@
 @import url('https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&family=Space+Grotesk:wght@300..700&family=Inter:wght@100..900&display=swap');
 
 :root {
-  /* ===== glass palette — LIGHT (default) ===== */
-  --bg: #faf9f7;
-  /* all-warm mesh (no blue) — orange/peach/amber only */
-  --bg-gradient:
-    radial-gradient(at 18% 0%,  rgba(255,196,150,0.55) 0%, transparent 50%),
-    radial-gradient(at 82% 22%, rgba(255,178,120,0.42) 0%, transparent 52%),
-    radial-gradient(at 50% 100%, rgba(255,158,100,0.40) 0%, transparent 55%);
-  --surface: rgba(255,255,255,0.74);
-  --surface-strong: rgba(252,251,249,0.94);
-  --bar: rgba(252,251,249,0.92);
-  --overlay: rgba(250,249,247,0.975);
-  --text: #16130f;
-  --text-muted: #6b6459;
-  --border: rgba(255,255,255,0.55);
-  --border-alt: rgba(20,16,12,0.08);
+  /* ===== FLAT palette — LIGHT (default) =====
+     Flat white, no mesh gradient, no tint. Orange is the ONLY chromatic element:
+     buttons, highlights, focus, active states. Panels separate from the page by a
+     hairline border + a soft shadow, not by a fill difference. */
+  --bg: #ffffff;
+  --bg-gradient: none;
+  --surface: #ffffff;
+  --surface-strong: #ffffff;
+  --bar: #ffffff;
+  --overlay: #ffffff;
+  --text: #0a0a0a;
+  --text-muted: #6e6e6e;
+  /* neutral hairlines — --border is the panel rim, --border-alt the divider */
+  --border: rgba(0,0,0,0.12);
+  --border-alt: rgba(0,0,0,0.10);
   --accent: #EC8242;
   --accent-hover: #d96e2e;
   --accent-soft: #f4a574;
-  --accent-tint: rgba(236,130,66,0.12);
+  --accent-tint: rgba(236,130,66,0.10);
   --accent-ring: 0 0 0 3px rgba(236,130,66,0.28);
   --ok: #3a9d6b;
   --danger: #d24b3e;
-  --inner-hi: inset 0 1px 0 rgba(255,255,255,0.60);
+  --inner-hi: 0 0 #0000;
+  /* modal/drawer scrim — was a hardcoded `bg-black/60` at every dialog, which is
+     far too heavy on a pure-white page */
+  --scrim: rgba(0,0,0,0.32);
 
   /* ===== shared (mode-independent) ===== */
   --radius: 16px;
+  /* surfaces are opaque now, so the blur is a no-op on panels; kept only so any
+     translucent overlay that still wants it renders the same as before */
   --blur: blur(20px) saturate(160%);
-  --shadow-soft: 0 8px 32px rgba(20,16,12,0.10);
-  --shadow-nav: 0 4px 16px rgba(20,16,12,0.08);
+  --shadow-soft: 0 1px 2px rgba(0,0,0,0.05), 0 8px 24px rgba(0,0,0,0.06);
+  --shadow-nav: 0 1px 2px rgba(0,0,0,0.05);
   --font-display: 'Geist', 'Space Grotesk Variable', ui-sans-serif, sans-serif;
   --font-body: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  --weight-thin: 200; --weight-light: 300; --weight-reg: 400;
+  --weight-thin: 200; --weight-light: 300; --weight-reg: 400; --weight-med: 500;
   --weight-bold: 700; --weight-black: 900;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --dur-fast: 0.3s; --dur-base: 0.6s; --dur-slow: 0.9s;
@@ -50,28 +57,38 @@
   --background: var(--bg); --foreground: var(--text);
   --card: var(--surface); --card-foreground: var(--text);
   --popover: var(--surface-strong); --popover-foreground: var(--text);
-  --primary: var(--accent); --primary-foreground: #ffffff;
+  --primary: var(--accent); --primary-foreground: var(--accent-foreground);
   --secondary: var(--surface); --secondary-foreground: var(--text);
   --muted: var(--surface); --muted-foreground: var(--text-muted);
-  --accent-foreground: #ffffff;
-  --destructive: var(--text-muted); --destructive-strong: var(--danger);
+  /* dark brown, not white: white on #EC8242 is 2.6:1, under AA. Matches dark mode,
+     where accent-foreground is already near-black — so accent buttons now read the
+     same way in both themes. */
+  --accent-foreground: #2b1608;
+  --destructive: var(--danger); --destructive-strong: var(--danger);
   --input: var(--border-alt); --ring: var(--accent);
   --font-sans: var(--font-display);
   --glow: var(--shadow-soft);
-  --chart-1: var(--accent); --chart-2: #6aa0e0; --chart-3: var(--text);
-  --chart-4: var(--text-muted); --chart-5: var(--accent-soft);
-  --chart-6: #6fc3b2;
+  /* orange ramp + neutrals: series stay distinguishable without reintroducing
+     off-theme blue/violet/teal into an orange-only palette */
+  --chart-1: var(--accent); --chart-2: var(--text-muted); --chart-3: var(--accent-soft);
+  --chart-4: var(--text); --chart-5: #b8702f;
+  --chart-6: #f7b98a;
   --label: var(--text-muted);
+  /* code-syntax palette — tokenized so light mode gets its own (darker) set.
+     These were hardcoded dark-only hexes in global.css: pale green strings and
+     #5a5a5a comments are unreadable on a white surface. */
+  --tok-kw: #7c3aed; --tok-type: #0f766e; --tok-bi: #1d4ed8;
+  --tok-str: #3f7d34; --tok-num: #a16207; --tok-com: #8a8279;
   --sidebar: var(--surface); --sidebar-foreground: var(--text);
-  --sidebar-primary: var(--accent); --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: var(--accent); --sidebar-accent-foreground: #ffffff;
+  --sidebar-primary: var(--accent); --sidebar-primary-foreground: var(--accent-foreground);
+  --sidebar-accent: var(--accent); --sidebar-accent-foreground: var(--accent-foreground);
   --sidebar-border: var(--border-alt); --sidebar-ring: var(--accent);
-  --ws01: var(--accent); --ws02: #6aa0e0; --ws03: #d8a657;
-  --ws04: #b89ce8; --ws05: #6fc3b2; --ws06: #e08a8a; --ws-accent: var(--accent);
+  --ws01: var(--accent); --ws02: #f7b98a; --ws03: #c96a24;
+  --ws04: #9a5520; --ws05: #ffd0aa; --ws06: #7a4418; --ws-accent: var(--accent);
   /* --jms-* aliases (jms.css classes reference these unchanged) */
   --jms-bg: var(--bg); --jms-bg-raised: var(--surface); --jms-fg: var(--text);
-  --jms-fg-dim: var(--text-muted); --jms-accent: var(--accent); --jms-accent-2: var(--chart-2);
-  --jms-accent-fg: #ffffff; --jms-border: var(--border-alt); --jms-ok: var(--ok);
+  --jms-fg-dim: var(--text-muted); --jms-accent: var(--accent); --jms-accent-2: var(--chart-3);
+  --jms-accent-fg: var(--accent-foreground); --jms-border: var(--border-alt); --jms-ok: var(--ok);
   --jms-danger: var(--danger); --jms-font-display: var(--font-display);
   --jms-font-body: var(--font-body); --jms-font-mono: var(--font-mono);
   --jms-radius: var(--radius); --jms-hover-shadow: var(--shadow-soft);
@@ -81,39 +98,50 @@
   /* --exp-* aliases */
   --exp-radius: var(--radius); --exp-glow: var(--shadow-soft);
   --exp-accent-tint: var(--accent-tint); --exp-accent-ring: var(--accent-ring);
-  --scrollbar: rgba(20,16,12,0.28);
+  --scrollbar: rgba(0,0,0,0.25);
 }
 
 .dark {
-  /* ===== glass palette — DARK (derived) ===== */
-  --bg: #0c0a08;
-  /* all-warm mesh (no blue) — orange/amber only */
-  --bg-gradient:
-    radial-gradient(at 18% 0%,  rgba(236,130,66,0.22) 0%, transparent 55%),
-    radial-gradient(at 82% 22%, rgba(200,110,55,0.16) 0%, transparent 55%),
-    radial-gradient(at 50% 100%, rgba(236,130,66,0.14) 0%, transparent 60%);
-  --surface: rgba(38,32,26,0.62);
-  --surface-strong: rgba(30,25,20,0.95);
-  --bar: rgba(26,21,16,0.94);
-  --overlay: rgba(20,16,12,0.975);
-  --text: #f5f2ec;
-  --text-muted: #9a9082;
-  --border: rgba(255,255,255,0.08);
-  --border-alt: rgba(255,255,255,0.06);
+  /* ===== FLAT palette — DARK =====
+     True black page, no mesh gradient, no warm tint. Panels lift off the page by
+     one step of neutral grey + a hairline border. Orange stays the only accent. */
+  --bg: #000000;
+  --bg-gradient: none;
+  --surface: #0e0e0e;
+  --surface-strong: #141414;
+  --bar: #000000;
+  --overlay: #0a0a0a;
+  --text: #f5f5f5;
+  --text-muted: #8a8a8a;
+  --border: rgba(255,255,255,0.14);
+  --border-alt: rgba(255,255,255,0.10);
   --accent: #f4914e;
   --accent-hover: #ffa361;
   --accent-soft: #b86a38;
-  --accent-tint: rgba(244,145,78,0.16);
+  --accent-tint: rgba(244,145,78,0.14);
   --accent-ring: 0 0 0 3px rgba(244,145,78,0.30);
   --ok: #4fb583;
   --danger: #e5675a;
-  --inner-hi: inset 0 1px 0 rgba(255,255,255,0.08);
-  --shadow-soft: 0 8px 32px rgba(0,0,0,0.45);
-  --shadow-nav: 0 4px 16px rgba(0,0,0,0.40);
+  --inner-hi: 0 0 #0000;
+  --shadow-soft: 0 0 #0000;
+  --shadow-nav: 0 0 #0000;
   --primary-foreground: #0c0a08;
   --jms-accent-fg: #0c0a08; --accent-foreground: #0c0a08;
   --scrollbar: rgba(255,255,255,0.18);
+  --scrim: rgba(0,0,0,0.62);
+  --tok-kw: #b89ce8; --tok-type: #6fc3b2; --tok-bi: #7aa2f7;
+  --tok-str: #9ec98f; --tok-num: #d8a657; --tok-com: #7d7468;
 }
+
+/* Per-workspace accent. AppShell stamps data-ws on the shell root and NavRail /
+   WorkspaceBar / Data / Chip all consume --ws-accent — but the mapping itself was
+   never written, so every one of them was permanently orange. This is that mapping. */
+[data-ws="01"] { --ws-accent: var(--ws01); }
+[data-ws="02"] { --ws-accent: var(--ws02); }
+[data-ws="03"] { --ws-accent: var(--ws03); }
+[data-ws="04"] { --ws-accent: var(--ws04); }
+[data-ws="05"] { --ws-accent: var(--ws05); }
+[data-ws="06"] { --ws-accent: var(--ws06); }
 
 /* mobile: cheaper blur (DESIGN.md §8) */
 @media (max-width: 768px) { :root { --blur: blur(8px) saturate(150%); } }
@@ -124,5 +152,5 @@
   color: var(--text);
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
-  transition: background-color 220ms ease, color 220ms ease;
+  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
 }

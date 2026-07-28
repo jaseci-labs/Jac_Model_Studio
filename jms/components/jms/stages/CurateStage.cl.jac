@@ -13,10 +13,34 @@ textarea → SAVE / CANCEL). A bulk bar accepts every pending row on the page an
 fires a REGENERATE-REJECTED gen job (jms_gen.start_gen with regen_of); the footer
 builds the split via materialize (two-click confirm when a split already exists).
 
+KEYBOARD REVIEW (this is the stage a user spends hours in, so it is driveable
+without the mouse): j/↓ and k/↑ move a cursor down/up the page, ↵ expands, a
+accepts, r rejects, e opens the inline editor, u undoes. The keydown
+listener is registered in a useEffect (NOT `can with exit` — that cleanup would
+capture first-render state) and every handler bails when the event target is an
+input/textarea/select/contentEditable or carries a Meta/Ctrl/Alt modifier, so
+typing in the edit textarea or the holdout field is never hijacked.
+
+# ponytail: the cursor is a plain int index into the current page, not a row id.
+# Ceiling — it does not survive a page turn or a filter change (both reset it to
+# 0), and if a decision shortens `rows` under it, it clamps to the last row rather
+# than tracking "the row I was on". Correct for the actual workflow (review a page
+# top-to-bottom, turn the page) and it costs no id-to-index lookup per keystroke.
+
+UNDO (`u`) is just another decision on that same append-only overlay: it appends
+action `reset`, which is the one action jms_curate._status_of does not recognise,
+so the row falls through to "pending" — exactly what undo means here. It takes the
+identical doDecide path as a/r, so the stat tiles, the progress bar and the stage
+rail all refresh the same way. An already-pending row is skipped client-side
+rather than round-tripped: the server would accept it happily, but a request that
+provably changes nothing should not be sent, and the UI should not flicker as if
+something happened.
+
 `project` is the get_project() dict (pid + provider/model + gen_jobs); `onRefresh`
 re-pulls it after a mutation so the stage rail's curate dot updates. Handlers are
-named pick.../do.../build... — never set<HasVar>."""
+named pick.../do.../build.../move... — never set<HasVar>."""
 
+import from react { useEffect }
 sv import from ....jms_curate { curate_stats, curate_rows, decide_row, decide_page, rejected_ids, materialize }
 sv import from ....jms_gen { start_gen }
 
@@ -54,7 +78,8 @@ def:pub CurateStage(project: any = None, onRefresh: any = None) -> JsxElement {
         matBusy: bool = False,
         matResult: any = None,
         holdoutStr: str = "10",
-        confirmMat: bool = False;
+        confirmMat: bool = False,
+        cursor: int = 0;
 
     def _pid -> str {
         if project { return str(project["pid"]); }
@@ -84,6 +109,7 @@ def:pub CurateStage(project: any = None, onRefresh: any = None) -> JsxElement {
         page = 0;
         expandedId = "";
         editingId = "";
+        cursor = 0;
         loadPage();
     }
 
@@ -92,6 +118,7 @@ def:pub CurateStage(project: any = None, onRefresh: any = None) -> JsxElement {
             page = page - 1;
             expandedId = "";
             editingId = "";
+            cursor = 0;
             loadPage();
         }
     }
@@ -101,8 +128,34 @@ def:pub CurateStage(project: any = None, onRefresh: any = None) -> JsxElement {
             page = page + 1;
             expandedId = "";
             editingId = "";
+            cursor = 0;
             loadPage();
         }
+    }
+
+    """Clamp *i* into the current page and scroll that card into view. The target
+    index is passed in rather than read back off `cursor` — a state write is async,
+    so reading `cursor` on the next line would still be the OLD row."""
+    def moveCursor(i: int) -> None {
+        n = len(rows);
+        if n == 0 { return; }
+        ni = i;
+        if ni < 0 { ni = 0; }
+        if ni > n - 1 { ni = n - 1; }
+        cursor = ni;
+        doc: any = document;
+        el: any = doc.getElementById("curate-row-" + str(ni));
+        if el { el.scrollIntoView({"block": "nearest"}); }
+    }
+
+    """`cursor` clamped to what is actually on the page right now (a decision under
+    the PENDING filter shortens `rows` out from under it)."""
+    def _cur -> int {
+        n = len(rows);
+        if n == 0 { return 0; }
+        if cursor > n - 1 { return n - 1; }
+        if cursor < 0 { return 0; }
+        return cursor;
     }
 
     def toggleExpand(rid: str) -> None {
@@ -131,7 +184,9 @@ def:pub CurateStage(project: any = None, onRefresh: any = None) -> JsxElement {
         nm: list = [];
         idx = 0;
         for m in editMsgs {
-            nr = dict(m);
+            # dict(m) compiles to Object.fromEntries(m) and a client dict literal is a
+            # plain JS object (not iterable) → TypeError. Spread is the working copy form.
+            nr = {**m};
             if idx == i { nr["content"] = val; }
             nm.append(nr);
             idx = idx + 1;
@@ -222,6 +277,59 @@ def:pub CurateStage(project: any = None, onRefresh: any = None) -> JsxElement {
         matBusy = False;
     }
 
+    # ------------------------------------------------------------- keyboard ----
+    # Document-level keydown. Deliberately a useEffect and not `can with exit`:
+    # that compiles to useEffect(..., []) and its cleanup would close over the
+    # FIRST render's handler, so the listener could never be removed. The handler
+    # ref is effect-LOCAL and the cleanup removes the exact same one it added.
+    # Deps re-register it whenever the data it reads changes (a stale closure here
+    # would accept the wrong row).
+    useEffect(lambda {
+        doc: any = document;
+        onKey = lambda e: any {
+            tgt: any = e.target;
+            tag = str(tgt.tagName or "").lower() if tgt else "";
+            # Never hijack a key the user is typing into a control.
+            if tag == "input" or tag == "textarea" or tag == "select" { return; }
+            if tgt and tgt.isContentEditable { return; }
+            if e.metaKey or e.ctrlKey or e.altKey { return; }
+            n = len(rows);
+            if n == 0 { return; }
+            k = str(e.key);
+            cur = _cur();
+            if k == "j" or k == "ArrowDown" { e.preventDefault(); moveCursor(cur + 1); return; }
+            if k == "k" or k == "ArrowUp" { e.preventDefault(); moveCursor(cur - 1); return; }
+            # An open editor owns the page: every remaining key (expand, accept,
+            # reject, re-edit) would throw away unsaved textarea content. j/k above
+            # still move, so the list stays navigable; CANCEL/SAVE releases the rest.
+            if editingId { return; }
+            row = rows[cur];
+            rid = str(row["_id"]);
+            # Enter is how a focused <button>/<a> is activated. Swallowing it there
+            # would break keyboard operation of every control on the page, so the
+            # expand shortcut yields when a real control has focus.
+            if k == "Enter" {
+                if tag == "button" or tag == "a" { return; }
+                e.preventDefault();
+                toggleExpand(rid);
+                return;
+            }
+            if k == "a" { e.preventDefault(); doDecide(rid, "accept"); return; }
+            if k == "r" { e.preventDefault(); doDecide(rid, "reject"); return; }
+            if k == "e" { e.preventDefault(); expandedId = rid; startEdit(row); return; }
+            if k == "u" {
+                # Nothing to undo on a row that carries no decision — skip the call
+                # instead of round-tripping a no-op and re-rendering the page.
+                if str(row["status"]) == "pending" { return; }
+                e.preventDefault();
+                doDecide(rid, "reset");
+                return;
+            }
+        };
+        doc.addEventListener("keydown", onKey);
+        return lambda { doc.removeEventListener("keydown", onKey); };
+    }, [rows, cursor, editingId]);
+
     # --------------------------------------------------------------- helpers ----
     def _excerpt(row: any) -> str {
         msgs = list(row["messages"]) if row and "messages" in row else [];
@@ -251,6 +359,46 @@ def:pub CurateStage(project: any = None, onRefresh: any = None) -> JsxElement {
             <span className="jms-stat">ACC {_g(stats, "acceptance_pct", "0")}%</span>
             {showSplit and <span className="jms-stat">TRAIN {_g(stats, "train_rows", "0")}</span>}
             {showSplit and <span className="jms-stat">HOLDOUT {_g(stats, "holdout_rows", "0")}</span>}
+        </div>;
+    }
+
+    """"N of M reviewed" + a flat bar. Reviewed = accepted+rejected+edited, i.e.
+    every row carrying a decision; the numbers come straight from curate_stats."""
+    def _progress -> JsxElement {
+        tot = _toInt(_g(stats, "total", "0"));
+        done = _toInt(_g(stats, "accepted", "0")) + _toInt(_g(stats, "rejected", "0")) + _toInt(_g(stats, "edited", "0"));
+        pct = (done * 100) // tot if tot > 0 else 0;
+        if pct > 100 { pct = 100; }
+        return <div className="flex flex-col gap-1.5">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <span className="jms-label">REVIEW PROGRESS</span>
+                <span className="jms-mono-dim">
+                    {str(done)} of {str(tot)} reviewed · {str(pct)}%{" · " + _g(stats, "pending", "0") + " left" if tot > 0 else ""}
+                </span>
+            </div>
+            <div
+                role="progressbar"
+                aria-label="rows reviewed"
+                aria-valuenow={pct}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                style={{"height": "3px", "width": "100%", "background": "var(--jms-border)", "overflow": "hidden"}}
+            >
+                <div style={{"height": "100%", "width": str(pct) + "%", "background": "var(--jms-accent)"}} />
+            </div>
+        </div>;
+    }
+
+    """Compact keybinding legend. Only rendered when there are rows to drive."""
+    def _keyHint -> JsxElement {
+        return <div className="flex flex-wrap items-center gap-x-3 gap-y-1 jms-mono-dim">
+            <span><span className="jms-kbd">j</span>/<span className="jms-kbd">k</span> move</span>
+            <span><span className="jms-kbd">a</span> accept</span>
+            <span><span className="jms-kbd">r</span> reject</span>
+            <span><span className="jms-kbd">e</span> edit</span>
+            <span><span className="jms-kbd">u</span> undo</span>
+            <span><span className="jms-kbd">↵</span> expand</span>
+            <span className="opacity-70">keys pause while you type</span>
         </div>;
     }
 
@@ -307,6 +455,7 @@ def:pub CurateStage(project: any = None, onRefresh: any = None) -> JsxElement {
                     <span className="jms-label">{str(editMsgs[i]["role"])}</span>
                     <textarea
                         className="jms-textarea"
+                        aria-label={"edit " + str(editMsgs[i]["role"]) + " message"}
                         value={str(editMsgs[i]["content"])}
                         onChange={lambda e: any { patchEditMsg(i, str(e.target.value)); }}
                     />
@@ -319,14 +468,22 @@ def:pub CurateStage(project: any = None, onRefresh: any = None) -> JsxElement {
         </div>;
     }
 
-    def _rowCard(row: any) -> JsxElement {
+    def _rowCard(row: any, i: int = 0) -> JsxElement {
         rid = str(row["_id"]);
         st = str(row["status"]);
         msgs = list(row["messages"]) if "messages" in row else [];
         chunks = list(row["chunks"]) if "chunks" in row else [];
         open_ = expandedId == rid;
         editing = editingId == rid;
-        return <div key={rid} className="jms-section flex flex-col gap-3">
+        # Keyboard cursor: an inset accent rule, not a border swap — .jms-section
+        # already owns its border and changing it would shift the card by a pixel.
+        onCursor = i == _cur();
+        return <div
+            key={rid}
+            id={"curate-row-" + str(i)}
+            className="jms-section flex flex-col gap-3"
+            style={{"boxShadow": "inset 2px 0 0 var(--jms-accent)"} if onCursor else {}}
+        >
             <button
                 className="flex items-center gap-3 text-left"
                 style={{"background": "transparent", "border": "none", "cursor": "pointer", "padding": "0"}}
@@ -391,6 +548,7 @@ def:pub CurateStage(project: any = None, onRefresh: any = None) -> JsxElement {
                         className="jms-input"
                         style={{"width": "90px"}}
                         type="number"
+                        aria-label="holdout percent"
                         value={holdoutStr}
                         onChange={lambda e: any { holdoutStr = str(e.target.value); confirmMat = False; }}
                     />
@@ -410,6 +568,7 @@ def:pub CurateStage(project: any = None, onRefresh: any = None) -> JsxElement {
 
     return <div className="flex flex-col gap-5">
         {_tiles()}
+        {_progress()}
         {_chips()}
         {_bulkBar()}
         {err and <span className="jms-mono-dim" style={{"color": "var(--jms-danger)"}}>{err}</span>}
@@ -421,8 +580,10 @@ def:pub CurateStage(project: any = None, onRefresh: any = None) -> JsxElement {
             </span>
         </div>}
 
+        {not loading and total > 0 and _keyHint()}
+
         {not loading and total > 0 and <div className="flex flex-col gap-3">
-            {[_rowCard({"row": r}) for r in rows]}
+            {[_rowCard({"row": rows[ri], "i": ri}) for ri in range(len(rows))]}
         </div>}
 
         {not loading and total > 0 and _pager()}

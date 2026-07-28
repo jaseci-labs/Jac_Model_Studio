@@ -24,7 +24,8 @@ def:pub CptSftData -> JsxElement {
         total: int = 0,
         expanded: int = -1,
         category: str = "all",
-        axis: str = "all";
+        axis: str = "all",
+        loadErr: str = "";
 
     # `p`/`off`/`cat`/`ax` passed explicitly — reading state right after setting
     # it returns the stale value (React writes are async). Only the filter that
@@ -33,9 +34,14 @@ def:pub CptSftData -> JsxElement {
     async def _fetch(p: str, off: int, cat: str, ax: str) -> None {
         catArg = cat if (("sft_train.jsonl" in p) and cat != "all") else "";
         axArg = ax if (("dpo_train.jsonl" in p) and ax != "all") else "";
-        r = await cptsft_rows(p, off, 25, catArg, axArg);
-        rows = list(r["rows"]);
-        total = int(r["total"]);
+        try {
+            r = await cptsft_rows(p, off, 25, catArg, axArg);
+            rows = list(r["rows"]);
+            total = int(r["total"]);
+        } except Exception as e {
+            rows = []; total = 0;
+            loadErr = "rows failed · " + str(e);
+        }
     }
 
     async def openFile(p: str) -> None {
@@ -82,24 +88,33 @@ def:pub CptSftData -> JsxElement {
     }
 
     async can with entry {
-        s = await cptsft_stats();
-        # tag each category with its ramp shade up front (avoids index math in JSX .map)
-        cats = list(s["categories"]);
-        idx = 0;
-        for c in cats {
-            c["shade"] = SHADES[idx % len(SHADES)];
-            idx += 1;
-        }
-        stats = s;
-        fs = await cptsft_files();
-        files = fs;
-        if len(list(fs)) > 0 {
-            await openFile(str(fs[0].path));
+        try {
+            s = await cptsft_stats();
+            # tag each category with its ramp shade up front (avoids index math in JSX .map)
+            cats = list(s["categories"]);
+            idx = 0;
+            for c in cats {
+                c["shade"] = SHADES[idx % len(SHADES)];
+                idx += 1;
+            }
+            stats = s;
+            fs = await cptsft_files();
+            files = fs;
+            if len(list(fs)) > 0 {
+                await openFile(str(fs[0].path));
+            }
+        } except Exception as e {
+            # Without this the compiled async IIFE rejects unhandled and `stats`
+            # stays None → a permanent "loading…" that actually means "failed".
+            loadErr = "CPT-SFT release failed to load · " + str(e);
         }
     }
 
     def _tiles() -> JsxElement {
         if not stats {
+            if loadErr {
+                return <span className="micro-label" style={{"color": "var(--danger)"}}>{loadErr}</span>;
+            }
             return <span className="micro-label">loading…</span>;
         }
         return <div className="grid grid-cols-3 gap-3 lg:grid-cols-6">
@@ -191,6 +206,9 @@ def:pub CptSftData -> JsxElement {
             <span className="micro-label">DATA · CPT-SFT RELEASE (read-only)</span>
             <span className="micro-label text-muted-foreground/80">04-cpt-sft/dataset/fresh</span>
         </div>
+        {loadErr and <div key="cptsfterr" className="border-b border-border px-4 py-1.5">
+            <span className="stat-line" style={{"color": "var(--danger)"}}>{loadErr}</span>
+        </div>}
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
             {_tiles()}
             {_composition()}

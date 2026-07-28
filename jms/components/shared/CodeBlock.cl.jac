@@ -8,6 +8,8 @@ strings / numbers / words, emitting <span> nodes with .tok-kw/.tok-type/.tok-bi/
 # studio: client port uses JS RegExp.matchAll instead of Python `re` — `import re`
 # is unresolvable in the Vite/esbuild bundle. RegExp(pat,"g") (no `new`) is valid JS."""
 
+import from react { useRef }
+
 glob KW: set = {
     "def", "return", "if", "else", "elif", "for", "while", "import", "from",
     "as", "with", "try", "except", "class", "lambda", "pass", "break",
@@ -87,14 +89,23 @@ def _highlight(code: str) -> list {
 
 def:pub CodeBlock(label: str, code: str, lang: str) -> JsxElement {
     has copied: bool = False;
+    # Timeout id lives in a ref, not `has`: `can with exit` compiles to a
+    # useEffect with EMPTY deps, so a state-held id would still read its
+    # first-render value (None) at unmount and never clear.
+    tid: any = useRef(None);
 
     tab = label if label else ("OUTPUT." + (lang.upper() if lang else "TXT"));
+
+    can with exit {
+        if tid.current { clearTimeout(float(str(tid.current))); }
+    }
 
     def _copy() -> None {
         nav: any = navigator;
         nav.clipboard.writeText(code);
         copied = True;
-        setTimeout(lambda -> None { copied = False; }, 1200);
+        if tid.current { clearTimeout(float(str(tid.current))); }
+        tid.current = setTimeout(lambda -> None { copied = False; }, 1200);
     }
 
     return <div className="relative mt-3 mb-1 exp-panel !bg-popover">

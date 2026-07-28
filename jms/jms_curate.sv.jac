@@ -100,14 +100,50 @@ def _status_of(rid: str, decisions: dict) -> str {
     return "pending";
 }
 
+"""Write *text* to *dst* atomically: a per-pid sibling `.tmp` in the same directory,
+then os.replace (an atomic rename on a POSIX filesystem). A reader either sees the
+whole old file or the whole new one — never a truncated one — and a crash mid-write
+leaves the previous contents intact instead of a half file."""
+def _atomic_write(dst: Path, text: str) -> None {
+    dst.parent.mkdir(parents=True, exist_ok=True);
+    tmp = dst.parent / f".{dst.name}.{os.getpid()}.tmp";
+    tmp.write_text(text);
+    os.replace(str(tmp), str(dst));
+}
+
 """Append one decision line, normalising a missing trailing newline first so the
-overlay never runs two records together on one line."""
+overlay never runs two records together on one line.
+
+A REAL append (open "a"), not read-all-then-rewrite-all: the previous version
+rebuilt the entire decision history on every accept/reject click, so a crash
+mid-write truncated every decision the user had ever made. The trailing-newline
+probe reads exactly one byte via st_size + seek instead of the whole file.
+# ponytail: ceiling — O_APPEND makes each write atomic against other appenders on
+# a local filesystem; two servers appending at once interleave records but never
+# corrupt one. Cross-machine (NFS) appends are out of scope for a one-GPU box."""
 def _append_decisions(p: JmsProject, added: str) -> None {
     df = _decisions_file(p);
     df.parent.mkdir(parents=True, exist_ok=True);
-    existing = df.read_text() if df.exists() else "";
-    if existing and not existing.endswith("\n") { existing = existing + "\n"; }
-    df.write_text(existing + added);
+    need_nl = False;
+    if df.exists() {
+        size = int(str(df.stat().st_size));
+        if size > 0 {
+            probe: any = open(df, "rb");
+            try {
+                probe.seek(size - 1);
+                need_nl = probe.read(1) != b"\n";
+            } finally {
+                probe.close();
+            }
+        }
+    }
+    fh: any = open(df, "a");
+    try {
+        if need_nl { fh.write("\n"); }
+        fh.write(added);
+    } finally {
+        fh.close();
+    }
 }
 
 # ------------------------------------------------------------------ readers ----
@@ -138,8 +174,13 @@ are line counts of the materialized files, 0 before the first BUILD."""
 def curate_stats(pid: str) -> dict {
     p = _find_project(pid);
     if p is None { return {}; }
-    raw = _read_raw(p);
-    decisions = _read_decisions(p);
+    return _stats_from(p, _read_raw(p), _read_decisions(p));
+}
+
+"""curate_stats over ALREADY-LOADED raw rows + folded decisions. Same dict, same
+key order — the decide_* endpoints reuse the data they just read instead of
+re-parsing raw.jsonl and decisions.jsonl a second and third time per click."""
+def _stats_from(p: JmsProject, raw: list[dict], decisions: dict) -> dict {
     pending = 0;
     accepted = 0;
     rejected = 0;
@@ -190,13 +231,19 @@ def curate_rows(pid: str, offset: int, limit: int, `filter: str = "all") -> dict
 }
 
 # --------------------------------------------------------------- decisions -----
-"""Record one accept/reject/edit for *row_id*. `edit` requires a valid sft-chat
-`messages` list (jms_gen.validate_row). Returns the fresh curate_stats, or
-{"error": ...}."""
+"""Record one accept/reject/edit/reset for *row_id*. `edit` requires a valid
+sft-chat `messages` list (jms_gen.validate_row). Returns the fresh curate_stats,
+or {"error": ...}.
+
+`reset` is the UNDO action: the overlay is append-only/last-write-wins, so undoing
+is just another decision whose action `_status_of` does not recognise — it falls
+through to "pending", which is exactly what undo means here. Nothing else needed
+changing: `materialize` already skips pending rows and `rejected_ids` already only
+collects rejects."""
 def decide_row(pid: str, row_id: str, action: str, messages: list = []) -> dict {
     p = _find_project(pid);
     if p is None { return {"error": "unknown project"}; }
-    if action not in ["accept", "reject", "edit"] { return {"error": "unknown action: " + action}; }
+    if action not in ["accept", "reject", "edit", "reset"] { return {"error": "unknown action: " + action}; }
     raw = _read_raw(p);
     found = False;
     for row in raw {
@@ -209,8 +256,13 @@ def decide_row(pid: str, row_id: str, action: str, messages: list = []) -> dict 
         if not validate_row({"messages": msgs}) { return {"error": "invalid messages — edit must be a valid sft-chat transcript"}; }
         entry["messages"] = msgs;
     }
+    decisions = _read_decisions(p);
     _append_decisions(p, json.dumps(entry) + "\n");
-    return curate_stats(pid);
+    # Fold the new decision in memory rather than re-reading raw.jsonl +
+    # decisions.jsonl through curate_stats: one pass over each file per click
+    # instead of two over raw and two over decisions. Same returned dict.
+    decisions[row_id] = entry;
+    return _stats_from(p, raw, decisions);
 }
 
 """Bulk accept or reject a set of row ids in one append (unknown ids are
@@ -222,16 +274,23 @@ def decide_page(pid: str, row_ids: list[str], action: str) -> dict {
     raw = _read_raw(p);
     valid: dict = {};
     for row in raw { valid[str(row.get("_id", ""))] = True; }
+    decisions = _read_decisions(p);
     ts = _now();
     added = "";
+    applied: dict = {};
     for rid in row_ids {
         r = str(rid);
         if r in valid {
-            added = added + json.dumps({"_id": r, "action": action, "ts": ts}) + "\n";
+            entry: dict = {"_id": r, "action": action, "ts": ts};
+            added = added + json.dumps(entry) + "\n";
+            applied[r] = entry;
         }
     }
     if added { _append_decisions(p, added); }
-    return curate_stats(pid);
+    # Same in-memory fold as decide_row — a bulk accept of a page no longer
+    # re-parses the whole dataset twice on top of the read it just did.
+    for k in applied { decisions[k] = applied[k]; }
+    return _stats_from(p, raw, decisions);
 }
 
 """_ids of every currently-rejected row (feeds the REGENERATE button)."""
@@ -252,9 +311,9 @@ def rejected_ids(pid: str) -> list[str] {
 def _compact_decisions(p: JmsProject, decisions: dict) -> None {
     lines: list[str] = [];
     for rid in decisions { lines.append(json.dumps(dict(decisions[rid]))); }
-    df = _decisions_file(p);
-    df.parent.mkdir(parents=True, exist_ok=True);
-    df.write_text("\n".join(lines) + ("\n" if lines else ""));
+    # Atomic: a crash here used to be able to leave the user's whole decision
+    # history half-written on disk.
+    _atomic_write(_decisions_file(p), "\n".join(lines) + ("\n" if lines else ""));
 }
 
 """The final shipped form of one accepted/edited row: edited messages win, then
@@ -300,8 +359,10 @@ def materialize(pid: str, holdout_pct: int = 10) -> dict {
         if bucket < hp { holdout.append(line); }
         else { train.append(line); }
     }
-    _train_file(p).write_text("\n".join(train) + ("\n" if train else ""));
-    _holdout_file(p).write_text("\n".join(holdout) + ("\n" if holdout else ""));
+    # Atomic: a trainer reading dataset/train.jsonl while a rebuild is in flight
+    # sees the previous complete split, never a truncated one.
+    _atomic_write(_train_file(p), "\n".join(train) + ("\n" if train else ""));
+    _atomic_write(_holdout_file(p), "\n".join(holdout) + ("\n" if holdout else ""));
     return {
         "train_rows": len(train), "holdout_rows": len(holdout),
         "skipped_rejected": skipped_rejected, "skipped_pending": skipped_pending

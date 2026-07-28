@@ -11,19 +11,43 @@ WORKSPACES) sits at the right, mirroring the JMS top bar's right-side action gro
 modal), a `⚙ KEYS` button renders just before ⚙ WORKSPACES. Experiments doesn't pass
 it, so its bar is unchanged.
 
-`onAssistant` is optional too (phase-2 task A6): when a caller passes it, a
-`✦ ASK` button renders in the right group (before ⚙ KEYS/⚙ WORKSPACES) that
-toggles the shell-level `<AssistantPanel>`. Both JmsShell and AppShell pass it,
-so the grounded assistant is reachable from either surface via the same bar."""
+There is deliberately no `onAssistant` prop: the grounded assistant is a
+self-mounting floating ✦ widget (`AssistantPanel.cl.jac`, mounted once per
+shell), so no caller ever needed a bar button and the prop shipped dead —
+`✦ ASK` never rendered anywhere. Removed rather than wired up; the widget is
+the single entry point."""
 
+import from react { useEffect }
 import from .ThemeSwitcher { ThemeSwitcher }
+sv import from ..jobs { active_jobs }
 
 def:pub WorkspaceBar(
     layout: any, workspace: str,
     onWorkspace: Callable[([str], None)], onSettings: Callable[[], None],
-    onHub: any = None, backLabel: str = "‹ HOME", onKeys: any = None,
-    onAssistant: any = None
+    onHub: any = None, backLabel: str = "‹ HOME", onKeys: any = None
 ) -> JsxElement {
+    has jobRunning: int = 0,
+        jobHeavy: str = "";
+
+    # Global activity indicator. Detached GPU jobs outlive the section that started
+    # them and the user moves between workspaces/surfaces, so without this there is
+    # no signal anything is running once you navigate away. Interval id is
+    # effect-LOCAL: a `has`-held id would be captured at its first-render value by
+    # the cleanup closure and never cleared (the leak class fixed across this app).
+    useEffect(lambda {
+        iv: any = None;
+        async def poll -> None {
+            try {
+                s = await active_jobs();
+                jobRunning = int(str(s["running"]));
+                jobHeavy = str(s["heavy"]);
+            } except Exception { }
+        }
+        poll();
+        iv = setInterval(lambda { poll(); }, 6000);
+        return lambda { if iv is not None { clearInterval(float(str(iv))); } };
+    }, []);
+
     wsList: list = list(layout["workspaces"]);
     return <header className="exp-topbar">
         <div className="flex min-w-0 items-center gap-4">
@@ -53,11 +77,15 @@ def:pub WorkspaceBar(
             </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+            {jobRunning > 0 and <span
+                className="exp-chip shrink-0"
+                title={("GPU slot: " + jobHeavy) if jobHeavy else "background jobs running"}
+                style={{"color": "var(--ok)", "borderColor": "var(--ok)"}}
+            >
+                <span className="pulse h-1.5 w-1.5 rounded-full" style={{"background": "var(--ok)"}} />
+                {str(jobRunning) + " RUNNING"}
+            </span>}
             <ThemeSwitcher />
-            {onAssistant is not None and <button
-                onClick={lambda e: MouseEvent { onAssistant(); }}
-                className="exp-btn exp-btn-accent shrink-0"
-            >✦ ASK</button>}
             {onKeys is not None and <button
                 onClick={lambda e: MouseEvent { onKeys(); }}
                 className="exp-btn exp-btn-ghost shrink-0"

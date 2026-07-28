@@ -13,6 +13,8 @@ import from persistence {
 import from data { FileRefView, DataRowView, dataset_stats, dataset_files, dataset_rows, add_examples, rl_sources, rl_dataset_files, rl_dataset_rows }
 import from builders { BuilderView, list_builders, run_builder, get_builder }
 import from prompts { list_prompts }
+# Cross-app activity snapshot for the top-bar indicator (read-only).
+import from jobs { active_jobs }
 import from gallery { list_galleries, gallery_images }
 import from evals { EvalView, create_eval, list_evals, get_eval, stop_eval, delete_eval }
 # Training control + read-only run metrics — consumed by the TRAIN section's
@@ -47,7 +49,11 @@ import from chat { chat_stream }
 # instance with a training command baked into runcmd.
 import from spheron {
     spheron_status, spheron_credential_status, spheron_providers,
-    search_gpus, create_gpu_instance,
+    search_gpus,
+    # create_gpu_instance is deliberately NOT registered: no client calls it, but as an
+    # HTTP endpoint it lets a caller deploy a billing GPU VM with no supervisor and no
+    # CloudRun node tracking it. Still used server-side (cloudruns.sv.jac:398,
+    # spheron.sv.jac:920) — the function is untouched, only its HTTP exposure is gone.
     spheron_instances, spheron_instance, spheron_ssh,
     destroy_gpu_instance, can_terminate_gpu_instance, rename_gpu_instance,
     spheron_ssh_keys, add_spheron_ssh_key,
@@ -64,9 +70,18 @@ import from cloudruns {
 # JMS product surface: per-user project management + source scanning (graph-backed,
 # root ++> JmsProject ++> JmsSource). Consumed by the JmsProjects / JmsProject /
 # SourcesStage client components via `sv import` RPC stubs.
+#
+# Project lifecycle (rename / duplicate / export) is the same module: `rename_project`
+# changes the DISPLAY name only (the slug stays the on-disk identity, so no directory
+# ever moves), `duplicate_project` clones config + sources + one plan with an opt-in
+# streamed curated-dataset copy, and the three export endpoints
+# (`dataset_export_info` / `export_dataset` / `export_summary`) all carry a hard
+# per-response byte budget and report in-band when they hit it.
 import from jms_projects {
     JmsProjectView,
     create_project, list_projects, get_project, update_project, delete_project,
+    rename_project, duplicate_project,
+    dataset_export_info, export_dataset, export_summary,
     add_source, remove_source, scan_source, write_project_snapshot
 }
 # JMS top nav: a lean per-user workspace registry that GROUPS projects (no
@@ -126,7 +141,7 @@ import from jms_chat { jms_chat_stream }
 # Local single-user mode: `local_mode()` is the flag the client's auth gate
 # reads; `local_session()` mints an in-process JWT so the desktop client (which
 # can't reach /user/* over HTTP in webview mode) can still establish a session.
-import from auth { local_mode, local_session }
+import from auth { local_mode, local_session, session_alive }
 
 # Client-side UI
 cl {

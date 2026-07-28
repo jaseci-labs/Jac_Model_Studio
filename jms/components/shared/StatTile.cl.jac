@@ -1,6 +1,10 @@
-"""StatTile — corner-bracket stat box. Ports ui/components/shared/stat-tile.tsx."""
+"""StatTile — corner-bracket stat box. Ports ui/components/shared/stat-tile.tsx.
 
-def:pub StatTile(label: str, value: str, sub: str, dim: bool) -> JsxElement {
+`sub`/`dim` are trailing OPTIONALS: 26 of the 33 call sites only ever wrote
+`sub="" dim={False}` to satisfy required params. Defaulting them changes nothing
+for a caller that still passes them explicitly (all current ones do)."""
+
+def:pub StatTile(label: str, value: str, sub: str = "", dim: bool = False) -> JsxElement {
     return <div className={"relative p-3 pt-4 " + ("opacity-40" if dim else "")}>
         <span className="absolute left-0 top-0 h-[10px] w-[10px] border-l border-t border-input" />
         <span className="absolute right-0 top-0 h-[10px] w-[10px] border-r border-t border-input" />

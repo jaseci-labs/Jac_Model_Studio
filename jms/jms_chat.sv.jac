@@ -20,8 +20,11 @@ capability. On this single-user desktop box the workspace is shared local storag
 so this matches how the rest of JMS treats it.
 
 Only local-mlx runs are chattable: a spheron run writes no mlx_config.json and its
-base weights aren't local, so it resolves to a clean SSE error frame. The adapter
-must be on disk (a completed run).
+base weights aren't local, so it resolves to a clean SSE error frame — one that
+NAMES the out-of-project dir its adapter was pulled into (read from the
+runs/<rid>/remote.json pointer jms_train writes), so the dead end is legible
+instead of looking like a missing run. The adapter must be on disk (a completed
+run).
 
 NO chat persistence — stateless completion; the client holds the transcript in
 memory (YAGNI, per the plan).
@@ -44,6 +47,25 @@ def _adapter_on_disk(adir: Path) -> bool {
     return False;
 }
 
+"""Why runs/<rid>/ carries no mlx_config.json, as a specific message. A spheron
+run leaves a remote.json pointer there (written by jms_train._start_spheron)
+naming the out-of-project dir cloudruns pulls its adapter into, so the error can
+say WHERE the adapter is instead of "run not found"."""
+def _no_mlx_config_error(run_dir: Path, rid: str) -> str {
+    ptr = run_dir / "remote.json";
+    if ptr.exists() {
+        adir = "";
+        try {
+            adir = str(dict(json.loads(ptr.read_text())).get("adapter_path", ""));
+        } except Exception { adir = ""; }
+        tail = (" — adapter is at " + adir) if adir else "";
+        return ("spheron runs cannot be chatted with yet: the adapter is HuggingFace PEFT "
+                + "format and the base weights live on the VM, not this box" + tail);
+    }
+    if run_dir.is_dir() { return "run has no local MLX config (not a local-mlx run): " + rid; }
+    return "unknown run: " + rid;
+}
+
 """Resolve (pid, rid) → {ok, base_path, adapter_path, model_id, error} from disk.
 Scans jms-projects/*/project.json for the pid, then reads runs/<rid>/mlx_config.json
 (local-mlx runs only) for the base-model abs path + the adapter dir. See the module
@@ -59,7 +81,7 @@ def _resolve_run(pid: str, rid: str) -> dict {
         run_dir = pj.parent / "runs" / rid;
         cfg = run_dir / "mlx_config.json";
         if not cfg.exists() {
-            return {"ok": False, "error": "run not found or not a local-mlx run: " + rid};
+            return {"ok": False, "error": _no_mlx_config_error(run_dir, rid)};
         }
         c: dict = {};
         try { c = dict(json.loads(cfg.read_text())); } except Exception {

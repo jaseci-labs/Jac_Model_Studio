@@ -10,15 +10,30 @@ APPROVE / REDRAFT. Prior versions list on the side; clicking one loads it (draft
 editable, approved read-only).
 
 SYNTHESIZE: config card (provider/model, target rows defaulted from the approved
-plan, max-rows hard cap ~1.2×, batch size) → PREVIEW COST (estimate tiles) →
-FIRE (enabled only after a cap_ok preview and while no job runs). Jobs list with
-rows_done/target + status dot + STOP; selecting a job shows its live log tail.
-Polls list_gen_jobs/gen_status every 2s while mounted (the Data.cl.jac
-unconditional-poll pattern). Any input change invalidates the preview.
+plan, max-rows hard cap ~1.2×, batch size) → PREVIEW COST → FIRE (enabled only
+after a cap_ok preview and while no job runs). FIRE is two-click: the second
+click's label spells out the rows and the dollar estimate it is about to spend,
+so an expensive job cannot go out on one stray click (same confirm pattern as
+CurateStage's split overwrite). Jobs list with a rows_done/target progress bar +
+status dot + STOP; selecting a job shows its counters and live log tail.
+
+Every number on this screen comes back from the server (estimate_gen /
+list_gen_jobs / gen_status); the only derived values are integer percentages of
+two returned counts and the wall-clock elapsed. Nothing is invented — in
+particular there is no ETA, because the backend reports no rate.
+
+# ponytail: progress is rows_done/target_rows only. Ceiling — no ETA, no
+# rows-per-minute, no cost burn-down, because the server returns neither a rate
+# nor a per-batch timeline (only `last_batch_at`, a single timestamp). Deriving a
+# rate from rows_done/elapsed would read as a promise the batching cannot keep.
+Polls list_gen_jobs/gen_status every 2s ONLY while `active` (this stage is the
+visible one) — the interval id is effect-local so the cleanup can actually see it
+(Cloud.cl.jac pattern). Any input change invalidates the preview.
 
 `project` is the get_project() dict; `onRefresh` re-pulls it after a mutation.
 Handlers are named draft.../save.../fire.../stopJob etc — never set<HasVar>."""
 
+import from react { useEffect }
 sv import from ....jms_plan { draft_plan, update_plan, approve_plan }
 sv import from ....jms_llm { llm_status }
 sv import from ....jms_gen { estimate_gen, start_gen, gen_status, stop_gen, list_gen_jobs }
@@ -32,7 +47,7 @@ def _toInt(s: str) -> int {
     try { return int(float(s.strip())); } except Exception { return 0; }
 }
 
-def:pub GenerateStage(project: any = None, onRefresh: any = None) -> JsxElement {
+def:pub GenerateStage(project: any = None, onRefresh: any = None, active: bool = True) -> JsxElement {
     has subtab: str = "plan",
         statusData: any = None,
         provider: str = "claude",
@@ -58,10 +73,10 @@ def:pub GenerateStage(project: any = None, onRefresh: any = None) -> JsxElement 
         estBusy: bool = False,
         genErr: str = "",
         fireBusy: bool = False,
+        fireConfirm: bool = False,
         genJobs: list = [],
         selJid: str = "",
-        selData: any = None,
-        genPollId: any = None;
+        selData: any = None;
 
     def _pid -> str {
         if project { return str(project["pid"]); }
@@ -147,15 +162,19 @@ def:pub GenerateStage(project: any = None, onRefresh: any = None) -> JsxElement 
             }
             loadedInit = True;
         }
-        await refreshGen();
-        genPollId = setInterval(lambda -> None { refreshGen(); }, 2000);
     }
 
-    can with exit {
-        if genPollId is not None {
-            clearInterval(float(str(genPollId)));
+    # Poll only while this stage is the visible one. The id MUST be effect-local:
+    # a `can with exit` cleanup captures the `has` var from the first render (still
+    # None) and so never clears anything — the leak this replaces.
+    useEffect(lambda {
+        iv: any = None;
+        if active {
+            refreshGen();
+            iv = setInterval(lambda { refreshGen(); }, 2000);
         }
-    }
+        return lambda { if iv is not None { clearInterval(float(str(iv))); } };
+    }, [active]);
 
     def pickProvider(pv: str) -> None {
         provider = pv;
@@ -259,7 +278,9 @@ def:pub GenerateStage(project: any = None, onRefresh: any = None) -> JsxElement 
         nm: list = [];
         idx = 0;
         for r in mix {
-            nr = dict(r);
+            # dict(r) compiles to Object.fromEntries(r) and a client dict literal is a
+            # plain JS object (not iterable) → TypeError. Spread is the working copy form.
+            nr = {**r};
             if idx == i {
                 if field == "share_pct" { nr["share_pct"] = _toInt(val); }
                 else { nr[field] = val; }
@@ -282,20 +303,25 @@ def:pub GenerateStage(project: any = None, onRefresh: any = None) -> JsxElement 
         ms = _modelsFor(pv);
         genModel = str(ms[0]) if len(ms) > 0 else "";
         estData = None;
+        fireConfirm = False;
         genErr = "";
     }
 
-    # Any config change invalidates the last preview (FIRE re-locks until a new one).
+    # Any config change invalidates the last preview (FIRE re-locks until a new one)
+    # AND drops an armed confirm — otherwise the second click would spend on numbers
+    # the user has since edited away.
     def patchGenField(field: str, val: str) -> None {
         if field == "target" { targetStr = val; }
         if field == "max" { maxStr = val; }
         if field == "batch" { batchStr = val; }
         estData = None;
+        fireConfirm = False;
     }
 
     async def previewCost -> None {
         estBusy = True;
         genErr = "";
+        fireConfirm = False;
         try {
             e = await estimate_gen(_pid(), genProvider, genModel, _toInt(targetStr), _toInt(batchStr));
             estData = e;
@@ -310,6 +336,17 @@ def:pub GenerateStage(project: any = None, onRefresh: any = None) -> JsxElement 
             if _g(j, "status", "") == "running" { return True; }
         }
         return False;
+    }
+
+    """First click arms; second click spends. `fireConfirm` is never read back on
+    the line after it is written — the arm path returns immediately."""
+    def fireClick -> None {
+        if not fireConfirm {
+            fireConfirm = True;
+            return;
+        }
+        fireConfirm = False;
+        fireNow();
     }
 
     async def fireNow -> None {
@@ -367,6 +404,35 @@ def:pub GenerateStage(project: any = None, onRefresh: any = None) -> JsxElement 
         }
     }
 
+    """rows_done/target_rows as a clamped integer percent. Both counts are the
+    server's (jms_gen._resolve_at reads them out of the worker's progress.json);
+    the division is the only thing computed here."""
+    def _pctOf(j: any) -> int {
+        tgt = _toInt(_g(j, "target_rows", "0"));
+        dn = _toInt(_g(j, "rows_done", "0"));
+        if tgt <= 0 { return 0; }
+        p = (dn * 100) // tgt;
+        if p > 100 { p = 100; }
+        if p < 0 { p = 0; }
+        return p;
+    }
+
+    """Flat 3px fill bar. Props-object component (params + -> JsxElement) — call
+    as _bar({"pct": n}), never positionally. `pct` is typed `any` precisely because
+    of that: the checker sees the props dict, not the destructured int."""
+    def _bar(pct: any) -> JsxElement {
+        return <div
+            role="progressbar"
+            aria-label="rows generated"
+            aria-valuenow={pct}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            style={{"height": "3px", "width": "100%", "background": "var(--jms-border)", "overflow": "hidden"}}
+        >
+            <div style={{"height": "100%", "width": str(pct) + "%", "background": "var(--jms-accent)"}} />
+        </div>;
+    }
+
     # --------------------------------------------------------------- render ----
     def _picker -> JsxElement {
         provs = _providers();
@@ -395,6 +461,7 @@ def:pub GenerateStage(project: any = None, onRefresh: any = None) -> JsxElement 
                 <select
                     className="jms-input"
                     style={{"width": "auto", "minWidth": "180px"}}
+                    aria-label="draft model"
                     value={model}
                     onChange={lambda e: any { model = str(e.target.value); }}
                 >
@@ -453,6 +520,7 @@ def:pub GenerateStage(project: any = None, onRefresh: any = None) -> JsxElement 
                 <span className="jms-label">DESCRIPTION</span>
                 <textarea
                     className="jms-textarea"
+                    aria-label="plan description"
                     value={desc}
                     disabled={ro}
                     onChange={lambda e: any { desc = str(e.target.value); }}
@@ -471,6 +539,7 @@ def:pub GenerateStage(project: any = None, onRefresh: any = None) -> JsxElement 
                         <input
                             className="jms-input"
                             style={{"width": "150px"}}
+                            aria-label="example type name"
                             value={_g(mix[i], "type_name", "")}
                             placeholder="type_name"
                             disabled={ro}
@@ -478,6 +547,7 @@ def:pub GenerateStage(project: any = None, onRefresh: any = None) -> JsxElement 
                         />
                         <input
                             className="jms-input flex-1"
+                            aria-label="example type description"
                             value={_g(mix[i], "description", "")}
                             placeholder="what this category teaches"
                             disabled={ro}
@@ -487,6 +557,7 @@ def:pub GenerateStage(project: any = None, onRefresh: any = None) -> JsxElement 
                             className="jms-input"
                             style={{"width": "72px"}}
                             type="number"
+                            aria-label="example type share percent"
                             value={_g(mix[i], "share_pct", "0")}
                             disabled={ro}
                             onChange={lambda e: any { patchRow(i, "share_pct", str(e.target.value)); }}
@@ -510,6 +581,7 @@ def:pub GenerateStage(project: any = None, onRefresh: any = None) -> JsxElement 
                     className="jms-input"
                     style={{"width": "140px"}}
                     type="number"
+                    aria-label="target rows"
                     value={targetRowsStr}
                     disabled={ro}
                     onChange={lambda e: any { targetRowsStr = str(e.target.value); }}
@@ -520,6 +592,7 @@ def:pub GenerateStage(project: any = None, onRefresh: any = None) -> JsxElement 
                 <span className="jms-label">SYSTEM PROMPT</span>
                 <textarea
                     className="jms-textarea"
+                    aria-label="system prompt"
                     value={sysPrompt}
                     disabled={ro}
                     onChange={lambda e: any { sysPrompt = str(e.target.value); }}
@@ -530,6 +603,7 @@ def:pub GenerateStage(project: any = None, onRefresh: any = None) -> JsxElement 
                 <span className="jms-label">GROUNDING NOTES</span>
                 <textarea
                     className="jms-textarea"
+                    aria-label="grounding notes"
                     value={grounding}
                     disabled={ro}
                     onChange={lambda e: any { grounding = str(e.target.value); }}
@@ -564,6 +638,16 @@ def:pub GenerateStage(project: any = None, onRefresh: any = None) -> JsxElement 
         if not hasApproved { hint = "Approve a plan in the PLAN tab first."; }
         elif genProvider == "claude" and not _configured() { hint = "Set an Anthropic key (⚙ KEYS, top bar) to generate with Claude."; }
         elif genProvider == "mlx" and len(_modelsFor("mlx")) == 0 { hint = "No local MLX model available — load one in the chat app first."; }
+        tgtN = _toInt(targetStr);
+        maxN = _toInt(maxStr);
+        # A max BELOW target is silently self-defeating: the worker stops at max, so
+        # the run costs money and still under-delivers. Warn before, not after.
+        capWarn = maxN > 0 and maxN < tgtN;
+        fireLabel = "FIRE";
+        if fireBusy { fireLabel = "FIRING…"; }
+        elif fireConfirm and canFire and estData is not None {
+            fireLabel = "CLICK AGAIN TO SPEND ~" + _fmtCost(estData["est_cost_usd"]) + " · " + str(tgtN) + " ROWS";
+        }
         return <div className="jms-section flex flex-col gap-3">
             <span className="jms-section-label">SYNTHESIZE ROWS</span>
             <div className="flex flex-wrap items-center gap-3">
@@ -579,8 +663,9 @@ def:pub GenerateStage(project: any = None, onRefresh: any = None) -> JsxElement 
                 <select
                     className="jms-input"
                     style={{"width": "auto", "minWidth": "180px"}}
+                    aria-label="synthesis model"
                     value={genModel}
-                    onChange={lambda e: any { genModel = str(e.target.value); estData = None; }}
+                    onChange={lambda e: any { genModel = str(e.target.value); estData = None; fireConfirm = False; }}
                 >
                     {for mid in _modelsFor(genProvider) {
                         <option key={str(mid)} value={str(mid)}>{str(mid)}</option>
@@ -592,6 +677,7 @@ def:pub GenerateStage(project: any = None, onRefresh: any = None) -> JsxElement 
                     <span className="jms-label">TARGET ROWS</span>
                     <input
                         className="jms-input" style={{"width": "110px"}} type="number"
+                        aria-label="target rows"
                         value={targetStr}
                         onChange={lambda e: any { patchGenField("target", str(e.target.value)); }}
                     />
@@ -600,6 +686,7 @@ def:pub GenerateStage(project: any = None, onRefresh: any = None) -> JsxElement 
                     <span className="jms-label">MAX ROWS (CAP)</span>
                     <input
                         className="jms-input" style={{"width": "110px"}} type="number"
+                        aria-label="max rows cap"
                         value={maxStr}
                         onChange={lambda e: any { patchGenField("max", str(e.target.value)); }}
                     />
@@ -608,6 +695,7 @@ def:pub GenerateStage(project: any = None, onRefresh: any = None) -> JsxElement 
                     <span className="jms-label">BATCH</span>
                     <input
                         className="jms-input" style={{"width": "80px"}} type="number"
+                        aria-label="batch size"
                         value={batchStr}
                         onChange={lambda e: any { patchGenField("batch", str(e.target.value)); }}
                     />
@@ -618,19 +706,44 @@ def:pub GenerateStage(project: any = None, onRefresh: any = None) -> JsxElement 
                     onClick={lambda e: MouseEvent { previewCost(); }}
                 >{"ESTIMATING…" if estBusy else "PREVIEW COST"}</button>
                 <button
-                    className="jms-btn jms-btn-accent"
+                    className={"jms-btn jms-btn-accent" + (" jms-btn-danger" if fireConfirm else "")}
                     disabled={not canFire}
-                    onClick={lambda e: MouseEvent { fireNow(); }}
-                >{"FIRING…" if fireBusy else "FIRE"}</button>
+                    onClick={lambda e: MouseEvent { fireClick(); }}
+                >{fireLabel}</button>
             </div>
-            {estData and <div className="flex flex-wrap items-center gap-4">
-                <span className="jms-stat">ROWS {_g(estData, "rows", "0")}</span>
-                <span className="jms-stat">BATCHES {_g(estData, "batches", "0")}</span>
-                <span className="jms-stat">~IN {_g(estData, "est_input_tokens", "0")} tok</span>
-                <span className="jms-stat">~OUT {_g(estData, "est_output_tokens", "0")} tok</span>
-                <span className="jms-stat">EST {_fmtCost(estData["est_cost_usd"])} · estimate</span>
-                {not bool(estData["cap_ok"]) and <span className="jms-stat" style={{"color": "var(--jms-danger)"}}>OVER THE 5000-ROW CAP</span>}
+
+            <span className="jms-mono-dim">
+                TARGET is how many rows the worker aims for; MAX ROWS is the hard stop it will not
+                pass. Batches of {batchStr} rows go out per request — one request costs roughly the
+                same whatever the batch, so a bigger batch means fewer, cheaper requests.
+                Product cap: 5000 rows per job.
+            </span>
+            {capWarn and <span className="jms-mono-dim" style={{"color": "var(--jms-danger)"}}>
+                MAX ROWS ({str(maxN)}) is below TARGET ({str(tgtN)}) — this run will stop at {str(maxN)} rows and still bill for what it spent.
+            </span>}
+
+            {estData and <div className="flex flex-col gap-2" style={{"borderTop": "1px solid var(--jms-border)", "paddingTop": "12px"}}>
+                <div className="flex flex-wrap items-baseline gap-3">
+                    <span className="jms-label">ESTIMATED COST</span>
+                    <span className="jms-mono" style={{"fontSize": "22px", "lineHeight": "1"}}>{_fmtCost(estData["est_cost_usd"])}</span>
+                    <span className="jms-mono-dim">for {_g(estData, "rows", "0")} rows in {_g(estData, "batches", "0")} requests</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-4">
+                    <span className="jms-stat">~IN {_g(estData, "est_input_tokens", "0")} tok</span>
+                    <span className="jms-stat">~OUT {_g(estData, "est_output_tokens", "0")} tok</span>
+                </div>
+                <span className="jms-mono-dim">
+                    Back-of-envelope only: token counts are the server's per-batch model, priced at the
+                    model's published $/Mtok. Local MLX models price at $0. The real bill follows the
+                    actual prompts — treat this as an order of magnitude, not a quote.
+                </span>
+                {not bool(estData["cap_ok"]) and <span className="jms-stat" style={{"color": "var(--jms-danger)"}}>OVER THE 5000-ROW CAP — lower TARGET ROWS</span>}
             </div>}
+            {(estData is None and hasApproved and not hint) and <span className="jms-mono-dim">
+                PREVIEW COST first — FIRE stays locked until you have seen what this run costs, and any
+                edit above clears the estimate.
+            </span>}
+
             {_anyRunning() and <span className="jms-mono-dim">a job is running — FIRE unlocks when it finishes</span>}
             {hint and <span className="jms-mono-dim" style={{"color": "var(--jms-danger)"}}>{hint}</span>}
             {genErr and <span className="jms-mono-dim" style={{"color": "var(--jms-danger)"}}>{genErr}</span>}
@@ -639,25 +752,32 @@ def:pub GenerateStage(project: any = None, onRefresh: any = None) -> JsxElement 
 
     def _synthJobs -> JsxElement {
         if len(genJobs) == 0 { return <></>; }
-        return <div className="jms-section flex flex-col gap-2">
+        return <div className="jms-section flex flex-col gap-3">
             <span className="jms-section-label">GENERATION JOBS</span>
             {for j in genJobs {
-                <div key={_g(j, "jid", "")} className="flex items-center gap-2">
-                    <button
-                        className={"jms-pill flex-1" + (" jms-pill-active" if selJid == _g(j, "jid", "") else "")}
-                        onClick={lambda e: MouseEvent { selectJob(_g(j, "jid", "")); }}
-                    >
-                        <span className={"jms-pill-dot" + (" jms-pill-dot-done" if _g(j, "status", "") == "completed" else "")} />
-                        <span>
-                            {_g(j, "jid", "")} · {_g(j, "provider", "")}/{_g(j, "model", "")} ·
-                            {" "}{_g(j, "rows_done", "0")}/{_g(j, "target_rows", "0")} rows ·
-                            {" "}{_g(j, "status", "")} · {_elapsedOf(j)} · {_fmtCost(j["est_cost_usd"])}
-                        </span>
-                    </button>
-                    {_g(j, "status", "") == "running" and <button
-                        className="jms-btn jms-btn-danger"
-                        onClick={lambda e: MouseEvent { stopJob(_g(j, "jid", "")); }}
-                    >STOP</button>}
+                <div key={_g(j, "jid", "")} className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2">
+                        <button
+                            className={"jms-pill flex-1" + (" jms-pill-active" if selJid == _g(j, "jid", "") else "")}
+                            onClick={lambda e: MouseEvent { selectJob(_g(j, "jid", "")); }}
+                        >
+                            <span className={"jms-pill-dot" + (" jms-pill-dot-done" if _g(j, "status", "") == "completed" else "")} />
+                            <span>
+                                {_g(j, "jid", "")} · {_g(j, "provider", "")}/{_g(j, "model", "")} ·
+                                {" "}{_g(j, "rows_done", "0")}/{_g(j, "target_rows", "0")} rows ({str(_pctOf(j))}%) ·
+                                {" "}{_g(j, "status", "")} · {_elapsedOf(j)} · {_fmtCost(j["est_cost_usd"])}
+                            </span>
+                        </button>
+                        {_g(j, "status", "") == "running" and <button
+                            className="jms-btn jms-btn-danger"
+                            onClick={lambda e: MouseEvent { stopJob(_g(j, "jid", "")); }}
+                        >STOP</button>}
+                    </div>
+                    {_bar({"pct": _pctOf(j)})}
+                    {(_g(j, "status", "") == "running" and _g(j, "last_batch_at", "")) and <span className="jms-mono-dim">
+                        last batch landed {_g(j, "last_batch_at", "")} · {_g(j, "batches", "0")} batches done · cost so far {_fmtCost(j["est_cost_usd"])}
+                    </span>}
+                    {_g(j, "error", "") and <span className="jms-mono-dim" style={{"color": "var(--jms-danger)"}}>{_g(j, "error", "")}</span>}
                 </div>
             }}
         </div>;
@@ -667,6 +787,15 @@ def:pub GenerateStage(project: any = None, onRefresh: any = None) -> JsxElement 
         if not selJid or selData is None { return <></>; }
         return <div className="jms-section flex flex-col gap-2">
             <span className="jms-section-label">JOB {selJid} · {_g(selData, "status", "")}</span>
+            <div className="flex flex-wrap items-center gap-4">
+                <span className="jms-stat">ROWS {_g(selData, "rows_done", "0")}/{_g(selData, "target_rows", "0")} · {str(_pctOf(selData))}%</span>
+                <span className="jms-stat">CAP {_g(selData, "max_rows", "0")}</span>
+                <span className="jms-stat">BATCHES {_g(selData, "batches", "0")}</span>
+                <span className="jms-stat">PLAN v{_g(selData, "plan_version", "0")}</span>
+                <span className="jms-stat">ELAPSED {_elapsedOf(selData)}</span>
+                <span className="jms-stat">COST {_fmtCost(selData["est_cost_usd"])}</span>
+            </div>
+            {_bar({"pct": _pctOf(selData)})}
             {_g(selData, "error", "") and <span className="jms-mono-dim" style={{"color": "var(--jms-danger)"}}>{_g(selData, "error", "")}</span>}
             <pre
                 className="jms-mono-dim"

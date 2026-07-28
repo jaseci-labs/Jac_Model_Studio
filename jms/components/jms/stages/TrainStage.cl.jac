@@ -9,12 +9,14 @@ no train split is materialized (hint points back to CURATE).
 
 Runs list: rid · backend chip · base-model · status dot · elapsed · adapter ✓;
 selecting one opens a detail view (status line + spheron phase/cost, LogView tail,
-MonoChart loss curve, STOP). Polls list_train_runs / train_status every 3s while a
-selected run is still running (the GenerateStage poll pattern + exit cleanup).
+MonoChart loss curve, STOP). Polls list_train_runs / train_status every 3s ONLY
+while `active` (this stage is the visible one) — the interval id is effect-local
+so the cleanup can actually see it (Cloud.cl.jac pattern).
 
 `project` is the get_project() dict; `onRefresh` re-pulls it after a mutation.
 Handlers are named start.../stop.../select... — never set<HasVar>."""
 
+import from react { useEffect }
 sv import from ....jms_train { start_train, train_status, stop_train, list_train_runs }
 sv import from ....models { list_models }
 sv import from ....spheron { search_gpus, spheron_ssh_keys }
@@ -30,7 +32,7 @@ def _toInt(s: str) -> int {
     try { return int(float(s.strip())); } except Exception { return 0; }
 }
 
-def:pub TrainStage(project: any = None, onRefresh: any = None) -> JsxElement {
+def:pub TrainStage(project: any = None, onRefresh: any = None, active: bool = True) -> JsxElement {
     has backend: str = "local-mlx",
         localModels: list = [],
         localModel: str = "",
@@ -50,8 +52,7 @@ def:pub TrainStage(project: any = None, onRefresh: any = None) -> JsxElement {
         selRid: str = "",
         selData: any = None,
         startBusy: bool = False,
-        startErr: str = "",
-        pollId: any = None;
+        startErr: str = "";
 
     def _pid -> str {
         if project { return str(project["pid"]); }
@@ -111,13 +112,18 @@ def:pub TrainStage(project: any = None, onRefresh: any = None) -> JsxElement {
     async can with entry {
         await loadModels();
         await loadSshKeys();
-        await refreshRuns();
-        pollId = setInterval(lambda -> None { refreshRuns(); }, 3000);
     }
 
-    can with exit {
-        if pollId is not None { clearInterval(float(str(pollId))); }
-    }
+    # Effect-local interval id + `active` gate: a `can with exit` cleanup closes over
+    # the first-render (None) value of a `has` var, so it never cleared anything.
+    useEffect(lambda {
+        iv: any = None;
+        if active {
+            refreshRuns();
+            iv = setInterval(lambda { refreshRuns(); }, 3000);
+        }
+        return lambda { if iv is not None { clearInterval(float(str(iv))); } };
+    }, [active]);
 
     async def searchOffers -> None {
         offerBusy = True;
@@ -246,6 +252,7 @@ def:pub TrainStage(project: any = None, onRefresh: any = None) -> JsxElement {
                 <span className="jms-label">BASE MODEL (local)</span>
                 <select
                     className="jms-input" style={{"width": "auto", "minWidth": "220px"}}
+                    aria-label="base model (local)"
                     value={localModel}
                     onChange={lambda e: any { localModel = str(e.target.value); }}
                 >
@@ -261,6 +268,7 @@ def:pub TrainStage(project: any = None, onRefresh: any = None) -> JsxElement {
                     <span className="jms-label">BASE MODEL (HuggingFace id)</span>
                     <input
                         className="jms-input" style={{"width": "260px"}}
+                        aria-label="base model (HuggingFace id)"
                         value={hfBase}
                         onChange={lambda e: any { hfBase = str(e.target.value); }}
                     />
@@ -270,6 +278,7 @@ def:pub TrainStage(project: any = None, onRefresh: any = None) -> JsxElement {
                         <span className="jms-label">GPU OFFER SEARCH</span>
                         <input
                             className="jms-input" style={{"width": "160px"}}
+                            aria-label="GPU offer search"
                             value={offerQuery}
                             onChange={lambda e: any { offerQuery = str(e.target.value); }}
                         />
@@ -314,26 +323,31 @@ def:pub TrainStage(project: any = None, onRefresh: any = None) -> JsxElement {
                 <div className="flex flex-col gap-1.5">
                     <span className="jms-label">{"ITERS" if backend == "local-mlx" else "MAX STEPS"}</span>
                     <input className="jms-input" style={{"width": "90px"}} type="number"
+                        aria-label={"iters" if backend == "local-mlx" else "max steps"}
                         value={itersStr} onChange={lambda e: any { itersStr = str(e.target.value); }} />
                 </div>
                 <div className="flex flex-col gap-1.5">
                     <span className="jms-label">BATCH</span>
                     <input className="jms-input" style={{"width": "70px"}} type="number"
+                        aria-label="batch size"
                         value={batchStr} onChange={lambda e: any { batchStr = str(e.target.value); }} />
                 </div>
                 <div className="flex flex-col gap-1.5">
                     <span className="jms-label">LR</span>
                     <input className="jms-input" style={{"width": "90px"}}
+                        aria-label="learning rate"
                         value={lrStr} onChange={lambda e: any { lrStr = str(e.target.value); }} />
                 </div>
                 <div className="flex flex-col gap-1.5">
                     <span className="jms-label">LoRA r</span>
                     <input className="jms-input" style={{"width": "70px"}} type="number"
+                        aria-label="LoRA r"
                         value={loraRStr} onChange={lambda e: any { loraRStr = str(e.target.value); }} />
                 </div>
                 <div className="flex flex-col gap-1.5">
                     <span className="jms-label">LoRA α</span>
                     <input className="jms-input" style={{"width": "70px"}} type="number"
+                        aria-label="LoRA alpha"
                         value={loraAlphaStr} onChange={lambda e: any { loraAlphaStr = str(e.target.value); }} />
                 </div>
                 <button
@@ -362,7 +376,9 @@ def:pub TrainStage(project: any = None, onRefresh: any = None) -> JsxElement {
                         <span>
                             {_g(r, "rid", "")} · <span className="jms-chip">{_g(r, "backend", "")}</span> ·
                             {" "}{_g(r, "base_model", "")} · {_g(r, "status", "")} · {_elapsed(r)}
-                            {" "}{"· adapter ✓" if _g(r, "adapter_ready", "") == "True" else ""}
+                            {# adapter_ready is a real JSON bool → _g's String() yields "true",
+                             # never Python's "True". Lowercase compare covers both shapes.
+                             " " + ("· adapter ✓" if _g(r, "adapter_ready", "").lower() == "true" else "")}
                         </span>
                     </button>
                     {_g(r, "status", "") == "running" and <button
@@ -389,10 +405,10 @@ def:pub TrainStage(project: any = None, onRefresh: any = None) -> JsxElement {
                 <span className="jms-stat">ITER {_g(prog, "last_iter", "0")}/{_g(prog, "total_iters", "0")}</span>
                 {phase and <span className="jms-stat">PHASE {phase}</span>}
                 {cost and "elapsed_usd" in cost and <span className="jms-stat">COST {_fmtCost(cost["elapsed_usd"])}</span>}
-                {_g(d, "adapter_ready", "") == "True" and <span className="jms-stat" style={{"color": "var(--jms-ok)"}}>ADAPTER ✓</span>}
+                {_g(d, "adapter_ready", "").lower() == "true" and <span className="jms-stat" style={{"color": "var(--jms-ok)"}}>ADAPTER ✓</span>}
             </div>
             {_g(d, "error", "") and <span className="jms-mono-dim" style={{"color": "var(--jms-danger)"}}>{_g(d, "error", "")}</span>}
-            <MonoChart title="LOSS · train + val" data={mets} secondary={vals} live={_g(d, "status", "") == "running"} accent="#4ade80" expY={False} />
+            <MonoChart title="LOSS · train + val" data={mets} secondary={vals} live={_g(d, "status", "") == "running"} accent="var(--chart-1)" expY={False} />
             <LogView text={_g(d, "log_tail", "")} maxH="16rem" />
             {_g(d, "status", "") == "running" and <button
                 className="jms-btn jms-btn-danger" style={{"alignSelf": "flex-start"}}

@@ -11,6 +11,9 @@ glob GALLERY_ROOTS: list[str] = ["model-experiments/01-sft-dpo/results", "model-
 glob IMG_EXTS: list[str] = [".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"];
 glob MAX_IMAGES: int = 48;
 glob MAX_BYTES: int = 4_000_000;
+# Total raw bytes one gallery_images call may encode. Without this the per-file
+# cap alone allows 48 x 4MB = ~192MB raw (~256MB base64) in a single response.
+glob MAX_TOTAL_BYTES: int = 24_000_000;
 
 def _is_img(p: Path) -> bool {
     return p.suffix.lower() in IMG_EXTS;
@@ -39,8 +42,9 @@ def _allowed(rel: str) -> bool {
 }
 
 """Every dir under the artifact roots that directly contains images:
-[{dir, count}], sorted by path."""
-def:pub list_galleries() -> list[dict] {
+[{dir, count}], sorted by path. Authenticated (was def:pub — an unauthenticated
+enumeration of every experiment artifact on the box)."""
+def list_galleries() -> list[dict] {
     base = models.data_root();
     out: list = [];
     for rt in GALLERY_ROOTS {
@@ -64,8 +68,11 @@ def:pub list_galleries() -> list[dict] {
 }
 
 """All images in *rel_dir* (allowlisted), name-sorted, as data-URI payloads:
-[{name, mime, b64}]. Oversized files are skipped with a stub entry."""
-def:pub gallery_images(rel_dir: str) -> list[dict] {
+[{name, mime, b64}]. Oversized files are skipped with a stub entry, and once the
+per-request MAX_TOTAL_BYTES budget is spent the remaining files come back as
+stub entries too (never silently dropped). Authenticated (was def:pub — an
+unauthenticated download of every artifact image on the box)."""
+def gallery_images(rel_dir: str) -> list[dict] {
     if not _allowed(rel_dir) { return []; }
     d = models.data_root() / rel_dir;
     if not d.is_dir() { return []; }
@@ -76,6 +83,7 @@ def:pub gallery_images(rel_dir: str) -> list[dict] {
     }
     files.sort(key=lambda (p: Path) -> str { return p.name; });
     n = 0;
+    spent = 0;
     for f in files {
         if n >= MAX_IMAGES { break; }
         n += 1;
@@ -86,6 +94,11 @@ def:pub gallery_images(rel_dir: str) -> list[dict] {
                 out.append({"name": f.name, "mime": "", "b64": "", "note": f"skipped ({mb}MB)"});
                 continue;
             }
+            if spent + size > MAX_TOTAL_BYTES {
+                out.append({"name": f.name, "mime": "", "b64": "", "note": "skipped (response size budget)"});
+                continue;
+            }
+            spent += size;
             raw = f.read_bytes();
             b64 = str(base64.b64encode(raw), "ascii");
             out.append({"name": f.name, "mime": _mime(f), "b64": b64, "note": ""});

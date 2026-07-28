@@ -7,10 +7,22 @@ so there's nothing else to edit here: a workspace list with inline rename +
 two-click delete, and an add-workspace control (label + accent picker over the
 fixed `ws01..ws06` swatch set).
 
+Feedback contract is the Experiments twin's: `err` renders in `--jms-danger`,
+`flash` in `--jms-ok` (the `.jms-flash` treatment), both in a pinned footer so a
+SAVE never looks like it did nothing; every async handler clears `busy` in a
+`finally`; DELETE is two-click ("SURE?") and names what it will delete.
+
 Every mutating call (`create/update/delete_jms_workspace`) already returns the
 freshly-seeded layout dict, so there's no separate reload round-trip needed —
-the response IS the new layout, handed straight up via `onChanged`."""
+the response IS the new layout, handed straight up via `onChanged`.
 
+Dialog semantics: `role="dialog" aria-modal="true"`, Escape closes (document
+keydown, removed in the effect cleanup), focus moves onto the drawer on open and
+returns to the ⚙ WORKSPACES trigger on close.
+# ponytail: no focus trap — Tab can still leave the drawer. Escape + initial
+focus + restore is the accessible floor without a shared hook module."""
+
+import from react { useEffect }
 sv import from ..jms_workspaces { create_jms_workspace, update_jms_workspace, delete_jms_workspace }
 
 glob ACCENTS: list[str] = ["ws01", "ws02", "ws03", "ws04", "ws05", "ws06"];
@@ -23,20 +35,24 @@ def _wsById(layout: any, wid: str) -> dict | None {
     return None;
 }
 
-def:pub JmsWorkspaceSettings(open: bool, layout: any, onClose: any, onChanged: any) -> JsxElement {
+def:pub JmsWorkspaceSettings(
+    open: bool, layout: any, onClose: any, onChanged: any, workspace: str = ""
+) -> JsxElement {
     has editId: str = "",
         editLabel: str = "",
         confirmId: str = "",
         newLabel: str = "",
         newAccent: str = "ws01",
         busy: bool = False,
-        status: str = "";
+        flash: str = "",
+        err: str = "";
 
     def startEdit(wid: str, label: str) -> None {
         editId = wid;
         editLabel = label;
         confirmId = "";
-        status = "";
+        flash = "";
+        err = "";
     }
 
     def cancelEdit -> None {
@@ -44,10 +60,21 @@ def:pub JmsWorkspaceSettings(open: bool, layout: any, onClose: any, onChanged: a
         editLabel = "";
     }
 
+    # Reset the two-click-delete arm and any stale banner whenever the drawer is
+    # opened or closed, so a half-armed DELETE can never survive a reopen.
+    async can with [open] entry {
+        confirmId = "";
+        editId = "";
+        editLabel = "";
+        flash = "";
+        err = "";
+    }
+
     async def saveRename(wid: str) -> None {
         if busy or not editLabel.strip() { return; }
         busy = True;
-        status = "";
+        flash = "";
+        err = "";
         try {
             wd = _wsById(layout, wid);
             acc = str(wd["accent"]) if wd else "ws01";
@@ -55,45 +82,67 @@ def:pub JmsWorkspaceSettings(open: bool, layout: any, onClose: any, onChanged: a
             onChanged(ly);
             editId = "";
             editLabel = "";
-            status = "Renamed.";
+            flash = "RENAMED ✓";
         } except Exception as e {
-            status = "Rename failed: " + str(e);
+            err = "Rename failed: " + str(e);
+        } finally {
+            busy = False;
         }
-        busy = False;
     }
 
     async def removeWs(wid: str) -> None {
-        if confirmId != wid { confirmId = wid; return; }
         if busy { return; }
+        if confirmId != wid { confirmId = wid; return; }
         confirmId = "";
         busy = True;
-        status = "";
+        flash = "";
+        err = "";
         try {
             before = len(list(layout["workspaces"]));
             ly = await delete_jms_workspace(wid);
             after = len(list(ly["workspaces"]));
             onChanged(ly);
-            status = "Deleted." if after < before else "Cannot delete the last workspace.";
+            if after < before { flash = "WORKSPACE DELETED ✓"; }
+            else { err = "Cannot delete the last workspace."; }
         } except Exception as e {
-            status = "Delete failed: " + str(e);
+            err = "Delete failed: " + str(e);
+        } finally {
+            busy = False;
         }
-        busy = False;
     }
 
     async def addWs -> None {
         if busy or not newLabel.strip() { return; }
         busy = True;
-        status = "";
+        flash = "";
+        err = "";
         try {
             ly = await create_jms_workspace(newLabel.strip(), newAccent);
             onChanged(ly);
             newLabel = "";
-            status = "Workspace created.";
+            flash = "WORKSPACE CREATED ✓";
         } except Exception as e {
-            status = "Create failed: " + str(e);
+            err = "Create failed: " + str(e);
+        } finally {
+            busy = False;
         }
-        busy = False;
     }
+
+    useEffect(lambda {
+        if not open { return lambda { }; }
+        doc: any = document;
+        prev: any = doc.activeElement;
+        onKey = lambda(e: any) {
+            if str(e.key) == "Escape" { onClose(); }
+        };
+        doc.addEventListener("keydown", onKey);
+        panel: any = doc.getElementById("jms-ws-settings");
+        if panel { panel.focus(); }
+        return lambda {
+            doc.removeEventListener("keydown", onKey);
+            if prev { prev.focus(); }
+        };
+    }, [open]);
 
     if not open or layout is None { return <></>; }
 
@@ -101,10 +150,17 @@ def:pub JmsWorkspaceSettings(open: bool, layout: any, onClose: any, onChanged: a
 
     return <div className="fixed inset-0 z-50 flex">
         <div
-            className="flex-1 bg-black/60"
+            className="flex-1 g-scrim reveal-fade"
             onClick={lambda e: MouseEvent { onClose(); }}
         />
-        <aside className="jms-card g-overlay !rounded-none flex h-full w-[24rem] shrink-0 flex-col border-l !border-r-0">
+        <aside
+            id="jms-ws-settings"
+            role="dialog"
+            aria-modal="true"
+            aria-label="JMS workspaces"
+            tabIndex={-1}
+            className="jms-card g-overlay reveal-scale !rounded-none flex h-full w-[24rem] shrink-0 flex-col border-l !border-r-0"
+        >
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
                 <span className="micro-label">WORKSPACES</span>
                 <button
@@ -119,23 +175,39 @@ def:pub JmsWorkspaceSettings(open: bool, layout: any, onClose: any, onChanged: a
                     wid = str(w["id"]);
                     label = str(w["label"]);
                     accent = str(w["accent"]);
-                    <div key={wid} className="jms-card p-2 space-y-2">
+                    editing = editId == wid;
+                    arming = confirmId == wid;
+                    isActive = workspace == wid and wid != "";
+                    <div
+                        key={wid}
+                        aria-current={"true" if isActive else None}
+                        className={"jms-card p-2 space-y-2" + (
+                            " !border-accent bg-accent/10" if editing
+                            else (" !border-danger" if arming else "")
+                        )}
+                    >
                         <div className="flex items-center gap-2">
                             <span className="h-2 w-2 shrink-0 rounded-full" style={{"background": "var(--" + accent + ")"}} />
+                            {isActive and <span key="active" className="jms-label" style={{"color": "var(--accent)"}}>ACTIVE</span>}
                             <span className="jms-mono-dim">{wid}</span>
+                            {if editing {
+                                <span key="ed" className="micro-label text-accent">EDITING {label}</span>;
+                                skip;
+                            }}
                         </div>
-                        {if editId == wid {
+                        {if editing {
                             <div className="flex gap-2">
                                 <input
                                     className="jms-input"
                                     value={editLabel}
+                                    aria-label={"Rename workspace " + wid}
                                     onChange={lambda e: any { editLabel = str(e.target.value); }}
                                 />
                                 <button
                                     className="jms-btn jms-btn-accent shrink-0"
-                                    disabled={busy}
+                                    disabled={busy or not editLabel.strip() or editLabel.strip() == label}
                                     onClick={lambda e: MouseEvent { saveRename(wid); }}
-                                >SAVE</button>
+                                >{"SAVING…" if busy else "SAVE"}</button>
                                 <button
                                     className="jms-btn shrink-0"
                                     onClick={lambda e: MouseEvent { cancelEdit(); }}
@@ -143,7 +215,7 @@ def:pub JmsWorkspaceSettings(open: bool, layout: any, onClose: any, onChanged: a
                             </div>;
                             skip;
                         }}
-                        {if editId != wid {
+                        {if not editing {
                             <div className="flex items-center justify-between gap-2">
                                 <span className="jms-label">{label}</span>
                                 <div className="flex gap-1">
@@ -152,12 +224,19 @@ def:pub JmsWorkspaceSettings(open: bool, layout: any, onClose: any, onChanged: a
                                         onClick={lambda e: MouseEvent { startEdit(wid, label); }}
                                     >RENAME</button>
                                     <button
-                                        className={"jms-btn" + (" jms-btn-danger" if confirmId == wid else "")}
+                                        className={"jms-btn" + (" jms-btn-danger" if arming else "")}
                                         disabled={busy}
+                                        aria-label={("Confirm delete workspace " if arming else "Delete workspace ") + label}
                                         onClick={lambda e: MouseEvent { removeWs(wid); }}
-                                    >{"SURE?" if confirmId == wid else "DELETE"}</button>
+                                    >{"SURE?" if arming else "DELETE"}</button>
                                 </div>
                             </div>;
+                            skip;
+                        }}
+                        {if arming {
+                            <p key="warn" className="jms-mono-dim" style={{"color": "var(--jms-danger)"}}>
+                                Deletes “{label}” permanently. Click SURE? to confirm.
+                            </p>;
                             skip;
                         }}
                     </div>
@@ -170,6 +249,7 @@ def:pub JmsWorkspaceSettings(open: bool, layout: any, onClose: any, onChanged: a
                     <input
                         className="jms-input"
                         value={newLabel}
+                        aria-label="New workspace label"
                         placeholder="label"
                         onChange={lambda e: any { newLabel = str(e.target.value); }}
                     />
@@ -185,20 +265,25 @@ def:pub JmsWorkspaceSettings(open: bool, layout: any, onClose: any, onChanged: a
                                     "outlineOffset": "2px"
                                 }}
                                 title={a}
+                                aria-label={"accent " + a}
+                                aria-pressed={a == newAccent}
                             />
                         }}
                     </div>
                     <button
                         className="jms-btn jms-btn-accent"
-                        disabled={busy}
+                        disabled={busy or not newLabel.strip()}
                         onClick={addWs}
                     >{"CREATING…" if busy else "ADD"}</button>
                 </div>
-
-                {if status {
-                    <p className="text-xs text-muted-foreground">{status}</p>
-                }}
             </div>
+
+            {if err {
+                <div key="errbar" role="alert" className="border-t border-border px-4 py-2 text-xs" style={{"color": "var(--jms-danger)"}}>{err}</div>
+            }}
+            {if flash {
+                <div key="okbar" role="status" className="jms-flash border-t border-border px-4 py-2">{flash}</div>
+            }}
         </aside>
     </div>;
 }

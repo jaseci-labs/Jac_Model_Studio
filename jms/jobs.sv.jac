@@ -17,6 +17,7 @@ import shlex;
 import time;
 import auth;
 import audit;
+import metrics;
 import models;
 import from pathlib { Path }
 import from signal { SIGTERM }
@@ -120,9 +121,19 @@ def read_job(job_file: Path) -> dict | None {
     }
 }
 
+"""Persist *job* as JSON. Written to a per-pid sibling `.tmp` and moved into place
+with os.replace, which is atomic on a POSIX filesystem: a concurrent read_job now
+sees either the previous job or the new one, never the half-written file that used
+to make a live job look missing (`read_job` → None → "job vanished").
+# ponytail: ceiling — atomic VISIBILITY only, no fsync. A power cut can still lose
+# the last status write; live_status rewrites the job file on every poll, so an
+# fsync here would put a disk flush on the status-polling hot path for a file that
+# is rebuilt from the run log anyway."""
 def write_job(job_file: Path, job: dict) {
     job_file.parent.mkdir(parents=True, exist_ok=True);
-    job_file.write_text(json.dumps(job));
+    tmp = job_file.parent / f".{job_file.name}.{os.getpid()}.tmp";
+    tmp.write_text(json.dumps(job));
+    os.replace(str(tmp), str(job_file));
 }
 
 def _exit_code(log_text: str) -> int {
@@ -141,11 +152,9 @@ def live_status(job_file: Path, runlog: Path) -> dict | None {
     if status != "running" { return job; }
     pid = int(str(job.get("pid") or 0));
     reap(pid);
-    log_text = "";
-    if runlog.exists() {
-        lines = runlog.read_text().split("\n");
-        log_text = "\n".join(lines[-80:]);
-    }
+    # Bounded backwards read — identical to the old read_text().split("\n")[-80:]
+    # join, but a 400 MB training log no longer gets decoded on every status poll.
+    log_text = metrics.tail(runlog, 80);
     code = _exit_code(log_text);
     if code == 0 {
         status = "done";
@@ -195,6 +204,81 @@ def _heavy_lock_file() -> Path {
     return models.results_dir() / ".heavy-lock.json";
 }
 
+"""Sibling mutex file for the heavy-lock read-check-write critical section. Held
+for microseconds; it is NOT the holder record (that stays .heavy-lock.json)."""
+def _heavy_guard_file() -> Path {
+    return models.results_dir() / ".heavy-lock.guard";
+}
+
+# A guard older than this is assumed abandoned (the section it protects is a
+# couple of file reads). Belt-and-braces next to the pid liveness check below:
+# together they guarantee a crashed process can never deadlock the heavy slot.
+glob _GUARD_STALE_SEC: float = 15.0;
+
+"""True iff an existing guard file was abandoned — its recorded pid is dead, or it
+is older than _GUARD_STALE_SEC. A vanished guard is NOT stale (the create will
+just be retried)."""
+def _guard_stale(guard: Path) -> bool {
+    st: any = None;
+    try {
+        st = guard.stat();
+    } except Exception {
+        return False;
+    }
+    if (time.time() - float(str(st.st_mtime))) > _GUARD_STALE_SEC { return True; }
+    txt = "";
+    try {
+        txt = guard.read_text().strip();
+    } except Exception {
+        return False;
+    }
+    if not txt { return False; }
+    holder_pid = 0;
+    try {
+        holder_pid = int(str(txt));
+    } except Exception {
+        return False;
+    }
+    return not alive(holder_pid);
+}
+
+"""Take the cross-PROCESS guard. os.open(O_CREAT|O_EXCL) is the real primitive:
+the kernel lets exactly one process create the file, so only one server process at
+a time runs the heavy-lock check-then-write. Returns False if it could not be
+taken within *timeout* (or the directory is unwritable) — callers then proceed
+anyway, degrading to the old in-process-only behaviour rather than blocking a
+training start."""
+def _guard_acquire(guard: Path, timeout: float = 2.0) -> bool {
+    deadline = time.time() + timeout;
+    while True {
+        try {
+            fd = os.open(str(guard), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644);
+            try {
+                os.write(fd, str(os.getpid()).encode());
+            } except Exception {}
+            os.close(fd);
+            return True;
+        } except FileExistsError {
+            if _guard_stale(guard) {
+                try { os.unlink(str(guard)); } except Exception {}
+                continue;
+            }
+        } except Exception {
+            return False;
+        }
+        if time.time() >= deadline { return False; }
+        time.sleep(0.02);
+    }
+    return False;
+}
+
+"""Drop the guard (best effort — a leaked guard self-heals via _guard_stale)."""
+def _guard_release(guard: Path) -> None {
+    try {
+        guard.unlink();
+    } except Exception {}
+}
+
 """True iff the recorded lock holder is still doing work: detached holders are
 resolved via live_status on their job file; in-process holders (no job file,
 e.g. rl_generate inside the server) via the recorded pid+stamp."""
@@ -212,25 +296,42 @@ compete for the same GPU + 48 GB). Returns {"ok": True} or {"ok": False,
 "busy_with": holder}. Self-healing: a recorded holder that is no longer running
 is stale and is replaced. Detached holders pass their job_file/runlog (so the
 lock heals from the job file after a server restart); in-process holders pass
-neither and are tracked by server pid + start-time stamp."""
+neither and are tracked by server pid + start-time stamp.
+
+The read-check-write is serialised twice: `_heavy_mutex` between threads of one
+server, and the O_EXCL guard file between server PROCESSES (a threading.Lock is
+per-interpreter, so two `jac start` processes could previously both find the slot
+free and both claim it). Both are released on every path, and the guard self-heals
+(dead pid / age) so a crashed process cannot wedge the slot shut.
+# ponytail: ceiling — unchanged pre-existing window between claiming the slot and
+# the spawned job's status reaching "running": during it a detached holder's
+# job_file does not yet say running, so _heavy_live reads it as stale. Narrowing
+# that needs a job-file state machine, not a lock change."""
 def heavy_acquire(holder: str, job_file: Path | None = None, runlog: Path | None = None) -> dict {
     _heavy_mutex.acquire();
     try {
         lf = _heavy_lock_file();
-        cur = read_job(lf);
-        if cur is not None and _heavy_live(cur) {
-            return {"ok": False, "busy_with": str(cur.get("holder", "?"))};
+        lf.parent.mkdir(parents=True, exist_ok=True);
+        guard = _heavy_guard_file();
+        got = _guard_acquire(guard);
+        try {
+            cur = read_job(lf);
+            if cur is not None and _heavy_live(cur) {
+                return {"ok": False, "busy_with": str(cur.get("holder", "?"))};
+            }
+            pid = int(os.getpid());
+            write_job(lf, {
+                "holder": holder,
+                "job_file": str(job_file) if job_file is not None else "",
+                "runlog": str(runlog) if runlog is not None else "",
+                "pid": pid if job_file is None else 0,
+                "stamp": proc_stamp(pid) if job_file is None else "",
+                "started": time.strftime("%Y-%m-%d %H:%M:%S")
+            });
+            return {"ok": True};
+        } finally {
+            if got { _guard_release(guard); }
         }
-        pid = int(os.getpid());
-        write_job(lf, {
-            "holder": holder,
-            "job_file": str(job_file) if job_file is not None else "",
-            "runlog": str(runlog) if runlog is not None else "",
-            "pid": pid if job_file is None else 0,
-            "stamp": proc_stamp(pid) if job_file is None else "",
-            "started": time.strftime("%Y-%m-%d %H:%M:%S")
-        });
-        return {"ok": True};
     } finally {
         _heavy_mutex.release();
     }
@@ -241,12 +342,20 @@ also self-heal on the next heavy_acquire, so missing a release is harmless.)"""
 def heavy_release(holder: str) {
     _heavy_mutex.acquire();
     try {
-        lf = _heavy_lock_file();
-        cur = read_job(lf);
-        if cur is not None and str(cur.get("holder", "")) == holder {
-            try {
-                lf.unlink();
-            } except Exception {}
+        guard = _heavy_guard_file();
+        # Same guard as heavy_acquire so a release can't land between a competing
+        # process's read and its write (which would drop the NEW holder's lock).
+        got = _guard_acquire(guard);
+        try {
+            lf = _heavy_lock_file();
+            cur = read_job(lf);
+            if cur is not None and str(cur.get("holder", "")) == holder {
+                try {
+                    lf.unlink();
+                } except Exception {}
+            }
+        } finally {
+            if got { _guard_release(guard); }
         }
     } finally {
         _heavy_mutex.release();
@@ -279,4 +388,30 @@ def spawn_detached(cmd: str, runlog: Path, env: dict, cwd: Path) -> int {
     pid = int(str(proc.pid));
     audit.log("job_spawn", {"pid": pid, "cwd": str(cwd), "runlog": str(runlog)});
     return pid;
+}
+
+"""Read-only cross-app job snapshot for the global activity indicator in the top
+bar. The app launches multi-hour detached GPU jobs and the user moves between 4
+workspaces and 2 surfaces, so without this there is no signal that anything is
+running once you navigate away from the section that started it.
+
+Reuses the existing helpers only — no new state, no writes, and it never touches
+the heavy lock's guard file (so it cannot contend with a real acquire).
+`heavy` is the current holder's label, "" when the GPU slot is free.
+# ponytail: ceiling — `running` rglob's the caller's results tree (same cost as
+# the pre-existing `_count_running_jobs`), so poll it on the order of seconds, not
+# continuously. If the tree grows enough to matter, keep a counter in the lock file."""
+def active_jobs() -> dict {
+    running = 0;
+    try {
+        running = _count_running_jobs();
+    } except Exception { running = 0; }
+    heavy = "";
+    try {
+        cur = read_job(_heavy_lock_file());
+        if cur is not None and _heavy_live(cur) {
+            heavy = str(cur.get("holder", ""));
+        }
+    } except Exception { heavy = ""; }
+    return {"running": running, "heavy": heavy};
 }

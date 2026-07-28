@@ -102,6 +102,14 @@ def _cloud_dir(p: JmsProject, rid: str) -> Path {
     return auth.user_results_dir() / _cloud_name(p, rid);
 }
 
+"""A spheron run's adapter lands under auth.user_results_dir(), OUTSIDE the
+project dir, so the downstream stages (jms_eval, and jms_chat which resolves
+purely from disk and never sees the graph) can't find it. This tiny JSON pointer
+inside runs/<rid>/ records WHERE it went — no model bytes are copied."""
+def _remote_ptr_file(p: JmsProject, rid: str) -> Path {
+    return _run_dir(p, rid) / "remote.json";
+}
+
 def _find_run(p: JmsProject, rid: str) -> JmsTrainRun | None {
     for r in _train_runs_of(p) {
         if r.rid == rid { return r; }
@@ -355,6 +363,18 @@ def _start_spheron(p: JmsProject, rid: str, base_model: str, opts: dict) -> dict
         "iters": int(str(opts.get("max_steps", opts.get("iters", 0)))),
         "offer": dict(offer_raw), "data": prep
     });
+    # Pointer to the out-of-project adapter dir (see _remote_ptr_file). Best
+    # effort: a run that trains fine must not fail because this write did.
+    try {
+        _remote_ptr_file(p, rid).write_text(json.dumps({
+            "backend": "spheron",
+            "cloud_run_id": cloud_run_id,
+            "cloud_dir": str(_cloud_dir(p, rid)),
+            "adapter_path": str(_cloud_dir(p, rid) / "adapter"),
+            "adapter_format": "peft",
+            "base_model": base_model
+        }, indent=2));
+    } except Exception {}
     p ++> JmsTrainRun(
         rid=rid, backend="spheron", base_model=base_model, status="running",
         cfg_json=cfg_json, adapter_path="", cloud_run_id=cloud_run_id, started=_now()
@@ -402,6 +422,13 @@ def train_status(pid: str, rid: str) -> dict {
     if p is None { return {"error": "unknown project"}; }
     r = _find_run(p, rid);
     if r is None { return {"error": "unknown run"}; }
+    return _status_for(p, r);
+}
+
+"""train_status once the project + run node are ALREADY resolved. Split out so
+list_train_runs pays for the `[root -->]` project scan (and the per-project run
+scan) ONCE instead of once per run."""
+def _status_for(p: JmsProject, r: JmsTrainRun) -> dict {
     if r.backend == "spheron" { return _spheron_status(p, r); }
     return _local_status(p, r);
 }
@@ -512,12 +539,14 @@ def stop_train(pid: str, rid: str) -> dict {
 }
 
 """All of a project's train runs, newest first, each live-resolved (with log tails
-+ metrics — a handful of runs per project, polled by the client)."""
++ metrics — a handful of runs per project, polled by the client). The project is
+looked up ONCE and reused for every run (see _status_for); the per-run log parse
+stays, it's what fills `metrics`/`progress` in the returned shape."""
 def list_train_runs(pid: str) -> list[dict] {
     p = _find_project(pid);
     if p is None { return []; }
     out: list[dict] = [];
-    for r in _train_runs_of(p) { out.append(train_status(pid, r.rid)); }
+    for r in _train_runs_of(p) { out.append(_status_for(p, r)); }
     out.sort(key=lambda d: dict -> str { return str(d.get("started", "")); }, reverse=True);
     return out;
 }

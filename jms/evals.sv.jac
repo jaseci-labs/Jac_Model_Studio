@@ -91,6 +91,33 @@ def eval_dir(eid: str) -> Path {
     return d;
 }
 
+"""Sandbox a caller-supplied model/adapter path to the data root.
+
+jobs.safe() alone only rejects `..` and odd characters, so an ABSOLUTE path
+(`/Users/someone/private/model`) used to sail straight through into the spawned
+worker's JAC_EVAL_MODEL/JAC_EVAL_ADAPTER. This rejects absolute paths, then
+resolves the candidate under data_root() and requires the RESOLVED path to still
+sit inside it — which also catches a symlink pointing out of the tree.
+
+Returns the accepted relative path, or "" when the path is rejected (callers turn
+that into the same validation-failure return they already use).
+ponytail: containment is a string-prefix test on two fully-resolved absolute
+paths rather than Path.relative_to + exception juggling. Ceiling — it assumes a
+POSIX "/" separator, which is what every other path helper here assumes too."""
+def _sandbox_rel(rel: str) -> str {
+    if not rel { return ""; }
+    if rel.startswith("/") { return ""; }
+    if not jobs.safe(rel, True) { return ""; }
+    try {
+        base = str(models.data_root().resolve());
+        full = str((models.data_root() / rel).resolve());
+    } except Exception {
+        return "";
+    }
+    if full != base and not full.startswith(base + "/") { return ""; }
+    return rel;
+}
+
 def _find(eval_id: str) -> EvalRun | None {
     for r in [root -->][?:EvalRun] {
         if r.eid == eval_id {
@@ -185,8 +212,10 @@ def create_eval(
 
     model_rel = "";
     if model_path {
-        if not jobs.safe(model_path, True) { return None; }
-        model_rel = model_path;
+        # Sandboxed to the data root for real now — absolute paths and anything
+        # that resolves outside data_root() are rejected (was: jobs.safe only).
+        model_rel = _sandbox_rel(model_path);
+        if not model_rel { return None; }
     } elif model_id {
         m = models.model_by_id(model_id);
         if not m { return None; }
@@ -198,8 +227,8 @@ def create_eval(
 
     adapter_rel = "";
     if adapter {
-        if not jobs.safe(adapter, True) { return None; }
-        adapter_rel = adapter;
+        adapter_rel = _sandbox_rel(adapter);
+        if not adapter_rel { return None; }
     }
 
     params: dict = {};

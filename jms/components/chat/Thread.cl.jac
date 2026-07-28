@@ -4,7 +4,14 @@ Asymmetric bubbles: the user is a right-aligned light pill, the assistant is a
 left-aligned borderless block whose fenced ```code``` segments render as labelled
 copy-able OUTPUT panes. When two assistant messages share a `pairGroup` (COMPARE
 mode) they render side-by-side in a 2-col grid of dashed panes labelled per model.
+
+AppShell mounts TWO Threads at once (the Chat section + the AssistantPanel
+drawer), so the scroll sentinel is addressed by a per-instance `useRef` — a
+hardcoded `id="chat-end"` made `getElementById` always return the first one in
+the DOM and the drawer scrolled the background chat instead of itself.
 """
+
+import from react { useRef }
 
 def _copy(text: str) -> None {
     nav: any = navigator;
@@ -87,19 +94,19 @@ def:pub Inline(text: str) -> JsxElement {
         {for (si, sg) in enumerate(_inlineSegs(text)) {
             <span key={str(si)}>
                 {if sg["t"] == "code" {
-                    <code className="rounded bg-popover px-1 py-0.5 font-mono text-[0.85em]">{str(sg["v"])}</code>
+                    <code key="if1" className="rounded-sm bg-popover px-1 py-0.5 font-mono text-[0.85em]">{str(sg["v"])}</code>
                     skip;
                 }}
                 {if sg["t"] == "bold" {
-                    <strong className="font-semibold">{str(sg["v"])}</strong>
+                    <strong key="if2" className="font-semibold">{str(sg["v"])}</strong>
                     skip;
                 }}
                 {if sg["t"] == "link" {
-                    <a href={str(sg["u"])} target="_blank" rel="noreferrer" className="text-accent underline">{str(sg["v"])}</a>
+                    <a key="if3" href={str(sg["u"])} target="_blank" rel="noreferrer" className="text-accent underline">{str(sg["v"])}</a>
                     skip;
                 }}
                 {if sg["t"] == "text" {
-                    <span className="whitespace-pre-wrap">{str(sg["v"])}</span>
+                    <span key="if4" className="whitespace-pre-wrap">{str(sg["v"])}</span>
                     skip;
                 }}
             </span>
@@ -192,11 +199,11 @@ def:pub MarkdownText(text: str) -> JsxElement {
         {for (bi, b) in enumerate(blocks) {
             <div key={str(bi)}>
                 {if str(b["kind"])[:1] == "h" {
-                    <div className={_hcls(int(str(b["kind"])[1:]))}><Inline text={str(b["text"])} /></div>
+                    <div key="if5" className={_hcls(int(str(b["kind"])[1:]))}><Inline text={str(b["text"])} /></div>
                     skip;
                 }}
                 {if b["kind"] == "ul" {
-                    <ul className="my-1 ml-4 list-disc space-y-0.5">
+                    <ul key="if6" className="my-1 ml-4 list-disc space-y-0.5">
                         {for (li, it) in enumerate(list(b["items"])) {
                             <li key={str(li)}><Inline text={str(it)} /></li>
                         }}
@@ -204,7 +211,7 @@ def:pub MarkdownText(text: str) -> JsxElement {
                     skip;
                 }}
                 {if b["kind"] == "table" {
-                    <div className="my-2 overflow-x-auto">
+                    <div key="if7" className="my-2 overflow-x-auto">
                         <table className="w-full border-collapse text-xs">
                             <thead>
                                 <tr>
@@ -227,7 +234,7 @@ def:pub MarkdownText(text: str) -> JsxElement {
                     skip;
                 }}
                 {if b["kind"] == "p" {
-                    <p className="my-1"><Inline text={str(b["text"])} /></p>
+                    <p key="if8" className="my-1"><Inline text={str(b["text"])} /></p>
                     skip;
                 }}
             </div>
@@ -269,6 +276,14 @@ def _rows(messages: list) -> list[dict] {
 
 def:pub CodeBlock(lang: str, code: str) -> JsxElement {
     has copied: bool = False;
+    # Timeout id lives in a ref, not `has`: `can with exit` compiles to a
+    # useEffect with EMPTY deps, so a state-held id would still read its
+    # first-render value (None) at unmount and never clear.
+    tid: any = useRef(None);
+
+    can with exit {
+        if tid.current { clearTimeout(float(str(tid.current))); }
+    }
 
     return <div className="relative mt-3 mb-1 exp-panel !bg-popover">
         <span className="micro-label absolute -top-2 left-3 bg-background px-2">
@@ -278,7 +293,8 @@ def:pub CodeBlock(lang: str, code: str) -> JsxElement {
             onClick={lambda (e: MouseEvent) {
                 _copy(code);
                 copied = True;
-                setTimeout(lambda -> None { copied = False; }, 1200);
+                if tid.current { clearTimeout(float(str(tid.current))); }
+                tid.current = setTimeout(lambda -> None { copied = False; }, 1200);
             }}
             className="absolute right-2 top-2 font-mono text-[9px] text-muted-foreground hover:text-foreground"
         >{"COPIED" if copied else "COPY"}</button>
@@ -288,6 +304,11 @@ def:pub CodeBlock(lang: str, code: str) -> JsxElement {
 
 def:pub Bubble(msg: dict, label: str, paired: bool, userText: str, onSave: any) -> JsxElement {
     has saved: bool = False;
+    savedTid: any = useRef(None);
+
+    can with exit {
+        if savedTid.current { clearTimeout(float(str(savedTid.current))); }
+    }
 
     if msg["role"] == "user" {
         return <div className="my-2 flex justify-end">
@@ -302,11 +323,11 @@ def:pub Bubble(msg: dict, label: str, paired: bool, userText: str, onSave: any) 
         {for (pi, part) in enumerate(_codeParts(content)) {
             <div key={str(pi)}>
                 {if part["kind"] == "code" {
-                    <CodeBlock lang={str(part["lang"])} code={str(part["text"])} />
+                    <CodeBlock key="if9" lang={str(part["lang"])} code={str(part["text"])} />
                     skip;
                 }}
                 {if part["kind"] == "text" {
-                    <MarkdownText text={str(part["text"])} />
+                    <MarkdownText key="if10" text={str(part["text"])} />
                     skip;
                 }}
             </div>
@@ -318,7 +339,8 @@ def:pub Bubble(msg: dict, label: str, paired: bool, userText: str, onSave: any) 
             onClick={lambda (e: MouseEvent) {
                 onSave(userText, content);
                 saved = True;
-                setTimeout(lambda -> None { saved = False; }, 1400);
+                if savedTid.current { clearTimeout(float(str(savedTid.current))); }
+                savedTid.current = setTimeout(lambda -> None { saved = False; }, 1400);
             }}
             className="exp-btn mt-1.5"
         >{"SAVED ✓ → sft.jsonl" if saved else "+ SAVE EXAMPLE"}</button>}
@@ -326,9 +348,10 @@ def:pub Bubble(msg: dict, label: str, paired: bool, userText: str, onSave: any) 
 }
 
 def:pub Thread(messages: list, labels: dict, onSave: any) -> JsxElement {
+    endRef: any = useRef(None);
+
     can with [messages] entry {
-        doc: any = document;
-        el: any = doc.getElementById("chat-end");
+        el: any = endRef.current;
         if el { el.scrollIntoView({"behavior": "smooth"}); }
     }
 
@@ -338,7 +361,7 @@ def:pub Thread(messages: list, labels: dict, onSave: any) -> JsxElement {
 
     return <div className="flex-1 overflow-y-auto px-6 py-4">
         {if len(messages) == 0 {
-            <div className="flex h-full items-center justify-center">
+            <div key="if11" className="flex h-full items-center justify-center">
                 <p className="micro-label">SELECT A PROMPT OR TYPE BELOW</p>
             </div>
             skip;
@@ -346,7 +369,7 @@ def:pub Thread(messages: list, labels: dict, onSave: any) -> JsxElement {
         {for (ri, row) in enumerate(_rows(messages)) {
             <div key={str(ri)}>
                 {if row["kind"] == "pair" {
-                    <div className="grid grid-cols-2 gap-4">
+                    <div key="if12" className="grid grid-cols-2 gap-4">
                         <div className="rounded-lg border border-dashed border-border p-3">
                             <Bubble msg={row["a"]} label={lbl(str(row["a"]["modelId"]))} paired={True} userText={str(row["user"])} onSave={onSave} />
                         </div>
@@ -357,11 +380,11 @@ def:pub Thread(messages: list, labels: dict, onSave: any) -> JsxElement {
                     skip;
                 }}
                 {if row["kind"] == "single" {
-                    <Bubble msg={row["a"]} label={lbl(str(row["a"]["modelId"]))} paired={False} userText={str(row["user"])} onSave={onSave} />
+                    <Bubble key="if13" msg={row["a"]} label={lbl(str(row["a"]["modelId"]))} paired={False} userText={str(row["user"])} onSave={onSave} />
                     skip;
                 }}
             </div>
         }}
-        <div id="chat-end" />
+        <div ref={endRef} />
     </div>;
 }

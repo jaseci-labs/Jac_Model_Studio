@@ -34,7 +34,9 @@ def:pub SectionMount(
     if component == "Evals" { return <Evals />; }
     if component == "Results" { return <Results />; }
     if component == "Generate" { return <Generate />; }
-    if component == "Plan" { return <Plan />; }
+    # Plan is workspace-scoped: it holds ONE workspace's hand-transcribed doc and
+    # must know where it is mounted, or it shows CPT content on 01/02.
+    if component == "Plan" { return <Plan workspace={workspace} />; }
     if component == "Cloud" { return <Cloud active={active} />; }
     return <div className="flex flex-1 items-center justify-center">
         <span className="micro-label text-muted-foreground/80">UNKNOWN SECTION {component}</span>

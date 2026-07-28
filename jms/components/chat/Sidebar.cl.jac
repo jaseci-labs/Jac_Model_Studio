@@ -28,7 +28,9 @@ def _groups(chats: list) -> list[dict] {
     return out;
 }
 
-def _mem_gauge(used: float, total: float) -> JsxElement {
+# props-object component (a `def -> JsxElement` with params) — render it as JSX
+# so the props object is built by the compiler and the call type-checks.
+def MemGauge(used: float, total: float) -> JsxElement {
     filled = 0;
     if total > 0.0 {
         filled = int(round(used / total * 8.0));
@@ -63,7 +65,7 @@ def:pub Sidebar(
         </button>
         <div className="flex-1 overflow-y-auto">
             {if len(chats) == 0 {
-                <p className="px-2 font-mono text-[10px] text-muted-foreground/80">no chats yet</p>
+                <p key="if1" className="px-2 font-mono text-[10px] text-muted-foreground/80">no chats yet</p>
                 skip;
             }}
             {for grp in _groups(chats) {
@@ -73,7 +75,16 @@ def:pub Sidebar(
                         {for c in list(grp["chats"]) {
                             <div
                                 key={str(c.id)}
+                                role="button"
+                                tabIndex={0}
+                                aria-current={str(c.id) == activeId}
                                 onClick={lambda (e: MouseEvent) { if not busy { onOpen(str(c.id)); } }}
+                                onKeyDown={lambda (e: KeyboardEvent) {
+                                    if (e.key == "Enter" or e.key == " ") and not busy {
+                                        e.preventDefault();
+                                        onOpen(str(c.id));
+                                    }
+                                }}
                                 className={"exp-hoverable group flex cursor-pointer items-center justify-between rounded-lg border px-2 py-1.5 text-xs " + (
                                     "border-border bg-accent/15 text-foreground" if str(c.id) == activeId
                                     else "border-transparent text-muted-foreground hover:text-foreground"
@@ -81,8 +92,9 @@ def:pub Sidebar(
                             >
                                 <span className="truncate" title={str(c.title)}>{c.title if c.title else "untitled"}</span>
                                 <button
+                                    aria-label={"delete chat: " + (str(c.title) if c.title else "untitled")}
                                     onClick={lambda (e: MouseEvent) { e.stopPropagation(); if not busy { onDelete(str(c.id)); } }}
-                                    className="hidden font-mono text-[9px] text-muted-foreground/80 hover:text-foreground/80 group-hover:block"
+                                    className="hidden font-mono text-[9px] text-muted-foreground/80 hover:text-foreground/80 group-hover:block focus:block"
                                 >DEL</button>
                             </div>
                         }}
@@ -90,6 +102,6 @@ def:pub Sidebar(
                 </div>
             }}
         </div>
-        {_mem_gauge({"used": residentGb, "total": ramGb})}
+        <MemGauge used={residentGb} total={ramGb} />
     </aside>;
 }

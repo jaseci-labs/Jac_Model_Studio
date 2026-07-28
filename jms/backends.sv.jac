@@ -20,6 +20,15 @@ import paths;
 import workspace;
 import from pathlib { Path }
 
+# Backends whose studio.workspace.toml templates name placeholders NO caller ever
+# supplies ({base_model}/{output_dir}/{config_yaml} — train.sv.jac only passes
+# run_name + model_id), so rendering them yields a shell command with literal
+# "{base_model}" in it. Hidden from list_backends so the UI can't offer them.
+# ponytail: a hardcoded name list, not a `stub = true` flag in
+# studio.workspace.toml — the toml is outside this change's blast radius, and
+# these are the only two stubs ("not wired yet" is already in their description).
+glob _STUB_BACKENDS: list[str] = ["hf_trl", "axolotl"];
+
 """Resolve a cwd scope string to an absolute Path."""
 def _cwd_for(scope: str) -> Path {
     if scope == "data" { return paths.data_root(); }
@@ -27,7 +36,9 @@ def _cwd_for(scope: str) -> Path {
     return paths.workspace_root();
 }
 
-"""Substitute {placeholders} in *template* from *tpl_vars* (missing → empty str)."""
+"""Substitute {placeholders} in *template* from *tpl_vars*. A placeholder with no
+matching key is left VERBATIM in the output — callers must supply every var their
+backend's template names (see _STUB_BACKENDS for the ones that can't be)."""
 def _apply_template(template: str, tpl_vars: dict) -> str {
     out = template;
     for k in tpl_vars {
@@ -128,12 +139,15 @@ def log_parser_for(backend_name: str, method: str) -> str {
     return str(raw) if raw is not None else "mlx";
 }
 
-"""List configured backends + their methods (for UI / debug)."""
+"""List configured backends + their methods (for UI / debug). Unwired stub
+backends (_STUB_BACKENDS) are omitted — their templates can't be rendered into a
+runnable command, so offering them in the picker only spawns a broken job."""
 def list_backends() -> dict {
     raw = workspace.training_backends();
     default = workspace.training_backend_default();
     out: list = [];
     for name in sorted(raw.keys()) {
+        if str(name) in _STUB_BACKENDS { continue; }
         cfg = dict(raw[name]) if isinstance(raw[name], dict) else {};
         methods = _methods(cfg);
         method_details: dict = {};

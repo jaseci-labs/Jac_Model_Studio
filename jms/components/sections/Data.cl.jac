@@ -12,6 +12,7 @@ The RL dataset browser lives in the 02 workspace's RlData section now.
 # 3s while mounted — a touch more network, but correct and far simpler.
 """
 
+import from react { useEffect }
 sv import from ...data { dataset_stats, dataset_files, dataset_rows, add_examples, FileRefView, DataRowView }
 sv import from ...builders { list_builders, run_builder, BuilderView }
 import from ..shared.StatTile { StatTile }
@@ -46,14 +47,20 @@ def:pub Data -> JsxElement {
         addBusy: bool = False,
         doneCount: int = 0,
         runningStage: str = "",
-        pollId: any = None;
+        loadErr: str = "";
 
     # `p`/`off` are passed explicitly — reading the state right after setting it
     # returns the stale value (React state writes are async).
     async def _fetch(p: str, off: int) -> None {
-        r = await dataset_rows(p, off, 25);
-        rows = list(r["rows"]);
-        total = int(r["total"]);
+        try {
+            r = await dataset_rows(p, off, 25);
+            rows = list(r["rows"]);
+            total = int(r["total"]);
+        } except Exception as e {
+            rows = [];
+            total = 0;
+            loadErr = "rows failed · " + str(e);
+        }
     }
 
     async def openFile(p: str) -> None {
@@ -68,21 +75,25 @@ def:pub Data -> JsxElement {
     }
 
     async def loadBuilders() -> None {
-        bs = await list_builders();
-        builders = bs;
-        dc = 0;
-        rs = "";
-        for b in bs {
-            st = str(b.status);
-            if st == "done" or st == "finished" {
-                dc += 1;
+        try {
+            bs = await list_builders();
+            builders = bs;
+            dc = 0;
+            rs = "";
+            for b in bs {
+                st = str(b.status);
+                if st == "done" or st == "finished" {
+                    dc += 1;
+                }
+                if st == "running" {
+                    rs = str(b.stage);
+                }
             }
-            if st == "running" {
-                rs = str(b.stage);
-            }
+            doneCount = dc;
+            runningStage = rs;
+        } except Exception as e {
+            loadErr = "pipeline poll failed · " + str(e);
         }
-        doneCount = dc;
-        runningStage = rs;
     }
 
     def selectStage(s: str) -> None {
@@ -91,39 +102,57 @@ def:pub Data -> JsxElement {
 
     async def runStage(s: str) -> None {
         selectedStage = s;
-        await run_builder(stage=s);
+        try {
+            await run_builder(stage=s);
+        } except Exception as e {
+            loadErr = "stage " + s + " failed to start · " + str(e);
+        }
         await loadBuilders();
     }
 
     async def submitExamples() -> None {
         addBusy = True;
         addResult = None;
-        r = await add_examples(target=addTarget, jsonl=addText);
-        addResult = r;
-        addBusy = False;
-        if int(r["added"]) > 0 {
-            stats = await dataset_stats();
-            fs = await dataset_files();
-            files = fs;
+        try {
+            r = await add_examples(target=addTarget, jsonl=addText);
+            addResult = r;
+            if int(r["added"]) > 0 {
+                stats = await dataset_stats();
+                fs = await dataset_files();
+                files = fs;
+            }
+        } except Exception as e {
+            loadErr = "append failed · " + str(e);
         }
+        # Always released: a throw above used to strand addBusy=True, which
+        # disables APPEND forever with no message.
+        addBusy = False;
     }
 
     async can with entry {
-        stats = await dataset_stats();
-        fs = await dataset_files();
-        files = fs;
-        await loadBuilders();
-        if len(fs) > 0 {
-            await openFile(str(fs[0].path));
+        try {
+            stats = await dataset_stats();
+            fs = await dataset_files();
+            files = fs;
+            await loadBuilders();
+            if len(fs) > 0 {
+                await openFile(str(fs[0].path));
+            }
+        } except Exception as e {
+            # Without this the async IIFE this block compiles to rejects
+            # unhandled and `stats` stays None — rendering "loading…" forever,
+            # indistinguishable from a slow load.
+            loadErr = "dataset load failed · " + str(e);
         }
-        pollId = setInterval(lambda -> None { loadBuilders(); }, 3000);
     }
 
-    can with exit {
-        if pollId is not None {
-            clearInterval(float(str(pollId)));
-        }
-    }
+    # ponytail: interval lives in its own effect with an effect-LOCAL id. The old
+    # `can with exit` cleanup closed over `pollId` from the first render (still
+    # None), so clearInterval never ran and every remount leaked a 3s poller.
+    useEffect(lambda {
+        iv: any = setInterval(lambda { loadBuilders(); }, 3000);
+        return lambda { clearInterval(float(str(iv))); };
+    }, []);
 
     async def prevPage -> None {
         if offset > 0 {
@@ -163,6 +192,9 @@ def:pub Data -> JsxElement {
 
     def _tiles() -> JsxElement {
         if not stats {
+            if loadErr {
+                return <span className="micro-label" style={{"color": "var(--danger)"}}>{loadErr}</span>;
+            }
             return <span className="micro-label">loading…</span>;
         }
         sp: any = stats["splits"];
@@ -201,7 +233,16 @@ def:pub Data -> JsxElement {
                         {for stage in list(group["stages"]) {
                             <div key={str(stage)}>
                                 <div
+                                    role="button"
+                                    tabIndex={0}
+                                    aria-label={"select stage " + str(stage)}
                                     onClick={lambda (e: MouseEvent) { selectStage(str(stage)); }}
+                                    onKeyDown={lambda (e: KeyboardEvent) {
+                                        if e.key == "Enter" or e.key == " " {
+                                            e.preventDefault();
+                                            selectStage(str(stage));
+                                        }
+                                    }}
                                     className={"exp-hoverable flex cursor-pointer items-center gap-2 rounded-lg border px-2 py-1 " + (
                                         "border-border bg-accent/15" if selectedStage == str(stage) else "border-transparent hover:text-foreground"
                                     )}
@@ -234,6 +275,7 @@ def:pub Data -> JsxElement {
                 <Segmented options={["sft", "dpo"]} value={addTarget} onSet={lambda (v: str) { addTarget = v; }} />
                 <textarea
                     rows={6}
+                    aria-label={"new " + addTarget + " examples (JSONL)"}
                     value={addText}
                     onChange={lambda (e: ChangeEvent) { addText = e.target.value; }}
                     placeholder={ph}
@@ -259,6 +301,9 @@ def:pub Data -> JsxElement {
             <span className="micro-label">DATA · SFT/DPO DATASET</span>
             {runningStage and <span key="running" className="micro-label pulse text-foreground/80">⦿ {runningStage}</span>}
         </div>
+        {loadErr and <div key="dataerr" className="border-b border-border px-4 py-1.5">
+            <span className="stat-line" style={{"color": "var(--danger)"}}>{loadErr}</span>
+        </div>}
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
             {_tiles()}
             <div className="grid gap-4" style={{"gridTemplateColumns": "280px 1fr"}}>

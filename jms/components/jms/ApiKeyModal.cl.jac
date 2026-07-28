@@ -12,8 +12,16 @@ assistant_providers()'s "openai" provider entry (Task A5).
 
 Handlers are named applyKey / clearKey / reload (and applyOpenAiKey /
 clearOpenAiKey / reloadOpenAi for the OpenAI section) — never set<HasVar>
-(that would shadow the auto-useState setter for a `has` field)."""
+(that would shadow the auto-useState setter for a `has` field).
 
+Dialog semantics: `role="dialog" aria-modal="true"`, Escape closes (document
+keydown, removed in the effect cleanup), focus moves onto the card on open and
+returns to whatever was focused before (the ⚙ KEYS button) on close.
+# ponytail: no focus trap — Tab can still walk out to the page behind. Escape +
+initial focus + restore is the floor; a trap needs a shared hook that would have
+to live outside this file."""
+
+import from react { useEffect }
 sv import from ...jms_llm { llm_status, set_anthropic_key, clear_anthropic_key }
 sv import from ...assistant { set_openai_key, clear_openai_key, assistant_providers }
 
@@ -104,6 +112,22 @@ def:pub ApiKeyModal(open: bool = False, onClose: any = None) -> JsxElement {
         if onClose is not None { onClose(); }
     }
 
+    useEffect(lambda {
+        if not open { return lambda { }; }
+        doc: any = document;
+        prev: any = doc.activeElement;
+        onKey = lambda(e: any) {
+            if str(e.key) == "Escape" { _close(); }
+        };
+        doc.addEventListener("keydown", onKey);
+        panel: any = doc.getElementById("jms-apikey-dialog");
+        if panel { panel.focus(); }
+        return lambda {
+            doc.removeEventListener("keydown", onKey);
+            if prev { prev.focus(); }
+        };
+    }, [open]);
+
     if not open { return <></>; }
 
     configured: bool = bool(status and status["configured"]);
@@ -131,16 +155,18 @@ def:pub ApiKeyModal(open: bool = False, onClose: any = None) -> JsxElement {
         oaiStatusLine = "Key configured · stored encrypted, never shown.";
     }
 
-    return <div
-        className="fixed inset-0 z-50 flex items-center justify-center"
-        style={{"background": "rgba(0,0,0,0.55)"}}
-    >
+    return <div className="fixed inset-0 z-50 flex items-center justify-center">
         <div
-            className="absolute inset-0"
+            className="absolute inset-0 g-scrim reveal-fade"
             onClick={lambda e: MouseEvent { _close(); }}
         />
         <div
-            className="jms-card g-overlay relative flex flex-col gap-4"
+            id="jms-apikey-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Provider API keys"
+            tabIndex={-1}
+            className="jms-card g-overlay reveal-scale relative flex flex-col gap-4"
             style={{"width": "min(460px, 92vw)", "padding": "22px", "zIndex": "1"}}
         >
             <div className="flex items-center justify-between">
@@ -156,6 +182,8 @@ def:pub ApiKeyModal(open: bool = False, onClose: any = None) -> JsxElement {
                 className="jms-input"
                 type="password"
                 value={keyInput}
+                aria-label="Anthropic API key"
+                autoComplete="off"
                 placeholder="sk-ant-…"
                 onChange={lambda e: any { keyInput = str(e.target.value); err = ""; }}
             />
@@ -190,6 +218,8 @@ def:pub ApiKeyModal(open: bool = False, onClose: any = None) -> JsxElement {
                 className="jms-input"
                 type="password"
                 value={oaiKeyInput}
+                aria-label="OpenAI API key"
+                autoComplete="off"
                 placeholder="sk-…"
                 onChange={lambda e: any { oaiKeyInput = str(e.target.value); oaiErr = ""; }}
             />

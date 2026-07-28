@@ -1,13 +1,14 @@
-"""studio - CPT corpus browser + training control (03-new attempt).
+"""studio - CPT corpus browser + training control (03-cpt-only attempt).
 
-Surfaces the continual-pretrain dataset built by 03-new/cpt_build/build_cpt.py:
+Surfaces the continual-pretrain dataset built by
+model-experiments/03-cpt-only/cpt_build/build_cpt.py:
 manifest stats (pivoted server-side into chart-ready lists) + per-source raw/packed
 row previews. Like rl.sv.jac, CPT data lives in THIS repo (jac_ml_studio), not the
 studio's data_root (which can point at the DataGeneration checkout), so paths resolve
 against the workspace root via paths.workspace_root() — NOT models.data_root().
 
 Training control mirrors train.sv.jac/runs.sv.jac (jobs.sv.jac for detached-process
-lifecycle, metrics.sv.jac for log parsing) but scoped to 03-new's own results/adapters
+lifecycle, metrics.sv.jac for log parsing) but scoped to 03-cpt-only's own results/adapters
 dirs instead of models.results_dir() -- CPT is LoRA continual pretrain on raw text via
 mlx_lm.lora directly (no run_probe.sh wrapper: no quantize/base-eval/fuse stages, CPT
 has no task-based holdout to eval against yet, see workflow.md's CF-guard open item).
@@ -193,10 +194,20 @@ def cpt_rows(path: str, offset: int, limit: int) -> dict {
 
 # ---------------------------------------------------------- training control
 
+# Launchable CPT runs: run name -> mlx_lm.lora --config file, workspace-root
+# relative (the cpt backend template's cwd is "workspace").
+#
+# EVERY VALUE HERE MUST EXIST ON DISK. The old map pointed at "03-new/..." — a
+# directory that was renamed to "model-experiments/03-cpt-only" — so START always
+# spawned a doomed trainer and reported "running". cpt-v2 / cpt-v3 are NOT listed
+# because they have no single config: config_v2_6epoch.yaml and
+# config_v3_rank32.yaml exist nowhere in the repo, and the real v2 run was driven
+# as 12 leg configs (config_v2_leg1..leg12.yaml) by cpt_train/run_epoch_loop.py,
+# which this single-config launcher cannot express. Starting them now returns a
+# clear error instead of silently training cpt-v1's config under another name.
+# Their read-only STATUS is unaffected (get_all_cpt_status still reports them).
 glob CPT_CONFIGS: dict = {
-    "cpt-v1": "03-new/cpt_train/config.yaml",
-    "cpt-v2": "03-new/cpt_train/config_v2_6epoch.yaml",
-    "cpt-v3": "03-new/cpt_train/config_v3_rank32.yaml"
+    "cpt-v1": "model-experiments/03-cpt-only/cpt_train/config.yaml"
 };
 glob CPT_TOTAL_ITERS: dict = {
     "cpt-v1": 2586,  # 3 epochs
@@ -208,11 +219,11 @@ glob CPT_TOTAL_ITERS: dict = {
 # shared repo checkout, so each tenant trains/resumes independently on their own
 # adapter tree. The CPT CORPUS (read by cpt_manifest/files/rows) stays shared.
 def _cpt_results_dir(name: str) -> Path {
-    return auth.user_workspace_dir("03-new", "results") / name;
+    return auth.user_workspace_dir("model-experiments/03-cpt-only", "results") / name;
 }
 
 def _cpt_adapter_dir(name: str) -> Path {
-    return auth.user_workspace_dir("03-new", "adapters") / name;
+    return auth.user_workspace_dir("model-experiments/03-cpt-only", "adapters") / name;
 }
 
 def _cpt_job_file(name: str) -> Path {
@@ -275,7 +286,7 @@ def _cpt_build_status(name: str, message: str = "") -> dict {
 }
 
 """Start (or resume) a CPT LoRA run via mlx_lm.lora, detached. Resume-aware: if
-03-new/adapters/<name> already has checkpoints, only the REMAINING iters run,
+model-experiments/03-cpt-only/adapters/<name> already has checkpoints, only the REMAINING iters run,
 picking up from the latest via --resume-adapter-file (same convention as
 run_probe.sh). Returns the status dict."""
 def start_cpt_training(name: str = "cpt-v1", config: str = "") -> dict {
@@ -283,8 +294,35 @@ def start_cpt_training(name: str = "cpt-v1", config: str = "") -> dict {
         raise ValueError("invalid name");
     }
 
-    config_file = str(CPT_CONFIGS.get(name, CPT_CONFIGS["cpt-v1"]));
-    if config { config_file = str(config); }
+    # *name* must be a launchable run. The old code fell back to cpt-v1's config
+    # for any unknown name, which silently trained the wrong recipe.
+    if name not in CPT_CONFIGS {
+        return _cpt_build_status(name, f"'{name}' is not a launchable CPT run (have: {', '.join(sorted(CPT_CONFIGS.keys()))})");
+    }
+    config_file = str(CPT_CONFIGS[name]);
+    # *config* is caller-supplied and lands on the mlx_lm `--config` flag. shlex.quote
+    # below stops shell injection but NOT path traversal, so restrict it to the
+    # CPT_CONFIGS allowlist — either a run name (key) or a config path already in
+    # the map (value). ponytail: allowlist membership, not a resolve-and-contain
+    # check. Ceiling — configs outside the map cannot be launched from the UI at
+    # all; add them to CPT_CONFIGS to enable them.
+    if config {
+        cand = str(config);
+        if cand in CPT_CONFIGS {
+            config_file = str(CPT_CONFIGS[cand]);
+        } elif cand in list(CPT_CONFIGS.values()) {
+            config_file = cand;
+        } else {
+            return _cpt_build_status(name, "config not allowed (must be a CPT_CONFIGS entry)");
+        }
+    }
+    # The config file has to actually exist BEFORE we take the single heavy-GPU
+    # lock — taking it and then spawning a doomed trainer blocks every other GPU
+    # job while reporting a happy "running".
+    cfg_abs = _abs(config_file);
+    if not cfg_abs.exists() {
+        return _cpt_build_status(name, f"config file missing: {config_file}");
+    }
     total_iters = CPT_TOTAL_ITERS.get(name, 2586);
 
     jf = _cpt_job_file(name);

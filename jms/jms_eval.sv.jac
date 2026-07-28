@@ -134,6 +134,20 @@ def _find_run(p: JmsProject, rid: str) -> JmsTrainRun | None {
     return None;
 }
 
+"""Where a non-local run's adapter actually lives: the node's synced adapter_path
+if cloudruns already pulled it, else the pointer jms_train wrote at start
+(<project>/runs/<rid>/remote.json), else "". Read-only."""
+def _remote_adapter_path(p: JmsProject, r: JmsTrainRun) -> str {
+    if r.adapter_path { return str(r.adapter_path); }
+    ptr = jms_project_dir(p.slug) / "runs" / r.rid / "remote.json";
+    if not ptr.exists() { return ""; }
+    try {
+        return str(dict(json.loads(ptr.read_text())).get("adapter_path", ""));
+    } except Exception {
+        return "";
+    }
+}
+
 """The evaluable run for *rid*: local-mlx, adapter on disk, not still training,
 with a resolvable local base model. Returns {ok, base_path, adapter_path,
 base_model, error}."""
@@ -141,7 +155,18 @@ def _resolve_run(p: JmsProject, rid: str) -> dict {
     r = _find_run(p, rid);
     if r is None { return {"ok": False, "error": "unknown run: " + rid}; }
     if r.backend != "local-mlx" {
-        return {"ok": False, "error": "eval is only supported for local-mlx runs (this run is " + r.backend + ")"};
+        # ponytail: spheron runs are REJECTED, not evaluated — but with the two
+        # concrete reasons and the adapter's real path, instead of a bare
+        # "only local-mlx". Actually scoring one needs a PEFT→mlx adapter
+        # conversion + the base weights pulled locally (see the report).
+        adir = _remote_adapter_path(p, r);
+        where = ("its adapter is at " + adir) if adir else "its adapter has not been pulled off the VM yet";
+        why = "the adapter is HuggingFace PEFT format and this box's scorer loads mlx-format adapters only";
+        bm = models.model_by_id(r.base_model);
+        if not bm or not models.model_available(bm) {
+            why = why + ", and its base model " + str(r.base_model) + " has no local weights here";
+        }
+        return {"ok": False, "error": "spheron runs cannot be evaluated yet — " + where + " (" + why + ")"};
     }
     if r.status == "running" {
         return {"ok": False, "error": "run is still training"};

@@ -7,12 +7,20 @@ free — same guarantee persistence.sv.jac / evals.sv.jac rely on.
 
 A project owns an on-disk skeleton under <workspace_root>/jms-projects/<slug>/
 (dataset/ sources/ jobs/ runs/ evals/); the slug is the filesystem identity and
-is immutable after creation (name is display-only, unrenamable). Sources are
+is **immutable after creation** — `rename_project` changes the DISPLAY name only
+and never touches the directory (see its docstring for why). Sources are
 fast os.walk stat passes — no file contents read — producing file counts + a
 bytes//4 token estimate + an extension histogram, capped at 50k files.
 
 `write_project_snapshot` dumps project.json into the project dir for the later
 generate/train workers to consume.
+
+Lifecycle extras (all additive — every pre-existing signature/return shape is
+untouched): `rename_project` (display name), `duplicate_project` (config-only
+clone by default, opt-in streamed curated-dataset copy), `dataset_export_info`
+(cheap size probe), `export_dataset` (paginated JSONL reader under a hard
+per-response byte budget) and `export_summary` (config + counts + results as
+JSON or Markdown, capped and self-reporting when it caps).
 
 Checker notes (jaclang 0.16.1): `++>` returns a LIST — unwrap `(root ++> X())[0]`;
 dict values are `any`, so `int(str(...))` when coercing; import native symbols
@@ -48,6 +56,17 @@ glob _INC_CODE: list[str] = [".py", ".js", ".ts", ".tsx", ".jac", ".go", ".rs", 
 glob _INC_DOCS: list[str] = [".md", ".rst", ".txt", ".mdx"];
 glob _MAX_BYTES: int = 1048576;   # 1 MB — skip larger files
 glob _MAX_FILES: int = 50000;     # walk cap — bail with a note beyond this
+
+# ------------------------------------------------------------- export budget ---
+# HARD per-response ceiling for `export_dataset` / `export_summary`. A curated
+# dataset is unbounded (tens of MB is normal), and one endpoint in this repo once
+# shipped 48 x 4MB base64 blobs in a single response — so the reader is PAGINATED
+# and every response says, in-band, whether it stopped early (`eof` / `truncated`
+# / `note`). Nothing is ever silently dropped.
+glob _EXPORT_MAX_BYTES: int = 2000000;   # ~2 MB of JSONL text per response
+glob _EXPORT_MAX_LINES: int = 2000;      # …or 2k rows, whichever trips first
+glob _SUMMARY_MAX_ITEMS: int = 200;      # per-list cap inside export_summary
+glob _COPY_CHUNK: int = 1048576;         # 1 MB streaming-copy chunk
 
 # ------------------------------------------------------------------- views -----
 """One project as a card sees it: fields + a derived source count."""
@@ -191,6 +210,75 @@ def _count_lines(p: Path) -> int {
     }
 }
 
+"""Non-blank line count by ITERATING the handle — never materializes the file in
+memory, unlike `_count_lines` above (kept as-is: `get_project`'s row_stats depend
+on its exact behavior). Used by the export/duplicate size probes, which are the
+paths that can meet a multi-hundred-MB curated dataset."""
+def _count_lines_stream(p: Path) -> int {
+    if not p.exists() { return 0; }
+    n = 0;
+    try {
+        fh: any = open(str(p), "r", encoding="utf-8", errors="replace");
+        try {
+            for raw in fh {
+                if raw.strip() { n = n + 1; }
+            }
+        } finally {
+            fh.close();
+        }
+    } except Exception {
+        return 0;
+    }
+    return n;
+}
+
+"""Byte size of *p*, 0 when missing/unstattable."""
+def _file_size(p: Path) -> int {
+    try {
+        return int(os.path.getsize(str(p)));
+    } except Exception {
+        return 0;
+    }
+}
+
+"""Copy src → dst in 1 MB chunks through a `.tmp` sibling, then `os.replace()`.
+
+Two properties this buys, both required by the brief: the file is NEVER read
+whole into memory (an explicit chunk loop, so a 2 GB dataset costs 1 MB of RSS),
+and a crash mid-copy leaves the `.tmp` behind rather than a truncated `dst` — the
+rename is atomic on POSIX. Returns bytes written, or -1 when src does not exist
+(or the copy failed, in which case dst is left exactly as it was)."""
+def _copy_stream(src: Path, dst: Path) -> int {
+    if not src.exists() { return -1; }
+    tmp = Path(str(dst) + ".tmp");
+    try {
+        fin: any = open(str(src), "rb");
+        try {
+            fout: any = open(str(tmp), "wb");
+            try {
+                while True {
+                    chunk: any = fin.read(_COPY_CHUNK);
+                    if not chunk { break; }
+                    fout.write(chunk);
+                }
+            } finally {
+                fout.close();
+            }
+        } finally {
+            fin.close();
+        }
+        # Size off the closed temp file (stat), not an accumulator — the handle is
+        # typed `any` here, so len(chunk) is unusable to the checker.
+        n = _file_size(tmp);
+        os.replace(str(tmp), str(dst));
+        return n;
+    } except Exception {
+        # Leave nothing half-written behind; dst is untouched either way.
+        try { tmp.unlink(); } except Exception {}
+        return -1;
+    }
+}
+
 # ---------------------------------------------------------------- slug logic ---
 glob _ALNUM: str = "abcdefghijklmnopqrstuvwxyz0123456789";
 
@@ -272,6 +360,24 @@ def _plans_newest_first(project: JmsProject) -> list[dict] {
     for g in _gen_plans_of(project) { out.append(_plan_dict(g)); }
     out.sort(key=lambda d: dict -> int { return int(str(d["version"])); }, reverse=True);
     return out;
+}
+
+"""The single plan worth carrying into a clone: the approved one if there is
+one, otherwise the highest-version draft. None when the project has no plans.
+# ponytail: one plan, not the whole version history — a clone is a fresh start,
+# and the older drafts are only meaningful next to the runs that consumed them
+# (which a clone deliberately does not copy). Ceiling: no "clone full history"."""
+def _plan_to_clone(project: JmsProject) -> JmsGenPlan | None {
+    plans = _gen_plans_of(project);
+    if not plans { return None; }
+    best = plans[0];
+    for g in plans[1:] {
+        g_ok = g.status == "approved";
+        b_ok = best.status == "approved";
+        if g_ok and not b_ok { best = g; }
+        elif g_ok == b_ok and g.version > best.version { best = g; }
+    }
+    return best;
 }
 
 """True when *project* has at least one approved plan (drives the GENERATE dot)."""
@@ -480,9 +586,10 @@ def _scan_walk(path: str, kind: str, inc: list[str], exc: list[str]) -> dict {
 # ---------------------------------------------------------------- endpoints ----
 """Create a project. Slug = slugified name (immutable fs identity), de-duplicated
 on collision, and gated through jobs.safe(). Lays down the on-disk skeleton
-(dataset/ sources/ jobs/ runs/ evals/). Name is display-only and cannot be
-renamed later (the slug would drift from the directory). `group_id` optionally
-places the project in a JMS workspace ("" = ungrouped, back-compat)."""
+(dataset/ sources/ jobs/ runs/ evals/). Name is display-only; `rename_project`
+can change it later but the slug (and therefore the directory) never moves.
+`group_id` optionally places the project in a JMS workspace ("" = ungrouped,
+back-compat)."""
 def create_project(name: str, use_case: str, group_id: str = "") -> JmsProjectView {
     base = _slugify(name);
     if not jobs.safe(base) { base = "project"; }
@@ -541,6 +648,14 @@ def get_project(pid: str) -> dict {
     train_state = "empty";
     if _has_done_train(p) { train_state = "done"; }
     elif _any_running_train(p) { train_state = "in-progress"; }
+    # Derived off the eval dicts already built above (no second graph scan): a
+    # completed scoring run → done; one still scoring → in-progress; else empty.
+    eval_state = "empty";
+    for ed in evals {
+        est = str(ed["status"]);
+        if est == "completed" { eval_state = "done"; break; }
+        if est == "running" { eval_state = "in-progress"; }
+    }
     stage_state: dict = {
         "sources": "done" if scanned >= 1 else "empty",
         "generate": "done" if _has_approved_plan(p) else "empty",
@@ -551,7 +666,8 @@ def get_project(pid: str) -> dict {
         # a completed run with its adapter on disk → done; a run still going →
         # in-progress; otherwise empty.
         "train": train_state,
-        "eval": "empty"
+        # a completed eval run → done; one still scoring → in-progress; else empty.
+        "eval": eval_state
     };
     return {
         "pid": p.pid, "name": p.name, "slug": p.slug, "use_case": p.use_case,
@@ -562,9 +678,11 @@ def get_project(pid: str) -> dict {
     };
 }
 
-"""Patch mutable fields (use_case / provider / model / group_id). Name is NOT
-renamable — the slug is the filesystem identity. Returns the refreshed view, or
-a blank view if the pid is unknown / not the caller's."""
+"""Patch mutable fields (use_case / provider / model / group_id). `name` is
+deliberately ignored here — renaming goes through `rename_project`, so an
+existing caller that happens to pass a stale `name` key can never surprise-rename
+a project. Returns the refreshed view, or a blank view if the pid is unknown /
+not the caller's."""
 def update_project(pid: str, fields: dict) -> JmsProjectView {
     p = _find_project(pid);
     if p is None { return JmsProjectView(); }
@@ -572,6 +690,35 @@ def update_project(pid: str, fields: dict) -> JmsProjectView {
     if "provider" in fields { p.provider = str(fields["provider"]); }
     if "model" in fields { p.model = str(fields["model"]); }
     if "group_id" in fields { p.group_id = str(fields["group_id"]); }
+    write_project_snapshot(p.pid);
+    return _project_view(p);
+}
+
+"""Change a project's DISPLAY name. The slug — and therefore
+`jms_project_dir(slug)` — is deliberately left alone.
+
+Why no re-slug (the decision, spelled out): the slug is not a label, it is a
+*resolved filesystem identity* that other records already point at by absolute
+path. `JmsTrainRun.adapter_path` stores an absolute `.../jms-projects/<slug>/runs/
+<rid>/...`; `jobs/<jid>/job.json` + `run.log`, `evals/<eid>/summary.json` and
+`dataset/*.jsonl` are all addressed under the same prefix; and detached worker
+processes (jms_gen / jms_train / jms_eval, plus the remote supervisor) hold those
+paths OPEN for the life of a run. Moving the directory would (a) invalidate every
+stored adapter_path with no back-reference to repair, and (b) yank the directory
+out from under a live writer — the exact "corrupt a running job" failure the brief
+forbids. A rename is a cosmetic act; it must not be able to destroy an artifact.
+So: name changes, slug never does, and no directory is ever moved by ANY endpoint
+in this module (the only fs removal remains delete_project's opt-in purge).
+
+Blank/whitespace-only names are rejected (a nameless card is unusable); the name
+is capped at 120 chars. Re-writes project.json so the on-disk snapshot the
+generate/train workers read stays in sync. Blank view if the pid is unknown."""
+def rename_project(pid: str, name: str) -> JmsProjectView {
+    p = _find_project(pid);
+    if p is None { return JmsProjectView(); }
+    nm = name.strip();
+    if not nm { return _project_view(p); }
+    p.name = nm[:120];
     write_project_snapshot(p.pid);
     return _project_view(p);
 }
@@ -673,4 +820,343 @@ def write_project_snapshot(pid: str) -> str {
     out = d / "project.json";
     out.write_text(json.dumps(snap, indent=2));
     return str(out);
+}
+
+# ------------------------------------------------------ duplicate / clone -----
+"""Clone a project's CONFIG into a brand-new project. Nothing is moved, nothing
+is overwritten, the source project is not touched at all.
+
+What is cloned: use_case, provider, model, group_id, every JmsSource (path +
+include/exclude globs + the last scan's counts, so the clone opens with SOURCES
+already green instead of forcing a re-walk) and ONE JmsGenPlan (the approved one
+if there is one, else the newest draft — see `_plan_to_clone`).
+
+What is deliberately NOT cloned: raw.jsonl, curated rows, gen jobs, train runs +
+their adapters, and eval runs. Those are gigabyte-scale, single-copy and
+run-specific; a duplicate is "start again from the same recipe", not "double my
+disk usage". `copy_curated=True` opts INTO copying just `dataset/train.jsonl` +
+`dataset/holdout.jsonl`, streamed 1 MB at a time through a `.tmp` + `os.replace`
+(`_copy_stream`) — never a read-whole-file — and the response reports the exact
+bytes written so the UI can show what it cost. Adapters are never copyable here.
+
+A fresh slug is minted from the new name (de-duplicated, jobs.safe()-gated) and a
+fresh dir skeleton is laid down. {"error": ...} on an unknown pid."""
+def duplicate_project(pid: str, name: str = "", copy_curated: bool = False) -> dict {
+    src = _find_project(pid);
+    if src is None { return {"error": "unknown project"}; }
+    newname = name.strip() if name.strip() else (src.name + " copy");
+    newname = newname[:120];
+    base = _slugify(newname);
+    if not jobs.safe(base) { base = "project"; }
+    slug = _unique_slug(base);
+    d = jms_project_dir(slug);
+    for sub in ["dataset", "sources", "jobs", "runs", "evals"] {
+        (d / sub).mkdir(parents=True, exist_ok=True);
+    }
+    p = (root ++> JmsProject(
+        pid=uuid4().hex[:12], name=newname, slug=slug, use_case=src.use_case,
+        created=_now(), provider=src.provider, model=src.model, group_id=src.group_id
+    ))[0];
+    # `++>` yields a LIST — every new node below unwraps with [0] for the same
+    # reason (this repo has crashed on the un-unwrapped form four times).
+    new_sids: list[str] = [];
+    for s in _sources_of(src) {
+        ns = (p ++> JmsSource(
+            sid=uuid4().hex[:12], kind=s.kind, path=s.path,
+            include=list(s.include), exclude=list(s.exclude),
+            files=s.files, est_tokens=s.est_tokens, skipped=s.skipped,
+            ext_json=s.ext_json, scanned_at=s.scanned_at
+        ))[0];
+        new_sids.append(ns.sid);
+    }
+    plan_copied = False;
+    g = _plan_to_clone(src);
+    if g is not None {
+        ng = (p ++> JmsGenPlan(
+            version=1, status=g.status, provider=g.provider, model=g.model,
+            plan_json=g.plan_json, created=_now(),
+            approved_at=(_now() if g.status == "approved" else "")
+        ))[0];
+        plan_copied = ng.version > 0;
+    }
+    copied: list[dict] = [];
+    copied_bytes = 0;
+    note = "";
+    if copy_curated {
+        sdir = jms_project_dir(src.slug) / "dataset";
+        for fn in ["train.jsonl", "holdout.jsonl"] {
+            n = _copy_stream(sdir / fn, d / "dataset" / fn);
+            if n >= 0 {
+                copied.append({"file": fn, "bytes": n});
+                copied_bytes = copied_bytes + n;
+            }
+        }
+        if not copied {
+            note = "nothing copied — the source project has no materialized dataset yet";
+        }
+    }
+    write_project_snapshot(p.pid);
+    return {
+        "pid": p.pid, "name": p.name, "slug": p.slug, "use_case": p.use_case,
+        "created": p.created, "provider": p.provider, "model": p.model,
+        "group_id": p.group_id, "source_count": len(new_sids),
+        "from_pid": src.pid, "from_slug": src.slug,
+        "plan_copied": plan_copied, "copied_curated": copy_curated,
+        "copied_files": copied, "copied_bytes": copied_bytes, "note": note
+    };
+}
+
+# ------------------------------------------------------------------ export ----
+"""Cheap size probe for the curated dataset — what the DUPLICATE and EXPORT
+controls quote BEFORE the user commits to anything. Sizes come from stat();
+line counts iterate the handle (`_count_lines_stream`) rather than slurping.
+Also echoes the export budget so the client never has to hardcode it.
+{"error": ...} on an unknown pid."""
+def dataset_export_info(pid: str) -> dict {
+    p = _find_project(pid);
+    if p is None { return {"error": "unknown project"}; }
+    dsdir = jms_project_dir(p.slug) / "dataset";
+    tr = dsdir / "train.jsonl";
+    ho = dsdir / "holdout.jsonl";
+    tb = _file_size(tr);
+    hb = _file_size(ho);
+    return {
+        "pid": p.pid, "slug": p.slug,
+        "train": {"exists": tr.exists(), "lines": _count_lines_stream(tr), "bytes": tb},
+        "holdout": {"exists": ho.exists(), "lines": _count_lines_stream(ho), "bytes": hb},
+        "total_bytes": tb + hb,
+        "max_response_bytes": _EXPORT_MAX_BYTES,
+        "max_response_lines": _EXPORT_MAX_LINES
+    };
+}
+
+"""One PAGE of a curated JSONL file, for a client-side Blob download.
+
+Hard response budget: at most `_EXPORT_MAX_LINES` rows or `_EXPORT_MAX_BYTES`
+(~2 MB) of text, whichever trips first. The page ALWAYS says whether it stopped
+early — `eof` False + `truncated` True + a human `note` + `next_offset` to
+resume from. The caller loops until `eof`, so an arbitrarily large dataset is
+still fully exportable; it just arrives in bounded chunks instead of one
+48-blobs-in-a-response fireball.
+
+The budget check is skipped for the FIRST row of a page, so a single row larger
+than the whole budget still ships (`oversize_row` flags it) — without that the
+loop could never advance past it. Blank lines are skipped. `offset` is a PHYSICAL
+line offset (feed back `next_offset` verbatim; do not compute it yourself).
+{"error": ...} for an unknown pid, a bad `which`, or a not-yet-materialized
+file."""
+def export_dataset(pid: str, which: str = "train", offset: int = 0) -> dict {
+    p = _find_project(pid);
+    if p is None { return {"error": "unknown project"}; }
+    if which not in ["train", "holdout"] { return {"error": "which must be train or holdout"}; }
+    f = jms_project_dir(p.slug) / "dataset" / (which + ".jsonl");
+    if not f.exists() { return {"error": which + ".jsonl has not been materialized yet"}; }
+    lines: list[str] = [];
+    nbytes = 0;
+    idx = 0;
+    eof = True;
+    try {
+        fh: any = open(str(f), "r", encoding="utf-8", errors="replace");
+        try {
+            for raw in fh {
+                if idx < offset { idx = idx + 1; continue; }
+                ln = str(raw).rstrip("\r\n");
+                if not ln.strip() { idx = idx + 1; continue; }
+                if lines and (len(lines) >= _EXPORT_MAX_LINES
+                              or nbytes + len(ln) + 1 > _EXPORT_MAX_BYTES) {
+                    eof = False;
+                    break;
+                }
+                lines.append(ln);
+                nbytes = nbytes + len(ln) + 1;
+                idx = idx + 1;
+            }
+        } finally {
+            fh.close();
+        }
+    } except Exception as e {
+        return {"error": "could not read " + which + ".jsonl: " + str(e)};
+    }
+    return {
+        "which": which, "offset": offset, "next_offset": idx, "eof": eof,
+        "lines": lines, "count": len(lines), "bytes": nbytes,
+        "truncated": not eof,
+        "oversize_row": len(lines) == 1 and nbytes > _EXPORT_MAX_BYTES,
+        "max_response_bytes": _EXPORT_MAX_BYTES,
+        "max_response_lines": _EXPORT_MAX_LINES,
+        "filename": p.slug + "-" + which + ".jsonl",
+        "note": "" if eof else "capped at the response budget — call again with offset=next_offset"
+    };
+}
+
+"""Trim *items* to _SUMMARY_MAX_ITEMS, appending an explicit line to *notes* when
+it actually trims. Capping is fine; capping SILENTLY is not."""
+def _capped(items: list, label: str, notes: list[str]) -> list {
+    if len(items) <= _SUMMARY_MAX_ITEMS { return items; }
+    notes.append(
+        label + ": newest " + str(_SUMMARY_MAX_ITEMS) + " of " + str(len(items)) + " shown (capped)"
+    );
+    return items[:_SUMMARY_MAX_ITEMS];
+}
+
+"""Render the summary dict as Markdown (tables for the run lists)."""
+def _summary_md(s: dict) -> str {
+    pr = dict(s["project"]);
+    cn = dict(s["counts"]);
+    ss = dict(s["stage_state"]);
+    L: list[str] = [];
+    L.append("# " + str(pr["name"]));
+    L.append("");
+    L.append("_" + str(pr["use_case"] or "no use case set") + "_");
+    L.append("");
+    L.append("| field | value |");
+    L.append("| --- | --- |");
+    for k in ["pid", "slug", "created", "provider", "model"] {
+        L.append("| " + k + " | `" + str(pr[k]) + "` |");
+    }
+    L.append("| exported_at | `" + str(s["exported_at"]) + "` |");
+    L.append("");
+    L.append("## Pipeline");
+    L.append("");
+    L.append("| stage | state |");
+    L.append("| --- | --- |");
+    for k in ["sources", "generate", "curate", "train", "eval"] {
+        L.append("| " + k + " | " + str(ss[k]) + " |");
+    }
+    L.append("");
+    L.append("## Counts");
+    L.append("");
+    L.append("| what | n |");
+    L.append("| --- | --- |");
+    for k in ["sources", "raw_rows", "curated_rows", "plans", "gen_jobs", "train_runs", "evals"] {
+        L.append("| " + k + " | " + str(cn[k]) + " |");
+    }
+    L.append("");
+    L.append("## Sources");
+    L.append("");
+    srcs = list(s["sources"]);
+    if not srcs { L.append("_none attached_"); }
+    else {
+        L.append("| kind | path | files | est. tokens |");
+        L.append("| --- | --- | --- | --- |");
+        for it in srcs {
+            r = dict(it);
+            L.append("| " + str(r["kind"]) + " | `" + str(r["path"]) + "` | "
+                     + str(r["files"]) + " | " + str(r["est_tokens"]) + " |");
+        }
+    }
+    L.append("");
+    L.append("## Train runs");
+    L.append("");
+    truns = list(s["train_runs"]);
+    if not truns { L.append("_none_"); }
+    else {
+        L.append("| rid | backend | base model | status | adapter | started |");
+        L.append("| --- | --- | --- | --- | --- | --- |");
+        for it in truns {
+            r = dict(it);
+            L.append("| `" + str(r["rid"]) + "` | " + str(r["backend"]) + " | `"
+                     + str(r["base_model"]) + "` | " + str(r["status"]) + " | "
+                     + ("yes" if r["adapter_ready"] else "no") + " | "
+                     + str(r["started"])[:19] + " |");
+        }
+    }
+    L.append("");
+    L.append("## Evals");
+    L.append("");
+    evs = list(s["evals"]);
+    if not evs { L.append("_none_"); }
+    else {
+        L.append("| eid | run | metric | status | n | mean | pass rate |");
+        L.append("| --- | --- | --- | --- | --- | --- | --- |");
+        for it in evs {
+            r = dict(it);
+            ms = float(str(r["mean_score"]));
+            pr2 = float(str(r["pass_rate"]));
+            L.append("| `" + str(r["eid"]) + "` | `" + str(r["run_rid"]) + "` | "
+                     + str(r["metric"]) + " | " + str(r["status"]) + " | "
+                     + str(r["n"]) + " | " + f"{ms:.3f}" + " | " + f"{pr2:.3f}" + " |");
+        }
+    }
+    notes = list(s["notes"]);
+    if notes {
+        L.append("");
+        L.append("## Export notes");
+        L.append("");
+        for n in notes { L.append("- " + str(n)); }
+    }
+    L.append("");
+    return "\n".join(L);
+}
+
+"""A project's config + counts + run/eval results as ONE downloadable document.
+
+`fmt` is "json" or "md". Returns {filename, mime, content, bytes, truncated,
+notes} — the client blobs `content` straight to a download; nothing is
+base64'd and no artifact bytes are inlined.
+
+Size budget, three layers, all self-reporting: each run list is capped at
+`_SUMMARY_MAX_ITEMS` (200) with a note naming the true total; the plan body (the
+only unbounded field, since a plan carries a schema + system prompt) is included
+only for the newest plan and is DROPPED entirely if the render still exceeds
+`_EXPORT_MAX_BYTES`; and a final hard slice guarantees the response can never
+exceed the budget, flagged by `truncated`. For the dataset ROWS themselves use
+`export_dataset` — this endpoint never inlines them."""
+def export_summary(pid: str, fmt: str = "json") -> dict {
+    p = _find_project(pid);
+    if p is None { return {"error": "unknown project"}; }
+    if fmt not in ["json", "md"] { return {"error": "fmt must be json or md"}; }
+    d = get_project(pid);
+    notes: list[str] = [];
+    srcs = list(d["sources"]);
+    plans = list(d["plans"]);
+    gjobs = list(d["gen_jobs"]);
+    truns = list(d["train_runs"]);
+    evals = list(d["evals"]);
+    rs = dict(d["row_stats"]);
+    if len(plans) > 1 {
+        notes.append("plans: only the newest of " + str(len(plans)) + " is included in full");
+    }
+    summary: dict = {
+        "project": {
+            "pid": d["pid"], "name": d["name"], "slug": d["slug"],
+            "use_case": d["use_case"], "created": d["created"],
+            "provider": d["provider"], "model": d["model"]
+        },
+        "counts": {
+            "sources": len(srcs), "raw_rows": rs["raw"], "curated_rows": rs["curated"],
+            "plans": len(plans), "gen_jobs": len(gjobs),
+            "train_runs": len(truns), "evals": len(evals)
+        },
+        "stage_state": d["stage_state"],
+        "sources": _capped(srcs, "sources", notes),
+        "plan": (plans[0] if plans else None),
+        "gen_jobs": _capped(gjobs, "gen_jobs", notes),
+        "train_runs": _capped(truns, "train_runs", notes),
+        "evals": _capped(evals, "evals", notes),
+        "exported_at": _now(),
+        "notes": notes
+    };
+    content = json.dumps(summary, indent=2) if fmt == "json" else _summary_md(summary);
+    if len(content) > _EXPORT_MAX_BYTES {
+        # The plan body is the only field that can realistically blow the budget.
+        notes.append("plan body omitted — the rendered summary exceeded the "
+                     + str(_EXPORT_MAX_BYTES) + "-byte response budget");
+        summary["plan"] = None;
+        summary["notes"] = notes;
+        content = json.dumps(summary, indent=2) if fmt == "json" else _summary_md(summary);
+    }
+    truncated = False;
+    if len(content) > _EXPORT_MAX_BYTES {
+        content = content[:_EXPORT_MAX_BYTES];
+        truncated = True;
+        notes.append("HARD-TRUNCATED at " + str(_EXPORT_MAX_BYTES) + " bytes — this document is incomplete");
+    }
+    return {
+        "filename": str(d["slug"]) + "-summary." + ("json" if fmt == "json" else "md"),
+        "mime": "application/json" if fmt == "json" else "text/markdown",
+        "content": content, "bytes": len(content),
+        "truncated": truncated, "notes": notes,
+        "max_response_bytes": _EXPORT_MAX_BYTES
+    };
 }

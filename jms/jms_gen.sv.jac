@@ -123,14 +123,21 @@ def _progress_file(p: JmsProject, jid: str) -> Path {
     return _jobs_dir(p, jid) / "progress.json";
 }
 
-def _read_progress(p: JmsProject, jid: str) -> dict {
-    pf = _progress_file(p, jid);
+"""progress.json under an already-resolved job dir — the hoisted form so a caller
+looping over many jobs resolves jms_project_dir()/workspace_root() once, not once
+per file per row."""
+def _read_progress_at(jd: Path) -> dict {
+    pf = jd / "progress.json";
     if not pf.exists() { return {}; }
     try {
         return dict(json.loads(pf.read_text()));
     } except Exception {
         return {};
     }
+}
+
+def _read_progress(p: JmsProject, jid: str) -> dict {
+    return _read_progress_at(_jobs_dir(p, jid));
 }
 
 # ----------------------------------------------------------------- finders ----
@@ -184,12 +191,20 @@ pattern) and sync the node on a terminal transition (incl. releasing the heavy
 lock for mlx holders — heavy_acquire also self-heals, this is just prompt).
 Returns the job dict WITHOUT the log tail (gen_status adds it)."""
 def _resolve(p: JmsProject, j: JmsGenJob) -> dict {
-    jf = _job_file(p, j.jid);
-    rl = _run_log(p, j.jid);
+    return _resolve_at(_jobs_dir(p, j.jid), j);
+}
+
+"""_resolve against an already-resolved job dir. Identical logic; split out so
+list_gen_jobs resolves jms_project_dir(p.slug) ONCE for the whole listing instead
+of three times per row (_job_file / _run_log / _progress_file each re-walked
+workspace_root())."""
+def _resolve_at(jd: Path, j: JmsGenJob) -> dict {
+    jf = jd / "job.json";
+    rl = jd / "run.log";
     live = jobs.live_status(jf, rl);
     status = j.status;
     if live is not None { status = _map_status(str(live.get("status", j.status))); }
-    prog = _read_progress(p, j.jid);
+    prog = _read_progress_at(jd);
     rows_done = j.rows_done;
     if "rows_done" in prog { rows_done = int(str(prog["rows_done"])); }
     cost = j.est_cost_usd;
@@ -362,7 +377,9 @@ def list_gen_jobs(pid: str) -> list[dict] {
     p = _find_project(pid);
     if p is None { return []; }
     out: list[dict] = [];
-    for j in _gen_jobs_of(p) { out.append(_resolve(p, j)); }
+    # hoisted: one jms_project_dir()/workspace_root() resolution for the listing.
+    jobs_base = jms_project_dir(p.slug) / "jobs";
+    for j in _gen_jobs_of(p) { out.append(_resolve_at(jobs_base / j.jid, j)); }
     out.sort(key=lambda d: dict -> str { return str(d["started"]); }, reverse=True);
     return out;
 }

@@ -21,26 +21,37 @@ def:pub RlData -> JsxElement {
         offset: int = 0,
         total: int = 0,
         expanded: int = -1,
-        sources: list = [];
+        sources: list = [],
+        loadErr: str = "";
 
     # `src`/`p`/`off` passed explicitly — reading state right after setting it
     # returns the stale value (React writes are async).
     async def _fetch(src: str, p: str, off: int) -> None {
-        r = await rl_dataset_rows(src, p, off, 25);
-        rows = list(r["rows"]);
-        total = int(r["total"]);
+        try {
+            r = await rl_dataset_rows(src, p, off, 25);
+            rows = list(r["rows"]);
+            total = int(r["total"]);
+        } except Exception as e {
+            rows = []; total = 0;
+            loadErr = "rows failed · " + str(e);
+        }
     }
 
     async def _loadSource(src: str) -> None {
-        fs = await rl_dataset_files(src);
-        files = fs;
-        expanded = -1;
-        offset = 0;
-        if len(list(fs)) > 0 {
-            path = str(fs[0].path);
-            await _fetch(src, str(fs[0].path), 0);
-        } else {
-            path = ""; rows = []; total = 0;
+        try {
+            fs = await rl_dataset_files(src);
+            files = fs;
+            expanded = -1;
+            offset = 0;
+            if len(list(fs)) > 0 {
+                path = str(fs[0].path);
+                await _fetch(src, str(fs[0].path), 0);
+            } else {
+                path = ""; rows = []; total = 0;
+            }
+        } except Exception as e {
+            files = []; path = ""; rows = []; total = 0;
+            loadErr = "file list failed · " + str(e);
         }
     }
 
@@ -79,11 +90,24 @@ def:pub RlData -> JsxElement {
     }
 
     async can with entry {
-        sources = await rl_sources();
-        if len(list(sources)) > 0 {
-            rlSource = str(sources[0]);
+        try {
+            # Locals, not the `has` fields: a `has` write lowers to a useState
+            # setter, so reading `sources`/`rlSource` back on the next line
+            # returned the pre-update closure value (jac check W3041) and the
+            # server's first source was never selected.
+            srcs = await rl_sources();
+            sources = srcs;
+            pick = rlSource;
+            if len(list(srcs)) > 0 {
+                pick = str(srcs[0]);
+                rlSource = pick;
+            }
+            await _loadSource(pick);
+        } except Exception as e {
+            # Un-.catch()ed before: the rejection vanished and the browser sat
+            # on an empty file list that looked like a slow load.
+            loadErr = "RL dataset failed to load · " + str(e);
         }
-        await _loadSource(rlSource);
     }
 
     return <div className="flex h-full min-w-0 flex-1 flex-col">
@@ -91,6 +115,9 @@ def:pub RlData -> JsxElement {
             <span className="micro-label">DATA · RL TRAINING SETS (read-only)</span>
             <span className="micro-label text-muted-foreground/80">02-rl-grpo/dataset</span>
         </div>
+        {loadErr and <div key="rlerr" className="border-b border-border px-4 py-1.5">
+            <span className="stat-line" style={{"color": "var(--danger)"}}>{loadErr}</span>
+        </div>}
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
             <div className="flex flex-wrap items-center gap-2">
                 <span className="micro-label text-muted-foreground/80">SOURCE</span>

@@ -54,15 +54,40 @@ def jac_bin() -> Path {
     return data_root() / ".venv" / "bin" / "jac";
 }
 
-"""On-disk size of a model dir in GB (2 dp). round(x,2) is broken in the checker,
-so the cents are computed with int division instead."""
+# Memoized model-dir sizes. `list_models()` backs the chat model picker AND
+# jms_llm.llm_status AND assistant.assistant_providers — all UI-polled — and each
+# call used to rglob + stat every file in every multi-GB model dir. Key = the model
+# directory's own absolute path + st_mtime_ns, as specified. Model dirs are
+# immutable downloads: files land, the dir mtime bumps, and nothing touches them
+# again. CAVEAT: a directory's mtime only tracks its DIRECT entries, so rewriting
+# an existing nested file in place (without adding/removing a direct child) would
+# not invalidate this entry. That does not happen for a downloaded model snapshot;
+# if it ever does, restart the server.
+glob _SIZE_CACHE: dict[str, float] = {};
+glob _SIZE_CAP: int = 128;
+
+"""On-disk size of a model dir in GB (2 dp), memoized on (dir path, dir mtime_ns).
+round(x,2) is broken in the checker, so the cents are computed with int division."""
 def dir_size_gb(p: Path) -> float {
     if not p.is_dir() { return 0.0; }
+    key = "";
+    try {
+        key = str(p) + "|" + str(p.stat().st_mtime_ns);
+    } except Exception { key = ""; }
+    if key {
+        hit = _SIZE_CACHE.get(key);
+        if hit is not None { return float(hit); }
+    }
     total = 0;
     for f in p.rglob("*") {
         if f.is_file() { total += f.stat().st_size; }
     }
-    return int(total / 10_000_000) / 100.0;
+    gb = int(total / 10_000_000) / 100.0;
+    if key {
+        if len(_SIZE_CACHE) > _SIZE_CAP { _SIZE_CACHE.clear(); }
+        _SIZE_CACHE[key] = gb;
+    }
+    return gb;
 }
 
 def total_ram_gb() -> int {

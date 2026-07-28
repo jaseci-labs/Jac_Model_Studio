@@ -21,14 +21,20 @@ def _lastY(series: any) -> str {
 
 def:pub CptResults(active: bool = False) -> JsxElement {
     has all: any = None,
-        loadedOnce: bool = False;
+        loadedOnce: bool = False,
+        loadErr: str = "";
 
     async can with [active] entry {
         if active {
             try {
                 all = await get_all_cpt_status();
                 loadedOnce = True;
-            } except Exception { }
+            } except Exception as e {
+                # The empty catch here left loadedOnce False, so the pane showed
+                # a pulsing "LOADING" forever — a failure disguised as a slow load.
+                loadErr = "CPT status failed · " + str(e);
+                loadedOnce = True;
+            }
         }
     }
 
@@ -58,6 +64,9 @@ def:pub CptResults(active: bool = False) -> JsxElement {
 
     return <div className="flex h-full min-w-0 flex-1 flex-col">
         <SectionHeader title={<span className="micro-label">RESULTS · CPT RUNS</span>} />
+        {loadErr and <div key="cptreserr" className="border-b border-border px-4 py-1.5">
+            <span className="stat-line" style={{"color": "var(--danger)"}}>{loadErr}</span>
+        </div>}
         <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-4">
             {if not loadedOnce {
                 <EmptyState key="loading" label="LOADING" pulse={True} />

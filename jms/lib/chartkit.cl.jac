@@ -18,8 +18,11 @@ def:pub chartColors() -> list[str] {
     return CHART_COLORS;
 }
 
+# NOTE: `--border` is the GLASS highlight — rgba(255,255,255,0.55) in light mode,
+# i.e. a white line on a cream panel (invisible). `--input` (= --border-alt) is
+# the hairline rule token: dark-on-light in light mode, light-on-dark in dark.
 def:pub gridStroke() -> str {
-    return "var(--border)";
+    return "var(--input)";
 }
 
 def:pub axisStroke() -> str {

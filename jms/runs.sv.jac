@@ -55,9 +55,26 @@ def _is_running(name: str) -> bool {
     return False;
 }
 
+"""Per-call read-once memo over metrics.last_row, keyed by absolute path.
+
+One _get_run_metrics used to re-read the SAME idiom JSONL up to 5x (_pick_idiom's
+2 probes, the isum last_row, and idiom_summary's function+graph probes). *memo* is
+a plain local dict, created fresh per call and never shared across requests, so it
+needs no invalidation — a file cannot change mid-call in any way this endpoint is
+allowed to observe. Result dicts are handed back by reference; nothing here
+mutates them."""
+def _last_row_once(memo: dict, p: Path) -> dict {
+    k = str(p);
+    hit = memo.get(k);
+    if hit is not None { return dict(hit); }
+    row = metrics.last_row(p);
+    memo[k] = row;
+    return row;
+}
+
 """Best idiom-metrics file for (run_dir, mode) — prefers function holdout over graph,
 accepts only files whose last row carries "avg_sim". Ports runlogs.pick_idiom."""
-def _pick_idiom(run_dir: Path, mode: str) -> Path | None {
+def _pick_idiom(run_dir: Path, mode: str, memo: dict) -> Path | None {
     candidates: list[Path] = [];
     if mode == "dpo" {
         candidates = [run_dir / "dpo" / "idiom-metrics.jsonl", run_dir / "dpo" / "graph-idiom.jsonl"];
@@ -65,10 +82,29 @@ def _pick_idiom(run_dir: Path, mode: str) -> Path | None {
         candidates = [run_dir / "idiom-metrics.jsonl", run_dir / "graph-idiom.jsonl"];
     }
     for cand in candidates {
-        row = metrics.last_row(cand);
+        row = _last_row_once(memo, cand);
         if row and "avg_sim" in row { return cand; }
     }
     return None;
+}
+
+"""metrics.idiom_summary, but reading through *memo* so a file already read by
+_pick_idiom is not read a second time. Same candidate order + same accept test as
+metrics.idiom_summary — keep the two in step if that one changes."""
+def _idiom_summary_once(memo: dict, run_dir: Path, mode: str, kind: str) -> dict {
+    base: Path = run_dir;
+    if mode == "dpo" { base = run_dir / "dpo"; }
+    candidates: list[Path] = [];
+    if kind == "function" {
+        candidates = [base / "idiom-metrics.jsonl"];
+    } else {
+        candidates = [base / "graph-idiom-metrics.jsonl", base / "graph-idiom.jsonl"];
+    }
+    for cand in candidates {
+        row = _last_row_once(memo, cand);
+        if row and "avg_sim" in row { return row; }
+    }
+    return {};
 }
 
 def _idiom_obj(s: dict) -> dict {
@@ -82,9 +118,13 @@ def _idiom_obj(s: dict) -> dict {
     };
 }
 
-"""Build the full RunMetrics dict for one run. Ports get_run_metrics."""
-def _get_run_metrics(name: str, mode: str) -> dict {
+"""Build the full RunMetrics dict for one run. Ports get_run_metrics.
+
+*want_tail* False skips the `log_tail` read (`""` instead) — compare_runs builds a
+row per run and throws the tail away, so it opts out. get_run keeps the default."""
+def _get_run_metrics(name: str, mode: str, want_tail: bool = True) -> dict {
     rdir = _run_dir(name);
+    row_memo: dict = {};
     curve_path: Path | None = None;
     log: Path = rdir / "train.log";
     if mode == "dpo" {
@@ -93,7 +133,7 @@ def _get_run_metrics(name: str, mode: str) -> dict {
         curve_path = rdir / "metrics.jsonl";
     }
 
-    idiom_path = _pick_idiom(rdir, mode);
+    idiom_path = _pick_idiom(rdir, mode, row_memo);
     idiom_label = "";
     if idiom_path is not None {
         if "graph-idiom" in idiom_path.name {
@@ -111,12 +151,12 @@ def _get_run_metrics(name: str, mode: str) -> dict {
     isum: dict = {};
     idiom_sim: list = [];
     if idiom_path is not None {
-        isum = metrics.last_row(idiom_path);
+        isum = _last_row_once(row_memo, idiom_path);
         idiom_sim = metrics.read_series(idiom_path, "avg_sim");
     }
 
-    func_sum = metrics.idiom_summary(rdir, mode, "function");
-    graph_sum = metrics.idiom_summary(rdir, mode, "graph");
+    func_sum = _idiom_summary_once(row_memo, rdir, mode, "function");
+    graph_sum = _idiom_summary_once(row_memo, rdir, mode, "graph");
 
     running = False;
     if mode == "sft" {
@@ -148,7 +188,7 @@ def _get_run_metrics(name: str, mode: str) -> dict {
         "idiom_total": _i(isum, "total"),
         "func_idiom": _idiom_obj(func_sum),
         "graph_idiom": _idiom_obj(graph_sum),
-        "log_tail": metrics.tail(log, 40)
+        "log_tail": metrics.tail(log, 40) if want_tail else ""
     };
 }
 
@@ -201,7 +241,9 @@ def compare_runs(mode: str = "sft") -> dict {
         for child in sorted(base.iterdir()) {
             if not child.is_dir() { continue; }
             if child.name in workspace.excluded_run_dirs() { continue; }
-            m = _get_run_metrics(child.name, mode);
+            # want_tail=False: compare_runs never surfaces log_tail, and reading a
+            # 40-line tail per run was pure waste.
+            m = _get_run_metrics(child.name, mode, False);
             if not m["found"] { continue; }
             name = child.name;
             names.append(name);

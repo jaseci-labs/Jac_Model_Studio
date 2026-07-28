@@ -487,10 +487,12 @@ def:pub Cloud(active: bool) -> JsxElement {
                     <button onClick={lambda (e: MouseEvent) { doAddSshKey(); }} disabled={busy} className={btn + "text-foreground"}>ADD KEY</button>
                 </div>
             </div>
-            {error and <p className="stat-line text-muted-foreground">{error}</p>}
+            {error and <p className="stat-line text-danger">{error}</p>}
         </div>;
     }
 
+    # NOTE: this pane renders `error` like _setup()/_runs() do. It used not to,
+    # so a failed TERMINATE / can_terminate showed the user absolutely nothing.
     def _instances() -> JsxElement {
         btn = "exp-btn ";
         termBlocked = bool(canTerm) and not bool(canTerm["can_terminate"]);
@@ -528,6 +530,7 @@ def:pub Cloud(active: bool) -> JsxElement {
                         <button onClick={lambda (e: MouseEvent) { doDestroy(); }} disabled={busy or termBlocked} className={btn + "text-muted-foreground"}>✕ TERMINATE</button>
                     </div>
                 </>}
+                {error and <p key="insterr" className="stat-line text-danger">{error}</p>}
             </div>
         </div>;
     }
@@ -541,7 +544,7 @@ def:pub Cloud(active: bool) -> JsxElement {
                 if i < cur {
                     cls += "border-input bg-secondary text-muted-foreground";
                 } elif i == cur {
-                    cls += "border-red-800 bg-[#1a0505] text-red-400" if failed
+                    cls += "border-danger bg-danger/10 text-danger" if failed
                         else "border-accent bg-accent/15 text-foreground";
                 } else {
                     cls += "border-border text-muted-foreground/60";
@@ -557,9 +560,9 @@ def:pub Cloud(active: bool) -> JsxElement {
         status = str(run["status"]);
         alert = bool(run["billing_alert"]);
         dotCls = "inline-block h-2 w-2 rounded-full ";
-        if status == "running" { dotCls += "bg-emerald-500"; }
+        if status == "running" { dotCls += "bg-ok"; }
         elif status == "done" { dotCls += "bg-foreground"; }
-        elif status == "detached" or status == "failed" { dotCls += "bg-red-500"; }
+        elif status == "detached" or status == "failed" { dotCls += "bg-danger"; }
         else { dotCls += "bg-muted-foreground"; }
         return <button
             key={rid}
@@ -573,7 +576,7 @@ def:pub Cloud(active: bool) -> JsxElement {
                 <span className={dotCls}></span>
                 <span className="font-mono text-xs text-foreground">{str(run["name"])}</span>
                 <span className="font-mono text-[10px] text-muted-foreground">{status}</span>
-                {alert and <span className="rounded border border-red-800 bg-[#1a0505] px-1.5 font-mono text-[9px] text-red-400">BILLING?</span>}
+                {alert and <span className="rounded border border-danger bg-danger/10 px-1.5 font-mono text-[9px] text-danger">BILLING?</span>}
             </div>
             {_phaseChips({"run": run})}
             <span className="font-mono text-[10px] text-muted-foreground">{_costLine(run)}</span>
@@ -599,10 +602,10 @@ def:pub Cloud(active: bool) -> JsxElement {
         adapterDir = str(art["adapter_dir"]) if "adapter_dir" in art else "";
         isTerminal = status == "done" or status == "failed" or status == "stopped";
         return <>
-            {alert and <div className="rounded-md border border-red-800 bg-[#1a0505] p-3">
-                <p className="font-mono text-[11px] font-bold text-red-400">DETACHED — VM MAY STILL BE BILLING</p>
-                <p className="stat-line mt-1 text-red-500">supervisor died with the run non-terminal · reattach to resume, or terminate the VM</p>
-                <button onClick={lambda (e: MouseEvent) { doReattach(); }} disabled={busy} className={btn + "mt-2 border-red-800 text-red-300"}>↻ REATTACH</button>
+            {alert and <div className="rounded-md border border-danger bg-danger/10 p-3">
+                <p className="font-mono text-[11px] font-bold text-danger">DETACHED — VM MAY STILL BE BILLING</p>
+                <p className="stat-line mt-1 text-danger">supervisor died with the run non-terminal · reattach to resume, or terminate the VM</p>
+                <button onClick={lambda (e: MouseEvent) { doReattach(); }} disabled={busy} className={btn + "mt-2 border-danger text-danger"}>↻ REATTACH</button>
             </div>}
             <div className="flex items-center gap-3">
                 <StatusGlyph status={"failed" if status == "detached" else status} showLabel={True} />
@@ -612,11 +615,11 @@ def:pub Cloud(active: bool) -> JsxElement {
             <span className="font-mono text-[11px] text-muted-foreground">{_costLine(run)}{" · vm terminated" if bool(run["vm_terminated"]) else ""}</span>
             <span className="font-mono text-[11px] text-muted-foreground">step {step}/{maxSteps} · loss {loss} · eval {evalLoss}</span>
             {str(run["message"]) and <span className="font-mono text-[11px] text-muted-foreground">{str(run["message"])}</span>}
-            {str(run["error"]) and <span className="font-mono text-[11px] text-red-400">{str(run["error"])}</span>}
+            {str(run["error"]) and <span className="font-mono text-[11px] text-danger">{str(run["error"])}</span>}
             <LogView text={str(run["log_tail"]) or "no train.log yet"} maxH="14rem" />
             <div className="flex flex-wrap gap-2">
                 <button onClick={lambda (e: MouseEvent) { doStopRun(); }} disabled={busy or isTerminal or detached} className={btn + "text-muted-foreground"}>■ STOP</button>
-                <button onClick={lambda (e: MouseEvent) { doTerminateVm(); }} disabled={busy or bool(run["vm_terminated"])} className={btn + ("border-red-800 text-red-300" if confirmTerm else "text-muted-foreground")}>
+                <button onClick={lambda (e: MouseEvent) { doTerminateVm(); }} disabled={busy or bool(run["vm_terminated"])} className={btn + ("border-danger text-danger" if confirmTerm else "text-muted-foreground")}>
                     {"⚠ CONFIRM TERMINATE VM?" if confirmTerm else "✕ TERMINATE VM"}
                 </button>
                 {isTerminal and not pulled and <button onClick={lambda (e: MouseEvent) { doPull(); }} disabled={busy} className={btn + "text-foreground"}>⇩ PULL ARTIFACTS</button>}
@@ -702,8 +705,8 @@ def:pub Cloud(active: bool) -> JsxElement {
                             <button
                                 onClick={lambda (e: MouseEvent) { autoTerm = not autoTerm; }}
                                 className={"exp-hoverable rounded-lg border px-3 py-1 font-mono text-[10px] transition-colors " + (
-                                    "border-emerald-700 bg-[#0a1a0f] text-emerald-400" if autoTerm
-                                    else "border-red-800 bg-[#1a0505] text-red-400"
+                                    "border-ok bg-ok/10 text-ok" if autoTerm
+                                    else "border-danger bg-danger/10 text-danger"
                                 )}
                             >
                                 {"ON (terminate on finish)" if autoTerm else "OFF — VM stays up + billing"}
@@ -719,7 +722,7 @@ def:pub Cloud(active: bool) -> JsxElement {
                     <div className="flex gap-2">
                         <button onClick={lambda (e: MouseEvent) { doStartRun(); }} disabled={busy or selOfferId == "" or selSshKeyId == ""} className={btn + "text-foreground"}>▶ START REMOTE SFT</button>
                     </div>
-                    {error and <p className="stat-line text-muted-foreground">{error}</p>}
+                    {error and <p className="stat-line text-danger">{error}</p>}
                 </div>
 
                 <div className="relative flex min-w-0 flex-1 flex-col gap-3 exp-panel p-4 pt-5">

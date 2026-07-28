@@ -14,6 +14,19 @@ import from "recharts" {
     ResponsiveContainer, LineChart, Line, BarChart, Bar,
     XAxis, YAxis, CartesianGrid, Tooltip, Legend
 }
+import from ...lib.chartkit {
+    chartColor, gridStroke, axisStroke, tick,
+    tipContentStyle, tipLabelStyle, tipItemStyle, tipCursor
+}
+
+# ponytail: chartkit's `MONO` is a plain `glob`, and globs don't cross a compiled
+# .cl.jac module boundary (it is absent from chartkit.js's export list), so the
+# token string is repeated here rather than imported. It is still a token, so
+# light/dark both resolve correctly.
+glob MONO: str = "var(--font-mono)";
+# Bar/area charts want a filled hover band, which chartkit only ships as a
+# stroked cursor (tipCursor) — one token-based literal covers it.
+glob FILL_CURSOR: dict = {"fill": "var(--muted)", "fillOpacity": 0.5};
 
 glob STAR1: list[dict] = [
     {"x": 0, "qwen3coder": 16.7, "jac-qwen3coder": 16.7},
@@ -36,19 +49,15 @@ glob FAILS: list[dict] = [
     {"t": "Qwen3.6 untrainable on 48 GB", "b": "dense 27B activates all params/token; 35B-A3B keeps 256 experts resident. Both OOM SFT at iter 1. Inference-only."},
     {"t": "STaR flicker didn't hold", "b": "qwen3coder pass@4 touched 25% at round 1 then fell back; greedy never left the 16.7% SFT floor."}
 ];
-glob STROKES: list[str] = ["#7aa2f7", "#d8a657", "#9ec98f"];
+glob PCT_TICKS: list[int] = [0, 25, 50, 75, 100];
+
 # Color encodes CONDITION (stable by name, not list index — so the same cond is
 # the same color across every chart). Model is encoded by line style instead:
 # solid = jac- finetuned, dashed = base model. See _colorFor / _dashFor.
-glob COND_COLOR: dict = {
-    "base": "#9aa0a6", "sft": "#7aa2f7", "raw_grpo": "#d8a657",
-    "sft_grpo": "#9ec98f", "sft_grpo_tuned": "#e07a8b"
+# Indices into chartkit's palette, so the ramp re-skins with the theme.
+glob COND_SLOT: dict = {
+    "base": 3, "sft": 1, "raw_grpo": 0, "sft_grpo": 5, "sft_grpo_tuned": 4
 };
-glob PCT_TICKS: list[int] = [0, 25, 50, 75, 100];
-
-def _tick() -> dict {
-    return {"fill": "#666", "fontSize": 10, "fontFamily": "'Geist Mono', ui-monospace, monospace"};
-}
 
 def _n(v: any) -> str {
     return (str(v) + "%") if v != None else "·";
@@ -60,7 +69,8 @@ def _condOf(key: str) -> str {
 }
 
 def _colorFor(key: str) -> str {
-    return COND_COLOR.get(_condOf(key), "#a78bdb");
+    c = _condOf(key);
+    return chartColor(int(str(COND_SLOT[c]))) if c in COND_SLOT else chartColor(2);
 }
 
 # solid line = jac- finetuned model; dashed = base model. Lets two series that
@@ -80,7 +90,7 @@ def _LadderTip(props: dict) -> JsxElement {
     for p in payload {
         if p.get("value") != None { present[str(p.get("dataKey"))] = p.get("value"); }
     }
-    return <div className="rounded-sm border border-input bg-background px-2.5 py-2" style={{"fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 11}}>
+    return <div className="rounded-sm border border-input bg-background px-2.5 py-2" style={{"fontFamily": MONO, "fontSize": 11}}>
         <div className="micro-label mb-1 text-muted-foreground">rung {props.get("label")} · pass@1</div>
         {for k in keys {
             <div key={k} className="flex items-center justify-between gap-4 leading-5">
@@ -101,11 +111,11 @@ def _ladderChart(props: dict) -> JsxElement {
         <span className="micro-label absolute -top-2 left-3 bg-background px-2">HOLDOUT pass@1 % · by rung (train-N) · Y axis 0–100</span>
         <ResponsiveContainer width="100%" height={260}>
             <LineChart data={rows} margin={{"top": 10, "right": 14, "left": 0, "bottom": 0}}>
-                <CartesianGrid stroke="#1c1c1f" vertical={False} />
-                <XAxis dataKey="x" tick={_tick()} tickLine={False} axisLine={{"stroke": "#333"}} />
-                <YAxis tick={_tick()} tickLine={False} axisLine={False} width={40} domain={[0, 100]} ticks={PCT_TICKS} unit="%" />
-                <Tooltip cursor={{"stroke": "#333", "strokeDasharray": "3 3"}} content={<_LadderTip keys={keys}/>} />
-                <Legend wrapperStyle={{"fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 10}} />
+                <CartesianGrid stroke={gridStroke()} vertical={False} />
+                <XAxis dataKey="x" tick={tick()} tickLine={False} axisLine={{"stroke": axisStroke()}} />
+                <YAxis tick={tick()} tickLine={False} axisLine={False} width={40} domain={[0, 100]} ticks={PCT_TICKS} unit="%" />
+                <Tooltip cursor={tipCursor()} content={<_LadderTip keys={keys}/>} />
+                <Legend wrapperStyle={{"fontFamily": MONO, "fontSize": 10, "color": "var(--muted-foreground)"}} />
                 {for k in keys {
                     <Line key={k} type="monotone" dataKey={k} stroke={_colorFor(k)} strokeDasharray={_dashFor(k)} strokeWidth={1.8} dot={{"r": 3.2, "fill": _colorFor(k), "strokeWidth": 0}} activeDot={{"r": 4.5}} isAnimationActive={False} connectNulls={False} />
                 }}
@@ -120,13 +130,13 @@ def _archiveLine(props: dict) -> JsxElement {
         <span className="micro-label absolute -top-2 left-3 bg-background px-2">{props["title"]}</span>
         <ResponsiveContainer width="100%" height={180}>
             <LineChart data={props["rows"]} margin={{"top": 10, "right": 14, "left": 0, "bottom": 0}}>
-                <CartesianGrid stroke="#1c1c1f" vertical={False} />
-                <XAxis dataKey="x" tick={_tick()} tickLine={False} axisLine={{"stroke": "#333"}} />
-                <YAxis tick={_tick()} tickLine={False} axisLine={False} width={40} domain={[0, 100]} ticks={PCT_TICKS} unit="%" />
-                <Tooltip cursor={{"stroke": "#333", "strokeDasharray": "3 3"}} contentStyle={{"background": "var(--background)", "border": "1px solid #333", "borderRadius": 0, "fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 11}} labelStyle={{"color": "#777"}} itemStyle={{"color": "#fafafa"}} />
-                <Legend wrapperStyle={{"fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 10}} />
-                <Line type="monotone" dataKey="qwen3coder" stroke={STROKES[0]} strokeDasharray="5 3" strokeWidth={1.8} dot={{"r": 2.6, "fill": STROKES[0], "strokeWidth": 0}} isAnimationActive={False} />
-                <Line type="monotone" dataKey="jac-qwen3coder" stroke={STROKES[1]} strokeWidth={1.8} dot={{"r": 2.6, "fill": STROKES[1], "strokeWidth": 0}} isAnimationActive={False} />
+                <CartesianGrid stroke={gridStroke()} vertical={False} />
+                <XAxis dataKey="x" tick={tick()} tickLine={False} axisLine={{"stroke": axisStroke()}} />
+                <YAxis tick={tick()} tickLine={False} axisLine={False} width={40} domain={[0, 100]} ticks={PCT_TICKS} unit="%" />
+                <Tooltip cursor={tipCursor()} contentStyle={tipContentStyle()} labelStyle={tipLabelStyle()} itemStyle={tipItemStyle()} />
+                <Legend wrapperStyle={{"fontFamily": MONO, "fontSize": 10, "color": "var(--muted-foreground)"}} />
+                <Line type="monotone" dataKey="qwen3coder" stroke={chartColor(1)} strokeDasharray="5 3" strokeWidth={1.8} dot={{"r": 2.6, "fill": chartColor(1), "strokeWidth": 0}} isAnimationActive={False} />
+                <Line type="monotone" dataKey="jac-qwen3coder" stroke={chartColor(0)} strokeWidth={1.8} dot={{"r": 2.6, "fill": chartColor(0), "strokeWidth": 0}} isAnimationActive={False} />
             </LineChart>
         </ResponsiveContainer>
     </div>;
@@ -145,26 +155,45 @@ def:pub Results -> JsxElement {
         corrLadder: list = [],
         corrHold: list = [],
         corrJourney: list = [],
-        corrKscale: list = [];
+        corrKscale: list = [],
+        loadErr: str = "";
 
     async can with entry {
-        d = await get_rl_ladder();
-        cells = list(d["cells"]);
-        curve = list(d["curve"]);
-        keys = list(d["curve_keys"]);
-        sgd = d["sg"];
-        sgcells = list(sgd["cells"]);
-        sgcurve = list(sgd["curve"]);
-        sgkeys = list(sgd["curve_keys"]);
-        v84d = d["v84"];
-        v84cells = list(v84d["cells"]);
-        v84curve = list(v84d["curve"]);
-        v84keys = list(v84d["curve_keys"]);
-        cr = await get_rl_corrected();
-        corrLadder = list(cr["ladder"]);
-        corrHold = list(cr["holdouts"]);
-        corrJourney = list(cr["journey"]);
-        corrKscale = list(cr["kscale"]);
+        # Both blocks are guarded independently so a failure in one still renders
+        # the other; unguarded these were un-.catch()ed async IIFEs whose
+        # rejection left every panel on its empty state with no explanation.
+        try {
+            d = await get_rl_ladder();
+            cells = list(d["cells"]);
+            curve = list(d["curve"]);
+            keys = list(d["curve_keys"]);
+            # `sg`/`v84` were indexed blind — an older payload without them threw
+            # a KeyError here and killed the whole mount, including the corrected
+            # charts below.
+            if "sg" in d and d["sg"] is not None {
+                sgd = d["sg"];
+                sgcells = list(sgd["cells"]);
+                sgcurve = list(sgd["curve"]);
+                sgkeys = list(sgd["curve_keys"]);
+            }
+            if "v84" in d and d["v84"] is not None {
+                v84d = d["v84"];
+                v84cells = list(v84d["cells"]);
+                v84curve = list(v84d["curve"]);
+                v84keys = list(v84d["curve_keys"]);
+            }
+        } except Exception as e {
+            loadErr = "ladder load failed · " + str(e);
+        }
+        try {
+            cr = await get_rl_corrected();
+            corrLadder = list(cr["ladder"]);
+            corrHold = list(cr["holdouts"]);
+            corrJourney = list(cr["journey"]);
+            corrKscale = list(cr["kscale"]);
+        } except Exception as e {
+            loadErr = (loadErr + " · " if loadErr else "") + "corrected results failed · " + str(e);
+        }
     }
 
     has_live = len(cells) > 0;
@@ -177,16 +206,20 @@ def:pub Results -> JsxElement {
             <span className="micro-label text-muted-foreground/80">{(str(len(cells)) + " cells") if has_live else "no ladder run yet"}</span>
         </div>
 
+        {loadErr and <div key="reserr" className="border-b border-border px-4 py-1.5">
+            <span className="stat-line" style={{"color": "var(--danger)"}}>{loadErr}</span>
+        </div>}
+
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
             <div className="relative rounded-md border border-emerald-900/40 bg-card p-3 pt-4">
                 <span className="micro-label absolute -top-2 left-3 bg-background px-2 text-emerald-500/80">THE STORY · a measurement bug hid an 11%→94% Jac generator</span>
                 <ResponsiveContainer width="100%" height={210}>
                     <LineChart data={corrJourney} margin={{"top": 14, "right": 20, "left": 0, "bottom": 0}}>
-                        <CartesianGrid stroke="#1c1c1f" vertical={False} />
-                        <XAxis dataKey="stage" tick={{"fill": "#888", "fontSize": 9, "fontFamily": "'Geist Mono', ui-monospace, monospace"}} tickLine={False} axisLine={{"stroke": "#333"}} interval={0} />
-                        <YAxis tick={_tick()} tickLine={False} axisLine={False} width={40} domain={[0, 100]} ticks={PCT_TICKS} unit="%" />
-                        <Tooltip cursor={{"fill": "#ffffff08"}} contentStyle={{"background": "var(--background)", "border": "1px solid #333", "borderRadius": 0, "fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 11}} labelStyle={{"color": "#777"}} itemStyle={{"color": "#fafafa"}} />
-                        <Line type="monotone" dataKey="acc" name="holdout accuracy %" stroke="#9ec98f" strokeWidth={2} dot={{"r": 4, "fill": "#9ec98f"}} isAnimationActive={False} />
+                        <CartesianGrid stroke={gridStroke()} vertical={False} />
+                        <XAxis dataKey="stage" tick={{"fill": "var(--label)", "fontSize": 9, "fontFamily": MONO}} tickLine={False} axisLine={{"stroke": axisStroke()}} interval={0} />
+                        <YAxis tick={tick()} tickLine={False} axisLine={False} width={40} domain={[0, 100]} ticks={PCT_TICKS} unit="%" />
+                        <Tooltip cursor={FILL_CURSOR} contentStyle={tipContentStyle()} labelStyle={tipLabelStyle()} itemStyle={tipItemStyle()} />
+                        <Line type="monotone" dataKey="acc" name="holdout accuracy %" stroke={chartColor(5)} strokeWidth={2} dot={{"r": 4, "fill": chartColor(5)}} isAnimationActive={False} />
                     </LineChart>
                 </ResponsiveContainer>
             </div>
@@ -195,13 +228,13 @@ def:pub Results -> JsxElement {
                 <span className="micro-label absolute -top-2 left-3 bg-background px-2 text-emerald-500/80">CORRECTED LADDER · greedy vs pass@8 · pure-fn holdout (n=18) · jac-qwen3coder</span>
                 <ResponsiveContainer width="100%" height={230}>
                     <BarChart data={corrLadder} margin={{"top": 10, "right": 14, "left": 0, "bottom": 0}}>
-                        <CartesianGrid stroke="#1c1c1f" vertical={False} />
-                        <XAxis dataKey="cell" tick={_tick()} tickLine={False} axisLine={{"stroke": "#333"}} />
-                        <YAxis tick={_tick()} tickLine={False} axisLine={False} width={40} domain={[0, 100]} ticks={PCT_TICKS} unit="%" />
-                        <Tooltip cursor={{"fill": "#ffffff08"}} contentStyle={{"background": "var(--background)", "border": "1px solid #333", "borderRadius": 0, "fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 11}} labelStyle={{"color": "#777"}} itemStyle={{"color": "#fafafa"}} />
-                        <Legend wrapperStyle={{"fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 10, "color": "#777"}} />
-                        <Bar dataKey="greedy" name="greedy pass@1" fill="#7aa2f7" isAnimationActive={False} />
-                        <Bar dataKey="passk" name="pass@8 (~best-of-k)" fill="#9ec98f" isAnimationActive={False} />
+                        <CartesianGrid stroke={gridStroke()} vertical={False} />
+                        <XAxis dataKey="cell" tick={tick()} tickLine={False} axisLine={{"stroke": axisStroke()}} />
+                        <YAxis tick={tick()} tickLine={False} axisLine={False} width={40} domain={[0, 100]} ticks={PCT_TICKS} unit="%" />
+                        <Tooltip cursor={FILL_CURSOR} contentStyle={tipContentStyle()} labelStyle={tipLabelStyle()} itemStyle={tipItemStyle()} />
+                        <Legend wrapperStyle={{"fontFamily": MONO, "fontSize": 10, "color": "var(--muted-foreground)"}} />
+                        <Bar dataKey="greedy" name="greedy pass@1" fill={chartColor(1)} isAnimationActive={False} />
+                        <Bar dataKey="passk" name="pass@8 (~best-of-k)" fill={chartColor(5)} isAnimationActive={False} />
                     </BarChart>
                 </ResponsiveContainer>
                 <div className="stat-line mt-1 text-muted-foreground/80">SFT lifts greedy 39%→61% (peak rung-20); GRPO≈SFT; raw-GRPO=base. The v1 "SFT does nothing" was the eval bug.</div>
@@ -211,15 +244,15 @@ def:pub Results -> JsxElement {
                 <span className="micro-label absolute -top-2 left-3 bg-background px-2 text-emerald-500/80">BEST-OF-K + COMPILER VERIFIER · base vs SFT · across 3 holdouts</span>
                 <ResponsiveContainer width="100%" height={230}>
                     <BarChart data={corrHold} margin={{"top": 10, "right": 14, "left": 0, "bottom": 0}}>
-                        <CartesianGrid stroke="#1c1c1f" vertical={False} />
-                        <XAxis dataKey="name" tick={_tick()} tickLine={False} axisLine={{"stroke": "#333"}} />
-                        <YAxis tick={_tick()} tickLine={False} axisLine={False} width={40} domain={[0, 100]} ticks={PCT_TICKS} unit="%" />
-                        <Tooltip cursor={{"fill": "#ffffff08"}} contentStyle={{"background": "var(--background)", "border": "1px solid #333", "borderRadius": 0, "fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 11}} labelStyle={{"color": "#777"}} itemStyle={{"color": "#fafafa"}} />
-                        <Legend wrapperStyle={{"fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 10, "color": "#777"}} />
-                        <Bar dataKey="greedy_base" name="greedy·base" fill="#4b5563" isAnimationActive={False} />
-                        <Bar dataKey="greedy_sft" name="greedy·SFT" fill="#7aa2f7" isAnimationActive={False} />
-                        <Bar dataKey="bok_base" name="best-of-k·base" fill="#6b8f5e" isAnimationActive={False} />
-                        <Bar dataKey="bok_sft" name="best-of-k·SFT" fill="#9ec98f" isAnimationActive={False} />
+                        <CartesianGrid stroke={gridStroke()} vertical={False} />
+                        <XAxis dataKey="name" tick={tick()} tickLine={False} axisLine={{"stroke": axisStroke()}} />
+                        <YAxis tick={tick()} tickLine={False} axisLine={False} width={40} domain={[0, 100]} ticks={PCT_TICKS} unit="%" />
+                        <Tooltip cursor={FILL_CURSOR} contentStyle={tipContentStyle()} labelStyle={tipLabelStyle()} itemStyle={tipItemStyle()} />
+                        <Legend wrapperStyle={{"fontFamily": MONO, "fontSize": 10, "color": "var(--muted-foreground)"}} />
+                        <Bar dataKey="greedy_base" name="greedy·base" fill={chartColor(3)} isAnimationActive={False} />
+                        <Bar dataKey="greedy_sft" name="greedy·SFT" fill={chartColor(1)} isAnimationActive={False} />
+                        <Bar dataKey="bok_base" name="best-of-k·base" fill={chartColor(4)} isAnimationActive={False} />
+                        <Bar dataKey="bok_sft" name="best-of-k·SFT" fill={chartColor(5)} isAnimationActive={False} />
                     </BarChart>
                 </ResponsiveContainer>
                 <div className="stat-line mt-1 text-muted-foreground/80">best-of-k+compiler-verifier is the universal win (deploy==oracle: the compiler is a perfect picker). Conversion+SFT peaks at 82%. Fresh model dead (gap 0). clean n=16 → 94%.</div>
@@ -229,11 +262,11 @@ def:pub Results -> JsxElement {
                 <span className="micro-label absolute -top-2 left-3 bg-background px-2 text-emerald-500/80">SAMPLING BUDGET vs ACCURACY · more samples, more solved (compiler picks)</span>
                 <ResponsiveContainer width="100%" height={200}>
                     <BarChart data={corrKscale} margin={{"top": 10, "right": 14, "left": 0, "bottom": 0}}>
-                        <CartesianGrid stroke="#1c1c1f" vertical={False} />
-                        <XAxis dataKey="k" tick={_tick()} tickLine={False} axisLine={{"stroke": "#333"}} />
-                        <YAxis tick={_tick()} tickLine={False} axisLine={False} width={40} domain={[0, 100]} ticks={PCT_TICKS} unit="%" />
-                        <Tooltip cursor={{"fill": "#ffffff08"}} contentStyle={{"background": "var(--background)", "border": "1px solid #333", "borderRadius": 0, "fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 11}} labelStyle={{"color": "#777"}} itemStyle={{"color": "#fafafa"}} />
-                        <Bar dataKey="acc" name="pure-fn accuracy %" fill="#7aa2f7" isAnimationActive={False} />
+                        <CartesianGrid stroke={gridStroke()} vertical={False} />
+                        <XAxis dataKey="k" tick={tick()} tickLine={False} axisLine={{"stroke": axisStroke()}} />
+                        <YAxis tick={tick()} tickLine={False} axisLine={False} width={40} domain={[0, 100]} ticks={PCT_TICKS} unit="%" />
+                        <Tooltip cursor={FILL_CURSOR} contentStyle={tipContentStyle()} labelStyle={tipLabelStyle()} itemStyle={tipItemStyle()} />
+                        <Bar dataKey="acc" name="pure-fn accuracy %" fill={chartColor(1)} isAnimationActive={False} />
                     </BarChart>
                 </ResponsiveContainer>
                 <div className="stat-line mt-1 text-muted-foreground/80">greedy 39% → k=8 72% → k=32 89%. The correct Jac is reachable; the compiler finds it among samples.</div>
@@ -350,14 +383,14 @@ def:pub Results -> JsxElement {
                 <span className="micro-label absolute -top-2 left-3 bg-background px-2">PHASE 1 · WARM-START LIFT · holdout pass%</span>
                 <ResponsiveContainer width="100%" height={200}>
                     <BarChart data={PHASE1} margin={{"top": 10, "right": 14, "left": 0, "bottom": 0}}>
-                        <CartesianGrid stroke="#1c1c1f" vertical={False} />
-                        <XAxis dataKey="model" tick={_tick()} tickLine={False} axisLine={{"stroke": "#333"}} />
-                        <YAxis tick={_tick()} tickLine={False} axisLine={False} width={40} domain={[0, 100]} ticks={PCT_TICKS} unit="%" />
-                        <Tooltip cursor={{"fill": "#ffffff08"}} contentStyle={{"background": "var(--background)", "border": "1px solid #333", "borderRadius": 0, "fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 11}} labelStyle={{"color": "#777"}} itemStyle={{"color": "#fafafa"}} />
-                        <Legend wrapperStyle={{"fontFamily": "'Geist Mono', ui-monospace, monospace", "fontSize": 10, "color": "#777"}} />
-                        <Bar dataKey="BASE" fill={STROKES[0]} isAnimationActive={False} />
-                        <Bar dataKey="WARM" fill={STROKES[1]} isAnimationActive={False} />
-                        <Bar dataKey="GRPO" fill={STROKES[2]} isAnimationActive={False} />
+                        <CartesianGrid stroke={gridStroke()} vertical={False} />
+                        <XAxis dataKey="model" tick={tick()} tickLine={False} axisLine={{"stroke": axisStroke()}} />
+                        <YAxis tick={tick()} tickLine={False} axisLine={False} width={40} domain={[0, 100]} ticks={PCT_TICKS} unit="%" />
+                        <Tooltip cursor={FILL_CURSOR} contentStyle={tipContentStyle()} labelStyle={tipLabelStyle()} itemStyle={tipItemStyle()} />
+                        <Legend wrapperStyle={{"fontFamily": MONO, "fontSize": 10, "color": "var(--muted-foreground)"}} />
+                        <Bar dataKey="BASE" fill={chartColor(1)} isAnimationActive={False} />
+                        <Bar dataKey="WARM" fill={chartColor(0)} isAnimationActive={False} />
+                        <Bar dataKey="GRPO" fill={chartColor(5)} isAnimationActive={False} />
                     </BarChart>
                 </ResponsiveContainer>
             </div>

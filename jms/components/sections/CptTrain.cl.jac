@@ -14,9 +14,11 @@ import from ..shared.StatusGlyph { StatusGlyph }
 import from ..shared.StatTile { StatTile }
 import from ..shared.LogView { LogView }
 import from ..shared.MonoChart { MonoChart }
+import from ...lib.chartkit { chartColor }
 
 glob RUN_NAME: str = "cpt-v1";
-glob CC: dict = {"loss": "#d8a657", "lr": "#7aa2f7", "tps": "#6fc3b2"};
+# chartkit palette SLOTS, not hex: the old literals were dark-theme-only.
+glob CC: dict = {"loss": 0, "lr": 1, "tps": 5};
 
 def _fix(v: any, n: int) -> str {
     return str(v.toFixed(n));
@@ -147,9 +149,9 @@ def:pub CptTrain(active: bool) -> JsxElement {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-                <MonoChart title="LOSS · train + val" data={train} secondary={val} live={feed == "live"} accent={str(CC["loss"])} expY={False} />
-                <MonoChart title="LEARNING.RATE" data={lr} secondary={[]} live={False} accent={str(CC["lr"])} expY={True} />
-                <MonoChart title="TOKENS/SEC" data={tps} secondary={[]} live={feed == "live"} accent={str(CC["tps"])} expY={False} />
+                <MonoChart title="LOSS · train + val" data={train} secondary={val} live={feed == "live"} accent={chartColor(int(str(CC["loss"])))} expY={False} />
+                <MonoChart title="LEARNING.RATE" data={lr} secondary={[]} live={False} accent={chartColor(int(str(CC["lr"])))} expY={True} />
+                <MonoChart title="TOKENS/SEC" data={tps} secondary={[]} live={feed == "live"} accent={chartColor(int(str(CC["tps"])))} expY={False} />
             </div>
 
             <LogView text={status is not None and status["log_tail"] and str(status["log_tail"]) or ""} maxH="16rem" />

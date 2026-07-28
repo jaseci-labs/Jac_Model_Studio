@@ -281,108 +281,250 @@ node Workspace {
     }
 }
 
+# --- the core rail ----------------------------------------------------------
+# Every Experiments workspace shows the SAME six sections, in this order:
+#   CHAT · DATA · TRAIN · EVALS · CLOUD · PLAN
+# Only the *component* behind a section id varies per workspace (see
+# _CORE_RAIL_COMPONENTS); workspace 02 additionally keeps RESULTS + GENERATE at
+# the tail because those are RL-only features with no meaning elsewhere.
+#
+# This is the single source of truth for BOTH first-run seeding (_seed_one_workspace)
+# and the backfill migration (_migrate_core_rail), so the two can never drift.
+glob _CORE_RAIL: list[dict] = [
+    {"id": "chat", "label": "CHAT", "component": "Chat"},
+    {"id": "data", "label": "DATA", "component": "Data"},
+    {"id": "train", "label": "TRAIN", "component": "Train"},
+    {"id": "evals", "label": "EVALS", "component": "Evals"},
+    {"id": "cloud", "label": "CLOUD", "component": "Cloud"},
+    {"id": "plan", "label": "PLAN", "component": "Plan"}
+];
+
+# Per-workspace component overrides for core rail ids. Anything not listed uses
+# the generic component from _CORE_RAIL above — so a user-created workspace ("05")
+# still gets a sensible six-item rail.
+glob _CORE_RAIL_COMPONENTS: dict[str, any] = {
+    "02": {"data": "RlData"},
+    "03": {"data": "CptData", "train": "CptTrain"},
+    "04": {"data": "CptSftData", "plan": "CptSftPlan"}
+};
+
+# RL-only tail sections, workspace 02 only.
+glob _RL_TAIL: list[dict] = [
+    {"id": "results", "label": "RESULTS", "component": "Results"},
+    {"id": "generate", "label": "GENERATE", "component": "Generate"}
+];
+
+# Canonical render position of every known section id. Used by the migration to
+# slot new sections in at the right place relative to what is already there.
+glob _CORE_RANK: dict[str, int] = {
+    "chat": 0, "data": 1, "train": 2, "evals": 3,
+    "cloud": 4, "plan": 5, "results": 6, "generate": 7
+};
+
+"""The full section spec (id/label/component, in render order) for one workspace."""
+def _rail_spec_for(wid: str) -> list[dict] {
+    over = _dict_of(_CORE_RAIL_COMPONENTS.get(wid));
+    out: list[dict] = [];
+    for item in _CORE_RAIL {
+        d = dict(item);
+        sid = str(d["id"]);
+        if sid in over { d["component"] = str(over[sid]); }
+        out.append(d);
+    }
+    if wid == "02" {
+        for item in _RL_TAIL { out.append(dict(item)); }
+    }
+    return out;
+}
+
 # Fixed workspace set used to seed the graph on first run. Mirrors the old
 # filesystem-discovered layout (01 SFT/DPO, 02 RL/GRPO, 03 CPT) — each now carries
-# an arbitrary `files` list the user can repoint to anything they want.
+# an arbitrary `files` list the user can repoint to anything they want. Sections
+# are NOT listed here: they come from _rail_spec_for(id) so seed and migration
+# stay in lockstep.
 glob _SEED_WORKSPACES: list[dict] = [
     {
         "id": "01",
         "label": "SFT/DPO",
         "accent": "ws01",
         "default_model": "qwen-dpo",
-        "files": ["01-sft-dpo"],
-        "sections": [
-            {"id": "chat", "label": "CHAT", "component": "Chat", "order": 0},
-            {"id": "data", "label": "DATA", "component": "Data", "order": 1},
-            {"id": "train", "label": "TRAIN", "component": "Train", "order": 2},
-            {"id": "evals", "label": "EVALS", "component": "Evals", "order": 3},
-            {"id": "cloud", "label": "CLOUD", "component": "Cloud", "order": 4}
-        ]
+        "files": ["01-sft-dpo"]
     },
     {
         "id": "02",
         "label": "RL/GRPO",
         "accent": "ws02",
         "default_model": "qwen3coder-rl",
-        "files": ["02-rl-grpo"],
-        "sections": [
-            {"id": "chat", "label": "CHAT", "component": "Chat", "order": 0},
-            {"id": "data", "label": "DATA", "component": "RlData", "order": 1},
-            {"id": "results", "label": "RESULTS", "component": "Results", "order": 2},
-            {"id": "generate", "label": "GENERATE", "component": "Generate", "order": 3}
-        ]
+        "files": ["02-rl-grpo"]
     },
     {
         "id": "03",
         "label": "CPT",
         "accent": "ws03",
         "default_model": "qwen-q4",
-        "files": ["03-new"],
-        "sections": [
-            {"id": "chat", "label": "CHAT", "component": "Chat", "order": 0},
-            {"id": "data", "label": "DATA", "component": "CptData", "order": 1},
-            {"id": "train", "label": "TRAIN", "component": "CptTrain", "order": 2},
-            {"id": "plan", "label": "PLAN", "component": "Plan", "order": 3}
-        ]
+        # was "03-new" — that directory does not exist; the attempt dir was
+        # renamed to 03-cpt-only (matches studio.workspace.toml's [cpt] paths).
+        "files": ["03-cpt-only"]
     },
     {
         "id": "04",
         "label": "CPT-SFT",
         "accent": "ws04",
         "default_model": "qwen-cpt-v1",
-        "files": ["04-cpt-sft"],
-        "sections": [
-            {"id": "chat", "label": "CHAT", "component": "Chat", "order": 0},
-            {"id": "data", "label": "DATA", "component": "CptSftData", "order": 1},
-            {"id": "train", "label": "TRAIN", "component": "Train", "order": 2},
-            {"id": "evals", "label": "EVALS", "component": "Evals", "order": 3},
-            {"id": "cloud", "label": "CLOUD", "component": "Cloud", "order": 4},
-            {"id": "plan", "label": "PLAN", "component": "CptSftPlan", "order": 5}
-        ]
+        "files": ["04-cpt-sft"]
     }
 ];
 
-"""Create the fixed workspace set on the graph the first time (idempotent).
-After seeding the graph is the source of truth — these nodes persist to SQLite
-and survive restarts. A no-op once any Workspace node exists."""
-def _ensure_cloud_section(ws: Workspace) -> None {
-    if ws.wid != "01" { return; }
-    for sec in [ws -->][?:WorkspaceSection] {
-        if sec.sid == "cloud" { return; }
-    }
-    ws ++> WorkspaceSection(sid="cloud", label="CLOUD", component="Cloud", order=4);
+# --- one-shot graph migrations ----------------------------------------------
+# `_ensure_workspaces_seeded` is a no-op once ANY Workspace exists, so changing
+# _CORE_RAIL alone does nothing for a user whose graph is already in SQLite.
+# Migrations below patch those live graphs. Each is guarded by a marker NODE
+# (root --> GraphMigration) rather than a new `has` field on Workspace: adding a
+# field to a persisted archetype has to survive unpickling of nodes written by
+# the older schema, whereas a brand-new node type is always safe. The marker also
+# gives requirement "run exactly once" for free — if the user deliberately
+# deletes CLOUD afterwards, the migration is already marked and never resurrects it.
+
+node GraphMigration {
+    has name: str = "";
 }
 
-# Construct one Workspace (+ its sections) from a _SEED_WORKSPACES spec at the given
+def _migration_applied(name: str) -> bool {
+    for m in [root -->][?:GraphMigration] {
+        if m.name == name { return True; }
+    }
+    return False;
+}
+
+def _mark_migration(name: str) -> None {
+    if _migration_applied(name) { return; }
+    root ++> GraphMigration(name=name);
+    return;
+}
+
+glob _CORE_RAIL_MIGRATION: str = "core_rail_v1";
+
+"""Add the core-rail sections this workspace is missing. Purely additive: never
+deletes, relabels, or re-components a section that is already there.
+
+Ordering: if the workspace still looks untouched (every section id is a known
+rail id AND their current `order` already agrees with _CORE_RANK), the whole rail
+is renumbered to the canonical ranks so the result renders in the intended
+sequence. If the user has reordered the rail or added a section of their own, we
+do NOT renumber — new sections are appended after the highest existing order, so
+their layout survives intact."""
+def _apply_core_rail(ws: Workspace) -> None {
+    existing = [s for s in [ws -->][?:WorkspaceSection]];
+    have: list[str] = [];
+    for s in existing { have.append(s.sid); }
+
+    missing: list[dict] = [];
+    for item in _rail_spec_for(ws.wid) {
+        if str(item["id"]) not in have { missing.append(item); }
+    }
+    if len(missing) == 0 { return; }
+
+    existing.sort(key=lambda s: WorkspaceSection -> int { return s.order; });
+    untouched = True;
+    prev = -1;
+    for s in existing {
+        if s.sid not in _CORE_RANK { untouched = False; break; }
+        rank = int(_CORE_RANK[s.sid]);
+        if rank <= prev { untouched = False; break; }
+        prev = rank;
+    }
+
+    if untouched {
+        for item in missing {
+            ws ++> WorkspaceSection(
+                sid=str(item["id"]), label=str(item["label"]),
+                component=str(item["component"]),
+                order=int(_CORE_RANK[str(item["id"])])
+            );
+        }
+        for s in existing { s.order = int(_CORE_RANK[s.sid]); }
+        return;
+    }
+
+    nxt = 0;
+    for s in existing {
+        if s.order >= nxt { nxt = s.order + 1; }
+    }
+    for item in missing {
+        ws ++> WorkspaceSection(
+            sid=str(item["id"]), label=str(item["label"]),
+            component=str(item["component"]), order=nxt
+        );
+        nxt = nxt + 1;
+    }
+    return;
+}
+
+"""Give every already-seeded workspace the uniform six-item rail. Runs at most
+once per root; a fresh graph is seeded with the rail already correct and is
+marked done immediately, so this body never executes for new users."""
+def _migrate_core_rail() -> None {
+    if _migration_applied(_CORE_RAIL_MIGRATION) { return; }
+    for ws in [root -->][?:Workspace] {
+        _apply_core_rail(ws);
+    }
+    _mark_migration(_CORE_RAIL_MIGRATION);
+    return;
+}
+
+glob _WS03_FILES_MIGRATION: str = "ws03_files_v1";
+
+"""One-shot repair of workspace 03's stale `files` entry. The attempt dir was
+renamed 03-new -> 03-cpt-only (studio.workspace.toml's [cpt] paths already point
+at the new name, and model-experiments/03-new does not exist). Fixing the seed
+alone would only help fresh installs, so patch already-seeded graphs too — but
+ONLY when `files` still holds the exact broken value, so a list the user has
+since repointed is never overwritten."""
+def _migrate_ws03_files() -> None {
+    if _migration_applied(_WS03_FILES_MIGRATION) { return; }
+    for ws in [root -->][?:Workspace] {
+        if ws.wid == "03" and list(ws.files) == ["03-new"] {
+            ws.files = ["03-cpt-only"];
+        }
+    }
+    _mark_migration(_WS03_FILES_MIGRATION);
+    return;
+}
+
+# Construct one Workspace (+ its rail) from a _SEED_WORKSPACES spec at the given
 # sort index. `root ++> Workspace(...)` returns a LIST — unwrap [0] before any
 # attribute/edge access (a real bug class this file has hit before).
 def _seed_one_workspace(spec: dict, sort_index: int) -> None {
+    wid = str(spec["id"]);
     ws = (root ++> Workspace(
-        wid=str(spec["id"]),
+        wid=wid,
         label=str(spec["label"]),
         accent=str(spec["accent"]),
         default_model=str(spec["default_model"]),
         files=[str(f) for f in (spec["files"] as list)],
         sort_order=sort_index
     ))[0];
-    for sec in (spec["sections"] as list) {
-        sd = sec as dict;
+    for item in _rail_spec_for(wid) {
         ws ++> WorkspaceSection(
-            sid=str(sd["id"]),
-            label=str(sd["label"]),
-            component=str(sd["component"]),
-            order=int(sd["order"])
+            sid=str(item["id"]),
+            label=str(item["label"]),
+            component=str(item["component"]),
+            order=int(_CORE_RANK[str(item["id"])])
         );
     }
+    return;
 }
 
+"""Create the fixed workspace set on the graph the first time, then keep an
+already-seeded graph current. After seeding the graph is the source of truth —
+these nodes persist to SQLite and survive restarts."""
 def _ensure_workspaces_seeded() -> None {
     existing = [root -->][?:Workspace];
     if len(existing) > 0 {
         # Already-seeded graph (persisted to SQLite): the initial-seed loop below
         # never re-runs, so a NEW _SEED_WORKSPACES entry (e.g. workspace 04) would
         # be skipped forever. Backfill any spec whose wid isn't on the graph yet,
-        # then run the existing cloud-section backfill for 01.
+        # then backfill the core rail onto the workspaces seeded by older builds.
         present: list[str] = [];
         for ws in existing { present.append(ws.wid); }
         for (i, spec) in enumerate(_SEED_WORKSPACES) {
@@ -390,14 +532,18 @@ def _ensure_workspaces_seeded() -> None {
                 _seed_one_workspace(spec, i);
             }
         }
-        for ws in [root -->][?:Workspace] {
-            _ensure_cloud_section(ws);
-        }
+        _migrate_core_rail();
+        _migrate_ws03_files();
         return;
     }
     for (i, spec) in enumerate(_SEED_WORKSPACES) {
         _seed_one_workspace(spec, i);
     }
+    # Freshly seeded graphs are already correct — mark both migrations spent so
+    # they can never re-add a section (or rewrite a path) the user later changed.
+    _mark_migration(_CORE_RAIL_MIGRATION);
+    _mark_migration(_WS03_FILES_MIGRATION);
+    return;
 }
 
 """All workspaces on the caller's root, ordered by sort_order then wid."""

@@ -3,7 +3,13 @@
 The workspace switcher now lives in the top <WorkspaceBar/>; this rail carries only
 the section tiles for whichever workspace is active, one per row. Sections are read
 from the graph via ui_layout (root --> Workspace --> Section). The active tile marks
-itself with a --ws-accent bar (stamped on the shell root via data-ws)."""
+itself with a --ws-accent bar (stamped on the shell root via data-ws).
+
+Every glyph stroke is `currentColor` (inherited from the tile's text colour) so
+the icons track light/dark and the active/inactive tile states. The two baseline
+axis rules (train + results sparkline) previously hardcoded `stroke="#444"`,
+which was invisible on dark and wrong on light; they are now `currentColor` at
+0.45 opacity."""
 
 def _glyph(s: str) -> JsxElement {
     if s == "chat" {
@@ -13,7 +19,7 @@ def _glyph(s: str) -> JsxElement {
     }
     if s == "train" {
         return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.25">
-            <path d="M2 13h12" stroke="#444" />
+            <path d="M2 13h12" opacity="0.45" />
             <path d="M2 3c3 0 3 7 6 7 2 0 3-2 6-2" />
         </svg>;
     }
@@ -39,9 +45,12 @@ def _glyph(s: str) -> JsxElement {
         </svg>;
     }
     if s == "plan" {
+        # Milestone flag. Was a 3-line list + checkmark, which read as a muddy
+        # blend of `data` (3 stacked bars) and `evals` (grid + checkmark) at 16px.
+        # A pole-and-pennant silhouette is unambiguous at that size.
         return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.25">
-            <path d="M3 4h7M3 8h5M3 12h4" />
-            <path d="M10.5 11.5l1.5 1.5L14.5 10" />
+            <path d="M4 2.5v11" />
+            <path d="M4 3.75h8l-2 2.25 2 2.25H4z" strokeLinejoin="miter" />
         </svg>;
     }
     if s == "cloud" {
@@ -51,7 +60,7 @@ def _glyph(s: str) -> JsxElement {
     }
     # results (also the old rl fallback): sparkline + point
     return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.25">
-        <path d="M2 13h12" stroke="#444" />
+        <path d="M2 13h12" opacity="0.45" />
         <path d="M2 11l3-3 3 2 5-6" strokeLinejoin="miter" />
         <circle cx="13" cy="4" r="1.2" fill="currentColor" stroke="none" />
     </svg>;

@@ -15,10 +15,19 @@ def:pub Generate -> JsxElement {
 
     async def doGen() -> None {
         genBusy = True; genJac = ""; genNote = "sampling 8 completions + compiler-verifying (~1-2 min, loads the model)…";
-        r = await rl_generate(genPrompt, 8);
-        genBusy = False;
-        genJac = str(r["jac"]);
-        genNote = ("✓ " + str(r["note"])) if r["verified"] else ("⚠ " + str(r["note"]));
+        # This is the app's longest, most failure-prone call (loads a 30B model).
+        # Unguarded it rejected unhandled and left genBusy=True — the button
+        # disabled forever with the note frozen on "sampling…".
+        try {
+            r = await rl_generate(genPrompt, 8);
+            genJac = str(r["jac"]);
+            genNote = ("✓ " + str(r["note"])) if r["verified"] else ("⚠ " + str(r["note"]));
+        } except Exception as e {
+            genJac = "";
+            genNote = "✗ generation failed · " + str(e);
+        } finally {
+            genBusy = False;
+        }
     }
 
     return <div className="flex h-full min-w-0 flex-1 flex-col">
@@ -32,6 +41,7 @@ def:pub Generate -> JsxElement {
                 <span className="micro-label absolute -top-2 left-3 bg-background px-2">GENERATE JAC · best-of-k + compiler verifier (~78%)</span>
                 <textarea
                     className="exp-input resize-y"
+                    aria-label="prompt for Jac generation"
                     rows={4} value={genPrompt} onChange={lambda (e: ChangeEvent) { genPrompt = str(e.target.value); }}
                     placeholder="Describe the Jac function to generate…" />
                 <div className="mt-2 flex items-center gap-3">

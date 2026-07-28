@@ -538,10 +538,21 @@ def spheron_instances(status: str = "") -> dict {
         if status { query["status"] = status; }
         rows: any = _request("GET", "/api/deployments", query=query);
         out: list[dict] = [];
+        # Ownership scoping used to call _key_source() (a graph scan) AND
+        # _owns_deployment() (another full graph scan) once PER ROW. Both are
+        # hoisted: the key source is resolved once and the owned-deployment ids
+        # are collected into a set in a single pass.
+        ks = _key_source();
+        owned: set = set();
+        if ks != "user" {
+            for dep in [root -->][?:SpheronDeployment] {
+                if not dep.terminated_at { owned.add(str(dep.deployment_id)); }
+            }
+        }
         if isinstance(rows, list) {
             for o in rows {
                 did = str(_f(o, "id", ""));
-                if _key_source() != "user" and not _owns_deployment(did) { continue; }
+                if ks != "user" and did not in owned { continue; }
                 out.append(_deployment_view(o));
             }
         }
@@ -774,18 +785,44 @@ def _dispatch_status_from(deployment_status: str) -> str {
     return "running";
 }
 
+# Message prefix written when a stop's terminate call failed — the VM may still
+# be up and billing. _dispatch_view derives billing_alert from it.
+glob _TERM_FAIL: str = "terminate failed:";
+
+# Each _refresh_dispatch is one HTTPS call with a 30s timeout, so a list of N
+# non-terminal dispatches used to be an N x 30s request (10 dispatches = 300s).
+# Cap how many any single list call may refresh.
+glob _MAX_REFRESH_PER_CALL: int = 4;
+
+"""True for a dispatch status that is never re-polled."""
+def _dispatch_terminal(d: SpheronDispatch) -> bool {
+    return d.status == "done" or d.status == "failed" or d.status == "stopped";
+}
+
 """Poll the backing deployment and refresh dispatch status. Spheron exposes no
 log tail, so log_tail is always '' — the UI tells the user to SSH in."""
 def _refresh_dispatch(d: SpheronDispatch) -> dict {
-    if d.status == "done" or d.status == "failed" or d.status == "stopped" {
+    if _dispatch_terminal(d) {
         return _dispatch_view(d, "");
     }
     inst = spheron_instance(d.deployment_id);
     if not bool(inst["ok"]) {
-        # Deployment gone (terminated/expired) -> mark done.
-        d.status = "done";
-        d.finished = _now();
-        d.message = str(inst["error"]);
+        # spheron_instance returns ok=False for ANY failure — a network blip, a
+        # 30s timeout, an expired key, an ownership miss. Treating all of those
+        # as "deployment gone" closed the dispatch permanently (the terminal
+        # short-circuit above stops all further polling), so a LIVE, still-
+        # BILLING GPU read as finished. Only the API's definitive not-found (the
+        # exact string spheron_instance builds when the deployment is absent from
+        # the response) closes it; anything else leaves the status untouched and
+        # surfaces the error in `message`, and the next poll retries.
+        err = str(inst["error"]);
+        if err == "deployment " + d.deployment_id + " not found" {
+            d.status = "done";
+            d.finished = _now();
+            d.message = err;
+        } else {
+            d.message = f"status unavailable ({err}) · left running, will retry";
+        }
         return _dispatch_view(d, "");
     }
     dep_status = str(_f(inst["instance"], "cur_state", ""));
@@ -801,7 +838,14 @@ def _refresh_dispatch(d: SpheronDispatch) -> dict {
 }
 
 def _dispatch_view(d: SpheronDispatch, log_tail: str) -> dict {
+    # billing_alert mirrors cloudruns._view: "we could not prove the VM is gone".
+    # ponytail: derived from the message prefix stop_spheron_dispatch writes
+    # rather than a new `has` field on SpheronDispatch (adding one to a node
+    # archetype that already has persisted rows is the riskier change). Ceiling —
+    # the flag is cleared by the next successful poll, which overwrites `message`;
+    # by then the status itself is truthful, which is the point of the fix.
     return {
+        "billing_alert": (not _dispatch_terminal(d)) and d.message.startswith(_TERM_FAIL),
         "id": d.did,
         "deployment_id": d.deployment_id,
         "name": d.name,
@@ -901,14 +945,36 @@ def dispatch_training_job(
     return {"ok": True, "dispatch": _dispatch_view(d, ""), "error": ""};
 }
 
-"""All dispatches recorded for the caller (newest first)."""
+"""All dispatches recorded for the caller (newest first).
+
+Terminal dispatches are returned from graph state with NO network call, and at
+most _MAX_REFRESH_PER_CALL of the non-terminal ones are actually re-polled — one
+30s-timeout HTTPS call each, so an uncapped list was an N x 30s request. Nothing
+is truncated: every dispatch is still in `dispatches` (skipped ones carry their
+last known state), and the skipped ids are named in `refresh_skipped`.
+ponytail: the cap is applied in graph order, so on a long backlog the same
+dispatches get refreshed each call. Ceiling — poll a specific one with
+get_spheron_dispatch(did), which always refreshes."""
 def list_spheron_dispatches() -> dict {
     rows: list[dict] = [];
+    skipped: list[str] = [];
+    refreshed = 0;
     for d in [root -->][?:SpheronDispatch] {
-        rows.append(_refresh_dispatch(d));
+        if _dispatch_terminal(d) {
+            rows.append(_dispatch_view(d, ""));
+        } elif refreshed < _MAX_REFRESH_PER_CALL {
+            refreshed = refreshed + 1;
+            rows.append(_refresh_dispatch(d));
+        } else {
+            skipped.append(str(d.did));
+            rows.append(_dispatch_view(d, ""));
+        }
     }
     rows.sort(key=lambda (r: dict) -> str { return str(r["started"]); }, reverse=True);
-    return {"dispatches": rows};
+    if skipped {
+        audit.log("spheron_dispatch_refresh_skipped", {"count": len(skipped), "dispatch_ids": skipped});
+    }
+    return {"dispatches": rows, "refresh_skipped": skipped};
 }
 
 """Poll one dispatch by id — refreshes status from the backing deployment."""
@@ -925,10 +991,21 @@ def stop_spheron_dispatch(did: str) -> dict {
     if d is None { return {"ok": False, "dispatch": {}, "error": "not found"}; }
     if d.status == "running" {
         term = destroy_gpu_instance(d.deployment_id);
-        d.status = "stopped";
-        d.finished = _now();
-        d.message = "deployment terminated" if bool(term["ok"]) else f"terminate failed: {str(term['error'])}";
-        audit.log("spheron_dispatch_stop", {"dispatch_id": did, "deployment_id": d.deployment_id});
+        if bool(term["ok"]) {
+            d.status = "stopped";
+            d.finished = _now();
+            d.message = "deployment terminated";
+        } else {
+            # The terminate FAILED, so the VM is very likely still up and still
+            # billing. Do NOT mark the dispatch stopped (it used to, unconditionally,
+            # which made a live GPU read as stopped and stopped it being polled).
+            # Status stays as-is and billing_alert goes up in _dispatch_view.
+            d.message = f"{_TERM_FAIL} {str(term['error'])}";
+        }
+        audit.log("spheron_dispatch_stop", {
+            "dispatch_id": did, "deployment_id": d.deployment_id,
+            "terminated": bool(term["ok"])
+        });
     }
     return {"ok": True, "dispatch": _dispatch_view(d, ""), "error": ""};
 }

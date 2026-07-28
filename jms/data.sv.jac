@@ -55,8 +55,58 @@ def _read_lines(rel: str) -> list {
     return out;
 }
 
+# Memoized non-blank line counts. Key = "<absolute path>|<st_mtime_ns>|<st_size>",
+# so any write to the file (which necessarily bumps mtime_ns and/or size) misses
+# the cache — a stale count is impossible short of a same-nanosecond same-size
+# rewrite. The absolute path carries the per-user/data-root prefix, so two tenants
+# pointed at different roots can never collide on a bare filename.
+glob _LINE_COUNT_CACHE: dict[str, int] = {};
+glob _LINE_COUNT_CAP: int = 512;
+
+"""Non-blank line count of *p*, streamed in 1 MiB binary chunks (the file is never
+loaded whole) and memoized on (path, mtime_ns, size). Missing file -> 0.
+
+# ponytail: byte-level `.strip()` (ASCII whitespace) instead of the text-mode
+# `str.strip()` the old full-read path used, and no lone-CR ("\r"-only) line-ending
+# translation. Both only differ for a line whose sole content is a lone CR or a
+# non-ASCII space — impossible in the JSONL these paths count."""
+def _count_lines_cached(p: Path) -> int {
+    try {
+        st = p.stat();
+    } except Exception {
+        return 0;
+    }
+    key = str(p) + "|" + str(st.st_mtime_ns) + "|" + str(st.st_size);
+    hit = _LINE_COUNT_CACHE.get(key);
+    if hit is not None { return int(hit); }
+    nl = "\n".encode();
+    n = 0;
+    rem = "".encode();
+    try {
+        with open(p, "rb") as fc {
+            while True {
+                chunk = fc.read(1048576);
+                if not chunk { break; }
+                parts = (rem + chunk).split(nl);
+                rem = parts[len(parts) - 1];
+                i = 0;
+                while i < len(parts) - 1 {
+                    if parts[i].strip() { n += 1; }
+                    i += 1;
+                }
+            }
+        }
+    } except Exception {
+        return 0;
+    }
+    if rem.strip() { n += 1; }
+    if len(_LINE_COUNT_CACHE) > _LINE_COUNT_CAP { _LINE_COUNT_CACHE.clear(); }
+    _LINE_COUNT_CACHE[key] = n;
+    return n;
+}
+
 def _line_count(rel: str) -> int {
-    return len(_read_lines(rel));
+    return _count_lines_cached(_abs(rel));
 }
 
 def _fence(text: str, lang: str) -> str {
@@ -225,7 +275,7 @@ def rl_dataset_files(source: str) -> list[FileRefView] {
     out: list[FileRefView] = [];
     pairs = (workspace.rl_preview_files().get(source, []) as list[list[str]]);
     for pair in pairs {
-        out.append(FileRefView(path=pair[0], label=pair[1], count=len(_rl_read_lines(pair[0]))));
+        out.append(FileRefView(path=pair[0], label=pair[1], count=_count_lines_cached(paths.resolve(pair[0], "workspace"))));
     }
     return out;
 }
@@ -254,9 +304,9 @@ def rl_dataset_rows(source: str, path: str, offset: int, limit: int) -> dict {
 non-empty line is validated as JSON with the required schema (DPO needs
 prompt/chosen/rejected; SFT needs a messages list). Returns {added, errors, total}.
 
-# studio: the original used a binary seek(-1, 2) to test for a trailing newline;
-# here read_text().endswith is simpler and the file is small (also re-read by
-# _line_count). Unknown targets return an error dict instead of raising."""
+# studio: like the original, a binary seek(-1, 2) tests for the trailing newline —
+# no whole-file read to inspect one byte. The closing _line_count streams the file
+# once (memoized). Unknown targets return an error dict instead of raising."""
 def add_examples(target: str, jsonl: str) -> dict {
     if target not in workspace.append_targets() {
         return {"added": 0, "errors": [f"unknown target: {target}"], "total": 0};
@@ -293,7 +343,16 @@ def add_examples(target: str, jsonl: str) -> dict {
         p = _abs(rel);
         p.parent.mkdir(parents=True, exist_ok=True);
         if p.exists() and p.stat().st_size > 0 {
-            if not p.read_text().endswith("\n") {
+            # One-byte seek instead of reading the whole file to inspect its last
+            # byte (the original studio code did exactly this seek(-1, 2)).
+            ends_nl = True;
+            try {
+                with open(p, "rb") as fs {
+                    fs.seek(-1, 2);
+                    ends_nl = fs.read(1) == "\n".encode();
+                }
+            } except Exception { ends_nl = True; }
+            if not ends_nl {
                 with open(p, "a") as fa {
                     fa.write("\n");
                 }

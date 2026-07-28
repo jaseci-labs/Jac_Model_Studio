@@ -7,6 +7,7 @@ when you peek at another workspace. The last workspace is remembered in
 localStorage; first-ever visit lands on the last discovered attempt (highest NN).
 """
 
+import from react { useEffect, useRef }
 sv import from ..models { system_ram }
 sv import from ..workspace { ui_layout }
 import from ..auth_session { handleUnauthorized }
@@ -16,6 +17,11 @@ import from .Offline { Offline }
 import from .SectionMount { SectionMount }
 import from .WorkspaceSettings { WorkspaceSettings }
 import from .AssistantPanel { AssistantPanel }
+import from .jms.ApiKeyModal { ApiKeyModal }
+import from .shared.CommandPalette { CommandPalette }
+import from .shared.Shortcuts { ShortcutSheet, isTypingTarget, toggleTheme }
+import from .shared.Toast { ToastHost }
+import from .shared.JobWatch { JobWatch }
 
 """Fresh per-workspace section pointers (first section in each workspace)."""
 def _defaultSections(layout: any) -> dict {
@@ -67,6 +73,70 @@ def _resolveWs(layout: any, x: str) -> str {
     return "";
 }
 
+"""Section ids of one workspace, in rail order — the `[` / `]` cycle order."""
+def _sectionIds(layout: any, ws: str) -> list {
+    out: list = [];
+    if layout is None { return out; }
+    for w in list(layout["workspaces"]) {
+        wd = w as dict;
+        if str(wd["id"]) == ws {
+            for sec in list(wd["sections"]) {
+                sd = sec as dict;
+                out.append(str(sd["id"]));
+            }
+        }
+    }
+    return out;
+}
+
+"""Command-palette menu for the Experiments surface. Order here IS display
+order (the palette does not re-rank), so categories stay contiguous."""
+def _expActions(layout: any, workspace: str) -> list {
+    out: list = [];
+    if layout is None { return out; }
+    n: int = 0;
+    for w in list(layout["workspaces"]) {
+        wd = w as dict;
+        wid = str(wd["id"]);
+        n += 1;
+        out.append({
+            "id": "ws:" + wid,
+            "group": "WORKSPACE",
+            "label": wid + " " + str(wd["label"]),
+            "hint": str(n) if n <= 6 else ""
+        });
+    }
+    for w in list(layout["workspaces"]) {
+        wd = w as dict;
+        if str(wd["id"]) != workspace { continue; }
+        for sec in list(wd["sections"]) {
+            sd = sec as dict;
+            out.append({
+                "id": "sec:" + str(sd["id"]),
+                "group": "SECTION",
+                "label": str(sd["label"]),
+                "hint": ""
+            });
+        }
+    }
+    out.append({"id": "nav:hub", "group": "GO TO", "label": "Hub — the landing screen", "hint": "g h"});
+    out.append({"id": "nav:jms", "group": "GO TO", "label": "JMS — project pipeline", "hint": ""});
+    out.append({"id": "ui:settings", "group": "SETTINGS", "label": "Workspaces settings drawer", "hint": ""});
+    out.append({"id": "ui:keys", "group": "SETTINGS", "label": "Provider API keys", "hint": ""});
+    out.append({"id": "ui:theme", "group": "SETTINGS", "label": "Toggle light / dark", "hint": "t"});
+    out.append({"id": "ui:help", "group": "SETTINGS", "label": "Keyboard shortcuts", "hint": "?"});
+    return out;
+}
+
+"""Cross-surface navigation. frontend.cl.jac routes on the URL hash and listens
+for hashchange, so writing the hash is the whole hop."""
+def _goHash(h: str) -> None {
+    try {
+        w: any = window;
+        w.location.hash = h;
+    } except Exception { }
+}
+
 """Flatten workspace × section mounts for a single JSX iteration pass."""
 def _allSlots(layout: any) -> list[dict] {
     out: list[dict] = [];
@@ -92,7 +162,10 @@ def:pub AppShell(onHub: any = None) -> JsxElement {
         workspace: str = "03",
         sections: dict = {},
         online: int = -1,
-        settingsOpen: bool = False;
+        settingsOpen: bool = False,
+        paletteOpen: bool = False,
+        sheetOpen: bool = False,
+        keyModalOpen: bool = False;
 
     async def probe -> None {
         try {
@@ -144,8 +217,18 @@ def:pub AppShell(onHub: any = None) -> JsxElement {
             }
         } except Exception { }
         await probe();
-        setInterval(lambda -> None { probe(); }, 3000);
     }
+
+    # Liveness poller. Deliberately NOT inside `can with entry`: that block's
+    # compiled cleanup can't see an id assigned later, so every hub↔experiments
+    # round-trip (which unmounts AppShell) used to leak another permanent 3s
+    # timer — and a zombie probe() failing calls handleUnauthorized() →
+    # signalExpired() → jacLogout(), i.e. an unmounted shell could log the user
+    # out. Effect-local id + cleanup, same shape as Cloud/Train.
+    useEffect(lambda {
+        iv: any = setInterval(lambda { probe(); }, 3000);
+        return lambda { clearInterval(float(str(iv))); };
+    }, []);
 
     def goWorkspace(wsId: str) -> None {
         workspace = wsId;
@@ -171,6 +254,82 @@ def:pub AppShell(onHub: any = None) -> JsxElement {
         vis = ws == workspace and s == str(sections[ws]);
         return "flex min-w-0 flex-1 reveal" if vis else "hidden";
     }
+
+    """Cycle the active workspace's sections (the `[` / `]` bindings)."""
+    def moveSection(delta: int) -> None {
+        if layout is None { return; }
+        ids: list = _sectionIds(layout, workspace);
+        if len(ids) == 0 { return; }
+        curId: str = str(sections[workspace]) if workspace in sections else "";
+        at: int = 0;
+        i: int = 0;
+        for sid in ids {
+            if str(sid) == curId { at = i; }
+            i += 1;
+        }
+        go(str(ids[(at + delta + len(ids)) % len(ids)]));
+    }
+
+    """The `1`–`6` bindings: Nth workspace in layout order."""
+    def wsByIndex(n: int) -> None {
+        if layout is None { return; }
+        ids: list = list(layout["workspace_ids"]);
+        if n >= 0 and n < len(ids) { goWorkspace(str(ids[n])); }
+    }
+
+    def goHub -> None {
+        if onHub is not None { onHub(); }
+    }
+
+    """Single dispatch point for every palette entry built by _expActions."""
+    def runAction(aid: str) -> None {
+        if aid.startswith("ws:") { goWorkspace(aid[3:]); return; }
+        if aid.startswith("sec:") { go(aid[4:]); return; }
+        if aid == "nav:hub" { goHub(); return; }
+        if aid == "nav:jms" { _goHash("jms"); return; }
+        if aid == "ui:settings" { settingsOpen = True; return; }
+        if aid == "ui:keys" { keyModalOpen = True; return; }
+        if aid == "ui:theme" { toggleTheme(); return; }
+        if aid == "ui:help" { sheetOpen = True; return; }
+    }
+
+    # `g h` chord state lives in a ref, never a `has`: the keydown listener is a
+    # closure and a `has` read inside it goes stale. The listener is added and
+    # REMOVED in the same effect; deps carry every value the handler reads, so
+    # the registered closure is always the current one.
+    gRef: any = useRef(0.0);
+    useEffect(lambda {
+        doc: any = document;
+        onKey = lambda(e: any) {
+            k: str = str(e.key);
+            meta: bool = bool(e.metaKey) or bool(e.ctrlKey);
+            if meta and (k == "k" or k == "K") {
+                e.preventDefault();
+                paletteOpen = not paletteOpen;
+                return;
+            }
+            if meta or bool(e.altKey) { return; }
+            # never steal a key the user is typing into a field
+            if isTypingTarget(e) { return; }
+            if paletteOpen { return; }
+            if k == "?" { sheetOpen = not sheetOpen; return; }
+            if sheetOpen { return; }
+            if k == "g" { gRef.current = Date.now(); return; }
+            if k == "h" {
+                if (Date.now() - float(str(gRef.current))) < 900.0 {
+                    gRef.current = 0.0;
+                    goHub();
+                }
+                return;
+            }
+            if k == "t" { toggleTheme(); return; }
+            if k == "[" { moveSection(-1); return; }
+            if k == "]" { moveSection(1); return; }
+            if k in ["1", "2", "3", "4", "5", "6"] { wsByIndex(int(k) - 1); return; }
+        };
+        doc.addEventListener("keydown", onKey);
+        return lambda { doc.removeEventListener("keydown", onKey); };
+    }, [layout, workspace, sections, paletteOpen, sheetOpen]);
 
     if online == 0 {
         return <Offline />;
@@ -231,9 +390,24 @@ def:pub AppShell(onHub: any = None) -> JsxElement {
         <WorkspaceSettings
             open={settingsOpen}
             layout={layout}
+            activeWorkspace={workspace}
             onClose={lambda -> None { settingsOpen = False; }}
             onChanged={handleLayoutChange}
         />
+
+        {keyModalOpen and <ApiKeyModal open={True} onClose={lambda { keyModalOpen = False; }} />}
+
+        <CommandPalette
+            open={paletteOpen}
+            actions={_expActions(layout, workspace)}
+            onRun={runAction}
+            onClose={lambda { paletteOpen = False; }}
+        />
+
+        <ShortcutSheet open={sheetOpen} onClose={lambda { sheetOpen = False; }} />
+
+        <ToastHost />
+        <JobWatch />
 
         <AssistantPanel pageContext={"Experiments surface · workspace " + workspace + (" · section " + str(sections[workspace]) if workspace in sections else "")} />
     </div>;

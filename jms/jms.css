@@ -13,18 +13,7 @@
 /* .jms-btn* unified with .exp-btn* in global.css */
 
 /* ------------------------------------------------------- landing layout --- */
-.jms-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 14px clamp(16px, 2.5vw, 32px);
-  background: var(--bar);
-  backdrop-filter: var(--blur);
-  -webkit-backdrop-filter: var(--blur);
-  border-bottom: 1px solid var(--border-alt);
-  flex-shrink: 0;
-}
+/* .jms-topbar unified with .exp-topbar in global.css */
 
 .jms-footer {
   display: flex;
@@ -32,6 +21,35 @@
   justify-content: center;
   padding: 10px clamp(16px, 2.5vw, 32px);
   border-top: 1px solid var(--border-alt);
+  flex-shrink: 0;
+}
+/* 3-slot variant: keyboard hint (start) · tagline (still optically centred) ·
+   live "at a glance" readout (end). A grid with a 1fr/auto/1fr track set keeps
+   the middle slot centred against the VIEWPORT rather than against its two
+   uneven neighbours, and the row stays exactly one 11px mono line tall — the
+   landing page is height-budgeted (see .jms-hero-grid's flex:1), so growing
+   the footer would shrink the frozen hero panels. */
+.jms-footer-3 {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: clamp(8px, 1.5vw, 24px);
+}
+.jms-footer-3 > :first-child { justify-self: start; }
+.jms-footer-3 > :last-child { justify-self: end; }
+/* both edge slots may overflow on a narrow window — clip rather than wrap
+   (a wrapped second line would change the footer height) */
+.jms-footer-3 > * { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.jms-glance {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: color var(--dur-fast) var(--ease-out);
+}
+.jms-glance:hover { color: var(--text); }
+.jms-live-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent);
   flex-shrink: 0;
 }
 
@@ -45,24 +63,75 @@
   overflow: hidden;
 }
 
+/* was justify-content:flex-start with a big top pad, which top-anchored the copy
+   and left ~400px of dead panel below it. Centring fills the panel at any height. */
 .jms-hero-panel {
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
+  justify-content: center;
   align-items: flex-start;
   gap: clamp(10px, 1.6vh, 20px);
   min-height: 0;
   min-width: 0;
-  padding: clamp(48px, 8vh, 96px) clamp(20px, 3vw, 52px) clamp(20px, 3vw, 52px);
+  padding: clamp(28px, 4vh, 56px) clamp(20px, 3vw, 52px);
   overflow: hidden;
   cursor: pointer;
   text-align: left;
 }
-.jms-hero-panel:hover {
-  transform: translateY(-2px);
-}
 .jms-hero-panel:hover .jms-hero-kicker {
   color: var(--jms-accent);
+}
+
+/* --- hero motion-only additions -------------------------------------------
+   The two hero panels are FROZEN: their resting appearance must stay
+   byte-identical. Everything below is opacity-0 at rest, so it adds nothing to
+   the paint until the pointer (or keyboard focus) arrives, and adds nothing to
+   layout at all (an absolutely positioned child is not a flex item).
+   An ambient accent wash over the panel's empty lower half was built here and
+   then removed: the theme went FLAT (theme.css — no mesh, no tint, orange only
+   as a solid highlight), and a radial accent gradient is exactly the ambience
+   that theme is defined against. */
+
+/* "↵ ENTER" affordance — the panels are real <button>s and tab-reachable, but
+   nothing said so. Absolutely positioned + opacity 0, so the resting panel is
+   unchanged; it fades in on hover AND on keyboard focus. */
+.jms-hero-enter {
+  position: absolute;
+  top: clamp(16px, 2.2vh, 26px);
+  right: clamp(16px, 2vw, 30px);
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--jms-font-mono);
+  font-size: 10px;
+  font-weight: var(--weight-med);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  opacity: 0;
+  transform: translateY(-5px);
+  pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.jms-hero-panel:hover .jms-hero-enter,
+.jms-hero-panel:focus-visible .jms-hero-enter {
+  opacity: 1;
+  transform: none;
+  color: var(--accent);
+}
+.jms-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 17px;
+  padding: 0 4px;
+  line-height: 15px;
+  color: inherit;
+  border: 1px solid var(--border-alt);
+  border-radius: calc(var(--radius) * 0.25);
+  background: var(--surface);
+  letter-spacing: 0;
 }
 
 .jms-hero-word {
@@ -81,10 +150,27 @@
   height: 3px;
   border-radius: 2px;
   background: linear-gradient(90deg, var(--accent), var(--accent-soft));
-  transition: width 200ms ease;
+  transition: width var(--dur-fast) var(--ease-out);
+  transform-origin: left center;
 }
 .jms-hero-panel:hover .jms-hero-accent-tick {
   width: 56px;
+}
+/* the tick DRAWS itself in after its panel has landed. Two deliberate choices,
+   both in service of the frozen hero:
+   - scaleX, not width: the hover rule above animates `width`, and a filled
+     animation on the same property would outrank it forever.
+   - fill-mode `backwards`, not `both`: backwards alone covers the delay window
+     (the tick is invisible until its turn). Adding `forwards` left a settled
+     `matrix(1,0,0,1,0,0)` on the element — an identity transform, but enough to
+     promote it to its own layer and shift the anti-aliasing of the 34x3 bar by
+     up to 11/255 per channel against the untouched page. `backwards` drops the
+     transform the moment the animation ends, so the settled hero is pixel-for-
+     pixel the page that was there before. */
+.jms-tick-draw { animation: jmsTickDraw var(--dur-base) var(--ease-out) backwards; }
+@keyframes jmsTickDraw {
+  from { transform: scaleX(0); opacity: 0; }
+  to { transform: scaleX(1); opacity: 1; }
 }
 
 /* floating pill nav (DESIGN.md §4 navigation) */
@@ -97,14 +183,101 @@
   padding: 8px 18px; border-radius: 999px;
   background: var(--bar); backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
   border: 1px solid var(--border); box-shadow: var(--shadow-nav), var(--inner-hi);
+  transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
 }
+/* no hover TRANSFORM here on purpose: .jms-pillnav also carries `.reveal`, and a
+   filled animation's final transform outranks a declarative one — the lift would
+   simply never paint. Rim + shadow are unaffected. */
+.jms-pillnav:hover { border-color: var(--accent); box-shadow: var(--shadow-soft), var(--inner-hi); }
+/* wordmark colour moved off an inline style in Landing.cl.jac so it can react to
+   hover at all. Same resting value (--text); a letter-spacing tween was tried
+   first and rejected — the pill is width:fit-content, so it reflowed and shoved
+   the ThemeSwitcher sideways. */
+.jms-pillnav .jms-label { color: var(--text); }
+.jms-pillnav:hover .jms-label { color: var(--accent); }
+
 /* depth row beneath the two entries */
 .jms-feature-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(12px,1.4vw,20px);
   padding: 0 clamp(16px,2.5vw,32px) clamp(14px,2vw,28px); }
-.jms-feature {
-  padding: 16px 18px; border-radius: var(--radius);
-  background: var(--surface); backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
-  border: 1px solid var(--border); box-shadow: var(--shadow-soft), var(--inner-hi);
+.jms-feature { padding: 16px 18px; overflow: hidden; }  /* surface unified with .exp-panel in global.css */
+/* .jms-feature was the one glass surface on this page with NO hover state at
+   all. FLAT-theme hover vocabulary only — a crisp accent rim, one step of
+   surface (a real step in dark, a no-op in light where both tokens are #fff, so
+   light leans on --shadow-soft instead), and solid-orange highlights that draw
+   themselves in. A translucent accent sheen sweep lived here first and was
+   removed when the theme went flat: it was a background wash, which is the one
+   thing the flat theme rules out. Everything additive lives on absolutely
+   positioned children so the card's box never changes size (see
+   .jms-footer-3's note on the page height budget). */
+.jms-feature:hover {
+  border-color: var(--accent);
+  background: var(--surface-strong);
+  box-shadow: var(--shadow-soft), var(--inner-hi);
+}
+/* accent rule that draws itself along the card's bottom edge on hover — the
+   same gesture as the hero's accent tick, so the row reads as one family */
+.jms-feat-rule {
+  position: absolute;
+  left: 18px;
+  bottom: 12px;
+  width: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-soft));
+  transition: width var(--dur-base) var(--ease-out);
+}
+.jms-feature:hover .jms-feat-rule { width: 40px; }
+/* right-aligned mono tag on the card's label row. `min-height: 1.5em` is
+   load-bearing, not decoration: the label used to be a bare inline inside the
+   card's block box, so its line box was the CARD's 16px strut (1.5em = 24px).
+   Wrapping it in a flex row made it a flex item sized to its own 10px text
+   (15px), the row lost 9px, and the hero grid — which is flex:1 against it —
+   grew by exactly that much and pushed the frozen panels' contents down 5px.
+   Restoring the 1.5em line box holds the whole page's height budget still. */
+.jms-feat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 1.5em;
+}
+.jms-feat-tag {
+  font-family: var(--jms-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  opacity: 0.7;
+  flex-shrink: 0;
+  transition: color var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
+}
+.jms-feature:hover .jms-feat-tag { color: var(--accent); opacity: 1; }
+
+/* ------------------------------------------- landing load choreography ---
+   The page assembles in one deliberate pass:
+     pill nav (.05s)  →  hero panels (.10/.15s, global .stagger-2/3)
+     →  accent ticks (.30s)  →  feature cards (.35/.40/.45s)  →  footer (.50s)
+   global.css owns `.reveal` + the fadeInUp/fadeIn keyframes and a .stagger-1..6
+   ladder; this page needs more rungs than 6, so the ladder is continued here.
+   The step is derived from --dur-fast (0.3s / 6 = 0.05s — exactly global's
+   spacing) rather than hardcoded, so retuning the token retunes the sequence. */
+.jms-scope { --jms-step: calc(var(--dur-fast) / 6); }
+.jms-seq-6 { animation-delay: calc(var(--jms-step) * 6); }
+.jms-seq-7 { animation-delay: calc(var(--jms-step) * 7); }
+.jms-seq-8 { animation-delay: calc(var(--jms-step) * 8); }
+.jms-seq-9 { animation-delay: calc(var(--jms-step) * 9); }
+.jms-seq-10 { animation-delay: calc(var(--jms-step) * 10); }
+
+/* global.css's reduced-motion block cannot see these classes (they did not
+   exist when it was written, and it is not mine to edit). Same intent: kill the
+   new keyframe, collapse the ladder to zero, and stop every hover-driven draw.
+   Nothing here is load-bearing — the accent rule is decoration and the ↵ badge
+   still appears, it just stops sliding — so the resting design is intact. */
+@media (prefers-reduced-motion: reduce) {
+  .jms-tick-draw { animation: none; }
+  .jms-seq-6, .jms-seq-7, .jms-seq-8, .jms-seq-9, .jms-seq-10 { animation-delay: 0s; }
+  .jms-feature:hover .jms-feat-rule { width: 0; }
+  .jms-hero-enter { transform: none; }
 }
 
 /* ------------------------------------------------------------ JMS shell --- */
@@ -229,7 +402,7 @@
   padding: 9px 12px;
   cursor: pointer;
   text-align: left;
-  transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease;
+  transition: color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
 }
 .jms-pill:hover { color: var(--jms-fg); }
 .jms-pill-active {

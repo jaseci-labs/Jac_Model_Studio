@@ -33,6 +33,8 @@ def:pub SourcesStage(project: any = None, onRefresh: any = None) -> JsxElement {
     has useCase: str = "",
         ucInit: bool = False,
         savedFlash: bool = False,
+        ucErr: str = "",
+        srcErr: str = "",
         savingUc: bool = False,
         addPath: str = "",
         addKind: str = "code",
@@ -58,9 +60,15 @@ def:pub SourcesStage(project: any = None, onRefresh: any = None) -> JsxElement {
     async def applyUseCase -> None {
         savingUc = True;
         savedFlash = False;
+        ucErr = "";
         try {
             await update_project(_pid(), {"use_case": useCase});
-        } except Exception { }
+        } except Exception {
+            # Never flash "saved ✓" on a failed write.
+            ucErr = "save failed — the use case was NOT saved";
+            savingUc = False;
+            return;
+        }
         savingUc = False;
         savedFlash = True;
         if onRefresh is not None { await onRefresh(); }
@@ -94,14 +102,16 @@ def:pub SourcesStage(project: any = None, onRefresh: any = None) -> JsxElement {
 
     async def rescanSrc(sid: str) -> None {
         busySid = sid;
-        try { await scan_source(_pid(), sid); } except Exception { }
+        srcErr = "";
+        try { await scan_source(_pid(), sid); } except Exception { srcErr = "rescan failed"; }
         busySid = "";
         if onRefresh is not None { await onRefresh(); }
     }
 
     async def removeSrc(sid: str) -> None {
         busySid = sid;
-        try { await remove_source(_pid(), sid); } except Exception { }
+        srcErr = "";
+        try { await remove_source(_pid(), sid); } except Exception { srcErr = "remove failed"; }
         busySid = "";
         if onRefresh is not None { await onRefresh(); }
     }
@@ -116,6 +126,7 @@ def:pub SourcesStage(project: any = None, onRefresh: any = None) -> JsxElement {
                 <span className="jms-mono-dim">What should the finetuned model be good at?</span>
                 <textarea
                     className="jms-textarea"
+                    aria-label="use case"
                     value={useCase}
                     placeholder="e.g. translate idiomatic Python into idiomatic Jac (OSP graph code)…"
                     onChange={lambda e: any {
@@ -130,18 +141,20 @@ def:pub SourcesStage(project: any = None, onRefresh: any = None) -> JsxElement {
                         onClick={lambda e: MouseEvent { applyUseCase(); }}
                     >{"SAVING…" if savingUc else "SAVE"}</button>
                     {savedFlash and <span className="jms-flash">saved ✓</span>}
+                    {ucErr and <span className="jms-mono-dim" style={{"color": "var(--jms-danger)"}}>{ucErr}</span>}
                 </div>
             </div>
         </div>
 
         <div className="jms-section">
             <span className="jms-section-label">SOURCES</span>
+            {srcErr and <span key="srcerr" className="jms-mono-dim" style={{"color": "var(--jms-danger)"}}>{srcErr}</span>}
             {if len(sources) == 0 {
-                <span className="jms-mono-dim">No sources yet — add a code or docs directory below.</span>
+                <span key="if1" className="jms-mono-dim">No sources yet — add a code or docs directory below.</span>
                 skip;
             }}
             {if len(sources) > 0 {
-                <div className="flex flex-col">
+                <div key="if2" className="flex flex-col">
                     {for s in sources {
                         <div key={str(s["sid"])} className="jms-srow">
                             <span className="jms-chip">{str(s["kind"])}</span>
@@ -178,6 +191,7 @@ def:pub SourcesStage(project: any = None, onRefresh: any = None) -> JsxElement {
             <div className="flex flex-col gap-3">
                 <input
                     className="jms-input"
+                    aria-label="source path"
                     value={addPath}
                     placeholder="/absolute/path/to/repo-or-docs"
                     onChange={lambda e: any { addPath = str(e.target.value); addErr = ""; }}
@@ -196,6 +210,7 @@ def:pub SourcesStage(project: any = None, onRefresh: any = None) -> JsxElement {
                     <input
                         className="jms-input flex-1"
                         style={{"minWidth": "140px"}}
+                        aria-label="include globs"
                         value={addInc}
                         placeholder="include globs (optional, comma-sep)"
                         onChange={lambda e: any { addInc = str(e.target.value); }}
@@ -203,6 +218,7 @@ def:pub SourcesStage(project: any = None, onRefresh: any = None) -> JsxElement {
                     <input
                         className="jms-input flex-1"
                         style={{"minWidth": "140px"}}
+                        aria-label="exclude globs"
                         value={addExc}
                         placeholder="exclude globs (optional, comma-sep)"
                         onChange={lambda e: any { addExc = str(e.target.value); }}
