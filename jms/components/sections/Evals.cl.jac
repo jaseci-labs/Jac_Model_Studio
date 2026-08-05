@@ -12,6 +12,7 @@ Errors render gray (text-foreground), never red — matches the monochrome theme
 import from react { useEffect }
 sv import from ...evals { create_eval, list_evals, get_eval, stop_eval, delete_eval, EvalView }
 sv import from ...models { list_models, ModelView }
+import from ...hooks.useConfirmReset { useConfirmReset }
 import from ..shared.Field { Field, TextInput, Segmented }
 import from ..shared.StatusGlyph { StatusGlyph }
 import from ..shared.LogView { LogView }
@@ -84,6 +85,7 @@ def:pub Evals -> JsxElement {
         current: any = None,
         error: str = "",
         loaded: bool = False,
+        confirmDel: str = "",
         busy: bool = False;
 
     async def _refreshList -> None {
@@ -136,7 +138,24 @@ def:pub Evals -> JsxElement {
         return lambda { if iv is not None { clearInterval(float(str(iv))); } };
     }, [current]);
 
+    # An armed DEL ("SURE?") disarms itself on Escape, on a pointer-down outside
+    # the button, or after 4s — see hooks/useConfirmReset. Without it the armed
+    # row stayed armed forever and a later stray click deleted an eval run.
+    useConfirmReset(confirmDel, lambda -> None { confirmDel = ""; });
+
     async def start -> None {
+        # No-wasted-call guard, mirroring SourcesStage.addSrc's "path required":
+        # create_eval cannot do anything without a model, and the button below is
+        # disabled for exactly this case — this is the belt to that suspenders
+        # (Enter on a focused control, a stale render, an assistant-driven call).
+        if not (modelId or modelPath.strip()) {
+            error = "pick a model above, or type a model path, before launching";
+            return;
+        }
+        if not holdout.strip() {
+            error = "pick a holdout set before launching";
+            return;
+        }
         busy = True;
         error = "";
         lim = 0;
@@ -179,7 +198,13 @@ def:pub Evals -> JsxElement {
         await _refreshList();
     }
 
+    # Two-click confirm (first click → SURE?), the app-wide destructive-action
+    # pattern — same shape as WorkspaceSettings' DELETE and JmsProjects' card
+    # DELETE. An eval run's scores are not reproducible for free, so the one
+    # unguarded one-click delete in this surface gets the same friction.
     async def removeEval(id: str) -> None {
+        if confirmDel != id { confirmDel = id; return; }
+        confirmDel = "";
         try {
             await delete_eval(id);
             c: any = current;
@@ -204,6 +229,28 @@ def:pub Evals -> JsxElement {
         for m in models {
             if m.available { avail.append(m); }
         }
+        # Disabled-with-the-reason-stated, the guard shape GenerateStage uses for
+        # DRAFT PLAN (canDraft + hint). `modelId` is auto-picked on mount from the
+        # first AVAILABLE model, so it is empty exactly when nothing is installed —
+        # LAUNCH was clickable in that state and always failed server-side.
+        #
+        # Reachability: the MODEL chips and the HOLDOUT Segmented are
+        # click-to-deselect — clicking the ACTIVE option clears it back to "".
+        # Without that, both pickers were radio-style with a default already
+        # selected on mount, so on any machine with a model installed this guard
+        # could never fire (correct-but-dead code). The default-on-mount
+        # selection is untouched; nothing changes until a user clicks twice.
+        hasModel = bool(modelId) or bool(modelPath.strip());
+        hasHoldout = bool(holdout.strip());
+        why = "";
+        if not hasModel {
+            why = ("No model selected — pick one above, or type a model path."
+                   if len(avail) > 0
+                   else "No model available — type a model path, or install a model first.");
+        } elif not hasHoldout {
+            why = "No holdout set selected — pick FUNCTION or GRAPH above.";
+        }
+        canLaunch = hasModel and hasHoldout;
         return <div className="relative exp-panel p-4 pt-5">
             <span className="micro-label absolute -top-2 left-3 bg-background px-2">EVAL.LAUNCH</span>
             <div className="flex flex-col gap-4">
@@ -222,7 +269,11 @@ def:pub Evals -> JsxElement {
                             {for m in avail {
                                 <button
                                     key={str(m.id)}
-                                    onClick={lambda (e: MouseEvent) { modelId = m.id; modelPath = ""; }}
+                                    title={"click again to deselect" if (modelId == m.id and not modelPath) else str(m.id)}
+                                    onClick={lambda (e: MouseEvent) {
+                                        if modelId == m.id and not modelPath { modelId = ""; }
+                                        else { modelId = m.id; modelPath = ""; }
+                                    }}
                                     className={"exp-chip !text-xs " + (
                                         "exp-chip-active" if (modelId == m.id and not modelPath)
                                         else ""
@@ -244,7 +295,7 @@ def:pub Evals -> JsxElement {
                     <TextInput value={adapter} onSet={lambda (v: str) { adapter = v; }} placeholder="e.g. model-experiments/01-sft-dpo/adapters/qwen-probe" mono={True} />
                 </Field>
                 <Field label="HOLDOUT">
-                    <Segmented options={["function", "graph"]} value={holdout} onSet={lambda (v: str) { holdout = v; }} />
+                    <Segmented options={["function", "graph"]} value={holdout} onSet={lambda (v: str) { holdout = "" if holdout == v else v; }} />
                 </Field>
                 <Field label="LIMIT">
                     <TextInput value={limit} onSet={lambda (v: str) { limit = v; }} placeholder="all" mono={True} />
@@ -254,11 +305,13 @@ def:pub Evals -> JsxElement {
                 </Field>}
                 <button
                     onClick={lambda (e: MouseEvent) { start(); }}
-                    disabled={busy}
+                    disabled={bool(busy or not canLaunch)}
+                    title={why if why else "run this eval"}
                     className="exp-btn exp-btn-accent mt-1 w-full"
                 >
                     {"LAUNCHING…" if busy else "LAUNCH"}
                 </button>
+                {why and <span className="stat-line text-muted-foreground/80">{why}</span>}
                 {error and <span className="stat-line text-foreground">{error}</span>}
             </div>
         </div>;
@@ -364,9 +417,14 @@ def:pub Evals -> JsxElement {
                                     <td className="py-1.5">
                                         <button
                                             onClick={lambda (e: MouseEvent) { e.stopPropagation(); removeEval(str(r.id)); }}
-                                            className="micro-label text-muted-foreground/80 transition-colors hover:text-foreground/80"
+                                            data-confirm-armed={"1" if confirmDel == str(r.id) else None}
+                                            aria-label={("confirm delete eval " if confirmDel == str(r.id) else "delete eval ") + str(r.id)}
+                                            title={"click again to permanently delete eval " + str(r.id) if confirmDel == str(r.id) else "delete this eval run"}
+                                            className={"micro-label transition-colors hover:text-foreground/80 " + (
+                                                "text-danger" if confirmDel == str(r.id) else "text-muted-foreground/80"
+                                            )}
                                         >
-                                            DEL
+                                            {"SURE?" if confirmDel == str(r.id) else "DEL"}
                                         </button>
                                     </td>
                                 </tr>

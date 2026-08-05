@@ -16,14 +16,14 @@ clearOpenAiKey / reloadOpenAi for the OpenAI section) — never set<HasVar>
 
 Dialog semantics: `role="dialog" aria-modal="true"`, Escape closes (document
 keydown, removed in the effect cleanup), focus moves onto the card on open and
-returns to whatever was focused before (the ⚙ KEYS button) on close.
-# ponytail: no focus trap — Tab can still walk out to the page behind. Escape +
-initial focus + restore is the floor; a trap needs a shared hook that would have
-to live outside this file."""
+returns to whatever was focused before (the ⚙ KEYS button) on close. Tab /
+Shift-Tab are trapped inside the card by hooks/useFocusTrap — that shared hook is
+what the "no focus trap" note here used to be waiting on."""
 
-import from react { useEffect }
+import from react { useEffect, useRef }
 sv import from ...jms_llm { llm_status, set_anthropic_key, clear_anthropic_key }
 sv import from ...assistant { set_openai_key, clear_openai_key, assistant_providers }
+import from ...hooks.useFocusTrap { useFocusTrap }
 
 def:pub ApiKeyModal(open: bool = False, onClose: any = None) -> JsxElement {
     has status: any = None,
@@ -34,6 +34,8 @@ def:pub ApiKeyModal(open: bool = False, onClose: any = None) -> JsxElement {
         oaiKeyInput: str = "",
         oaiBusy: bool = False,
         oaiErr: str = "";
+
+    panelRef: any = useRef(None);
 
     async def reload -> None {
         try { status = await llm_status(); } except Exception { status = None; }
@@ -120,13 +122,18 @@ def:pub ApiKeyModal(open: bool = False, onClose: any = None) -> JsxElement {
             if str(e.key) == "Escape" { _close(); }
         };
         doc.addEventListener("keydown", onKey);
-        panel: any = doc.getElementById("jms-apikey-dialog");
+        panel: any = panelRef.current;
         if panel { panel.focus(); }
         return lambda {
             doc.removeEventListener("keydown", onKey);
             if prev { prev.focus(); }
         };
     }, [open]);
+
+    # Tab / Shift-Tab cycle inside the card. MUST stay below the effect above —
+    # effects run in declaration order and the trap assumes the card already
+    # focused itself. See hooks/useFocusTrap.
+    useFocusTrap(panelRef, open);
 
     if not open { return <></>; }
 
@@ -162,6 +169,7 @@ def:pub ApiKeyModal(open: bool = False, onClose: any = None) -> JsxElement {
         />
         <div
             id="jms-apikey-dialog"
+            ref={panelRef}
             role="dialog"
             aria-modal="true"
             aria-label="Provider API keys"

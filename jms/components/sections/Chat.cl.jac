@@ -107,10 +107,19 @@ def:pub Chat(workspace: str, defaultModel: str) -> JsxElement {
         return out;
     }
 
+    # "+ new chat" is a pure client-side reset — a Chat row is only created on the
+    # first send (see `send`), so eagerly calling create_chat here would litter the
+    # sidebar with empty rows. This used to reset ONLY chatId/messages/lastStats,
+    # which on the app's initial state (both already empty) made the button a
+    # visible no-op and, worse, left a half-typed `draft` and a stale `bootError`
+    # sitting in the composer of the supposedly-fresh chat. Reset everything the
+    # user can see instead.
     async def newChat -> None {
         chatId = "";
         messages = [];
         lastStats = None;
+        draft = "";
+        bootError = "";
     }
 
     async def openChat(id: str) -> None {

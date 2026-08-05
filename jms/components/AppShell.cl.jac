@@ -250,9 +250,22 @@ def:pub AppShell(onHub: any = None) -> JsxElement {
         sections = nd;
     }
 
+    """Visibility class for one section slot.
+
+    NO `reveal` here. Every section instance stays mounted and is toggled with
+    `hidden` (display:none) — and a CSS animation RESTARTS whenever an element
+    goes display:none -> displayed. `.reveal` is `opacity:0` + a 0.6s fadeInUp,
+    so putting it on this slot replayed that animation on EVERY section and
+    workspace switch: the whole content pane snapped to opacity 0 and crawled
+    back over ~600ms, exposing the bare page background — pure black in dark
+    mode. That read as the app "going black" on every tab click. This was latent
+    until the Tailwind build was fixed: while `hidden` emitted no CSS, sections
+    were never actually display:none, so the animation only ever ran once.
+    Section switching is now instant, which is what a tab swap should be.
+    """
     def slot(ws: str, s: str) -> str {
         vis = ws == workspace and s == str(sections[ws]);
-        return "flex min-w-0 flex-1 reveal" if vis else "hidden";
+        return "flex min-w-0 flex-1" if vis else "hidden";
     }
 
     """Cycle the active workspace's sections (the `[` / `]` bindings)."""
@@ -353,12 +366,19 @@ def:pub AppShell(onHub: any = None) -> JsxElement {
         };
     } except Exception { }
 
+    # ⚙ WORKSPACES is a TOGGLE, not an opener: it used to hard-set
+    # `settingsOpen = True`, so a second click on it was a no-op (only ✕ / Esc /
+    # the scrim closed the drawer). The palette entry below stays open-only —
+    # "Workspaces settings drawer" should never mean "close it".
+    # The toggle only actually WORKS because WorkspaceSettings' overlay starts at
+    # --topbar-h instead of inset-0: while it was `fixed inset-0`, the drawer
+    # panel painted over this very button and swallowed the second click.
     return <div className="flex h-screen flex-col overflow-hidden" data-ws={workspace}>
         <WorkspaceBar
             layout={layout}
             workspace={workspace}
             onWorkspace={goWorkspace}
-            onSettings={lambda -> None { settingsOpen = True; }}
+            onSettings={lambda -> None { settingsOpen = not settingsOpen; }}
             onHub={onHub}
         />
 

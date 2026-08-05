@@ -17,13 +17,16 @@ Dialog semantics follow ApiKeyModal.cl.jac: role="dialog" aria-modal="true",
 Escape (both via the container's onKeyDown and a document listener that IS
 removed in the cleanup, so a scrim click that moved focus to <body> can still
 Esc out), focus moved onto the search input on open and RESTORED to whatever was
-focused before on close.
-# ponytail: no focus trap — same ceiling as ApiKeyModal.
+focused before on close. Tab / Shift-Tab are trapped inside the panel by
+hooks/useFocusTrap (same treatment as ApiKeyModal). The search input is usually
+the only focusable stop in here, so the trap normally just pins Tab in place —
+which is the point: the page behind an `aria-modal` dialog is not tabbable.
 
 Mouse parity: hovering a row moves the selection, mousedown runs it.
 """
 
-import from react { useEffect }
+import from react { useEffect, useRef }
+import from ...hooks.useFocusTrap { useFocusTrap }
 
 """Substring hit, else subsequence hit, else False."""
 def _matches(hay: str, needle: str) -> bool {
@@ -83,6 +86,8 @@ def:pub CommandPalette(
     has query: str = "",
         cursor: int = 0;
 
+    panelRef: any = useRef(None);
+
     def _close -> None {
         if onClose is not None { onClose(); }
     }
@@ -104,6 +109,11 @@ def:pub CommandPalette(
             if prev { prev.focus(); }
         };
     }, [open]);
+
+    # Tab / Shift-Tab cycle inside the panel. MUST stay below the effect above —
+    # effects run in declaration order and the trap assumes focus already sits on
+    # the search input. See hooks/useFocusTrap.
+    useFocusTrap(panelRef, open);
 
     if not open { return <></>; }
 
@@ -144,6 +154,7 @@ def:pub CommandPalette(
         />
         <div
             id="jms-cmdk-dialog"
+            ref={panelRef}
             role="dialog"
             aria-modal="true"
             aria-label="Command palette"

@@ -235,6 +235,25 @@ def:pub TrainStage(project: any = None, onRefresh: any = None, active: bool = Tr
     def _config -> JsxElement {
         canStart = _hasTrain() and not _anyRunning() and not startBusy;
         if backend == "local-mlx" and localModel == "" { canStart = False; }
+        # Disabled-reason surfacing, the BUILD TRAINING SPLIT shape (CurateStage
+        # `_footer`): one `startHint` string feeds the button's `title` (hover),
+        # and `aria-describedby` points at whichever visible span already states
+        # that same reason so a screen reader announces it with the disabled
+        # button. The `else None` keeps the attribute off the DOM entirely when
+        # there is no reason to point at (React drops null props).
+        startHint = "";
+        startHintId = "";
+        if not _hasTrain() {
+            startHint = "Materialize a training split first (CURATE stage).";
+            startHintId = "jms-train-split-hint";
+        } elif backend == "local-mlx" and localModel == "" {
+            startHint = "No local base model available." if len(localModels) == 0
+                        else "Pick a base model above.";
+            if len(localModels) == 0 { startHintId = "jms-train-model-hint"; }
+        } elif _anyRunning() {
+            startHint = "a run is training — START unlocks when it finishes";
+            startHintId = "jms-train-running-hint";
+        }
         return <div className="jms-section flex flex-col gap-3">
             <span className="jms-section-label">TRAIN A LoRA ADAPTER</span>
             <div className="flex items-center gap-1">
@@ -260,7 +279,7 @@ def:pub TrainStage(project: any = None, onRefresh: any = None, active: bool = Tr
                         <option key={str(m["id"])} value={str(m["id"])}>{str(m["label"])} · {str(m["id"])}</option>
                     }}
                 </select>
-                {len(localModels) == 0 and <span className="jms-mono-dim" style={{"color": "var(--jms-danger)"}}>No local base model available.</span>}
+                {len(localModels) == 0 and <span id="jms-train-model-hint" className="jms-mono-dim" style={{"color": "var(--jms-danger)"}}>No local base model available.</span>}
             </div>}
 
             {backend == "spheron" and <div className="flex flex-col gap-2">
@@ -353,11 +372,13 @@ def:pub TrainStage(project: any = None, onRefresh: any = None, active: bool = Tr
                 <button
                     className="jms-btn jms-btn-accent"
                     disabled={not canStart}
+                    title={startHint if startHint else "train a LoRA adapter on the materialized split"}
+                    aria-describedby={startHintId if startHintId else None}
                     onClick={lambda e: MouseEvent { startNow(); }}
                 >{"STARTING…" if startBusy else "START TRAINING"}</button>
             </div>
-            {not _hasTrain() and <span className="jms-mono-dim" style={{"color": "var(--jms-danger)"}}>Materialize a training split first (CURATE stage).</span>}
-            {_anyRunning() and <span className="jms-mono-dim">a run is training — START unlocks when it finishes</span>}
+            {not _hasTrain() and <span id="jms-train-split-hint" className="jms-mono-dim" style={{"color": "var(--jms-danger)"}}>Materialize a training split first (CURATE stage).</span>}
+            {_anyRunning() and <span id="jms-train-running-hint" className="jms-mono-dim">a run is training — START unlocks when it finishes</span>}
             {startErr and <span className="jms-mono-dim" style={{"color": "var(--jms-danger)"}}>{startErr}</span>}
         </div>;
     }

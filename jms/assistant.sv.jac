@@ -527,6 +527,18 @@ def assistant_context() -> str {
 # rather than byllm (jms_plan.sv.jac's approach for the PLAN feature) because
 # byllm has no token-streaming API — litellm.completion(..., stream=True) does.
 # Never yields the resolved key in any frame.
+#
+# SHAPE (do not collapse back into one function): `assistant_stream` is a PLAIN
+# function that resolves grounding + the provider key and RETURNS one of the
+# `_stream_*` generators. Only that split runs the graph reads inside the
+# caller's request context — a `yield` in the endpoint itself defers the whole
+# body to a context with no user root, which is what made a configured Anthropic
+# key invisible and Claude permanently unreachable. See assistant_stream's
+# docstring.
+#
+# No error frame ever carries a raw exception: `_clean_error` logs the detail
+# server-side and returns short, actionable copy (the transcript used to receive
+# Python errno strings straight from inference.stream_chat / litellm).
 # ================================================================================
 
 glob _ASSISTANT_PREAMBLE: str = (
@@ -612,10 +624,142 @@ def _grounded_messages(messages: list[dict], context: str) -> list[dict] {
     return out;
 }
 
+"""Display name for a provider id, for user-facing error copy."""
+def _provider_label(provider: str) -> str {
+    if provider == "claude" { return "Claude"; }
+    if provider == "openai" { return "OpenAI"; }
+    return "The local model";
+}
+
+"""The 'no key configured' copy, matching how the rest of the app phrases it
+(GenerateStage: "Set an Anthropic key (⚙ KEYS, top bar) to draft with Claude.")."""
+def _no_key_message(provider: str) -> str {
+    if provider == "claude" {
+        return "Set an Anthropic key (⚙ KEYS, top bar) to chat with Claude.";
+    }
+    return "Set an OpenAI key (⚙ KEYS, top bar) to chat with OpenAI.";
+}
+
+"""Clean, user-facing text for a failure — NEVER the raw exception.
+
+The chat transcript used to receive `str(e)` verbatim (a Python errno/traceback
+string: internals leaked into the UI, and unreadable for the user). The detail
+now goes to the studio log only; the caller gets a short actionable line."""
+def _clean_error(provider: str, detail: str) -> str {
+    print("[assistant_stream] " + provider + " failed: " + detail);
+    low = detail.lower();
+    label = _provider_label(provider);
+    if ("authentication" in low or "api key" in low or "api_key" in low
+        or "401" in low or "unauthorized" in low or "permission" in low) {
+        return label + " rejected the configured API key — update it in ⚙ KEYS.";
+    }
+    if "rate limit" in low or "ratelimit" in low or "429" in low {
+        return label + " is rate-limited right now — try again in a moment.";
+    }
+    if ("timeout" in low or "timed out" in low or "connection" in low
+        or "network" in low) {
+        return "Could not reach " + label + " — check the connection and try again.";
+    }
+    if provider == "mlx" {
+        return "The local model failed to run — see the studio log for details.";
+    }
+    return label + " request failed — see the studio log for details.";
+}
+
+"""One-frame error stream. Lets the dispatcher below stay a plain (non-generator)
+function while still handing back a valid SSE generator."""
+def _error_stream(text: str) -> any {
+    yield {"kind": "error", "text": text};
+}
+
+"""Local MLX branch: mirrors chat_stream's model resolution, then delegates to
+inference.stream_chat. stream_chat surfaces its own failures as an
+`{kind:"error", text: str(e)}` frame — that text is a RAW Python error (e.g.
+"[Errno 24] Too many open files"), so it is rewritten here before it can reach
+the transcript."""
+def _stream_local(
+    grounded: list[dict], model_id: str,
+    temperature: float, top_p: float, max_tokens: int
+) -> any {
+    try {
+        m = models.model_by_id(model_id);
+        if not m {
+            yield {"kind": "error", "text": f"unknown model_id: {model_id}"};
+            return;
+        }
+        if not models.model_available(m) {
+            yield {"kind": "error", "text": f"model not found on disk: {model_id}"};
+            return;
+        }
+        path = str(models.model_path(m));
+        gen: any = inference.stream_chat(grounded, model_id, path, temperature, top_p, max_tokens);
+        for frame in gen {
+            f: dict = dict(frame);
+            if str(f.get("kind", "")) == "error" {
+                yield {"kind": "error", "text": _clean_error("mlx", str(f.get("text", "")))};
+            } else {
+                yield f;
+            }
+        }
+    } except Exception as e {
+        yield {"kind": "error", "text": _clean_error("mlx", str(e))};
+    }
+}
+
+"""Claude / OpenAI branch. `key` is resolved by the caller IN the request context
+(see `assistant_stream`) and never leaves this process."""
+def _stream_api(
+    grounded: list[dict], provider: str, model_id: str, key: str,
+    temperature: float, max_tokens: int
+) -> any {
+    model_str = ("anthropic/" if provider == "claude" else "openai/") + model_id;
+    try {
+        import litellm;
+        yield {"kind": "load", "load_s": 0.0, "model_id": model_id};
+        resp: any = litellm.completion(
+            model=model_str, messages=grounded, stream=True,
+            api_key=key, max_tokens=max_tokens, temperature=temperature
+        );
+        text = "";
+        ntok = 0;
+        for chunk in resp {
+            delta: any = chunk.choices[0].delta.content;
+            if delta is None {
+                continue;
+            }
+            text += str(delta);
+            ntok += 1;
+            yield {"kind": "token", "token": delta, "text": text};
+        }
+        yield {
+            "kind": "done", "text": text, "tokens": ntok, "tps": 0,
+            "load_s": 0, "gen_s": 0
+        };
+    } except Exception as e {
+        yield {"kind": "error", "text": _clean_error(provider, str(e))};
+    }
+}
+
 """Grounded streaming chat over any provider. Same SSE frame protocol as
 chat_stream: {kind:"load",load_s,model_id} once, {kind:"token",token,text} per
 token, {kind:"done",text,tokens,tps,load_s,gen_s} last, {kind:"error",text} on
-failure or an unrecognized provider."""
+failure, a missing key, or an unrecognized provider.
+
+THIS FUNCTION MUST NOT CONTAIN `yield`. That is the whole point of the split:
+jac-scale runs a function endpoint inside the caller's request context
+(`ExecutionManager.execute_function_sync` -> `_begin_request_context(root_id)`)
+and resets that context in its `finally` — but a generator's BODY only runs
+later, when the StreamingResponse iterates it. So a `yield` here would defer
+every graph read to a context with no user root: `resolved_anthropic_key()` read
+an EMPTY graph and returned "", and Claude answered "API key not set" even for a
+user whose key was configured (verified live) — i.e. picking Claude could never
+work unless the ANTHROPIC_API_KEY env var happened to be set. It never silently
+fell back to MLX, but it never reached Claude either.
+
+Keeping this body generator-free runs the key + grounding resolution IN the
+request context and hands back an inner generator, which jac-scale still detects
+(`isgenerator(result)`) and wraps in the same SSE StreamingResponse. Same reason
+`_grounded_messages` prefers a client-supplied `context`."""
 def assistant_stream(
     messages: list[dict], provider: str, model_id: str, context: str = "",
     temperature: float = 0.3, top_p: float = 0.9, max_tokens: int = 1536
@@ -623,62 +767,19 @@ def assistant_stream(
     grounded = _grounded_messages(messages, context);
 
     if provider == "mlx" {
-        try {
-            m = models.model_by_id(model_id);
-            if not m {
-                yield {"kind": "error", "text": f"unknown model_id: {model_id}"};
-                return;
-            }
-            if not models.model_available(m) {
-                yield {"kind": "error", "text": f"model not found on disk: {model_id}"};
-                return;
-            }
-            path = str(models.model_path(m));
-            # stream_chat guards load+generate in try/except and emits its own error frame.
-            gen: any = inference.stream_chat(grounded, model_id, path, temperature, top_p, max_tokens);
-            for frame in gen {
-                yield frame;
-            }
-        } except Exception as e {
-            yield {"kind": "error", "text": str(e)};
-        }
-        return;
+        return _stream_local(grounded, model_id, temperature, top_p, max_tokens);
     }
 
     if provider == "claude" or provider == "openai" {
+        # Same key-status source of truth the picker's `configured` flag uses
+        # (assistant_providers -> resolved_*_key). Refuse BEFORE dispatching so
+        # an unconfigured provider can never quietly land on another backend.
         key = resolved_anthropic_key() if provider == "claude" else resolved_openai_key();
         if not key {
-            yield {"kind": "error", "text": provider + " API key not set — add it in ⚙ KEYS"};
-            return;
+            return _error_stream(_no_key_message(provider));
         }
-        model_str = ("anthropic/" if provider == "claude" else "openai/") + model_id;
-        try {
-            import litellm;
-            yield {"kind": "load", "load_s": 0.0, "model_id": model_id};
-            resp: any = litellm.completion(
-                model=model_str, messages=grounded, stream=True,
-                api_key=key, max_tokens=max_tokens, temperature=temperature
-            );
-            text = "";
-            ntok = 0;
-            for chunk in resp {
-                delta: any = chunk.choices[0].delta.content;
-                if delta is None {
-                    continue;
-                }
-                text += str(delta);
-                ntok += 1;
-                yield {"kind": "token", "token": delta, "text": text};
-            }
-            yield {
-                "kind": "done", "text": text, "tokens": ntok, "tps": 0,
-                "load_s": 0, "gen_s": 0
-            };
-        } except Exception as e {
-            yield {"kind": "error", "text": str(e)};
-        }
-        return;
+        return _stream_api(grounded, provider, model_id, key, temperature, max_tokens);
     }
 
-    yield {"kind": "error", "text": f"unknown provider: {provider}"};
+    return _error_stream(f"unknown provider: {provider}");
 }

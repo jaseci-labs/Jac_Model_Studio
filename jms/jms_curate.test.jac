@@ -203,3 +203,36 @@ test "materialize carve edges: holdout_pct 0 → all train, 100 → all holdout"
     assert int(str(a["train_rows"])) == int(str(b["train_rows"])), [a, b];
     assert int(str(a["holdout_rows"])) == int(str(b["holdout_rows"])), [a, b];
 }
+
+test "materialize refuses a no-op build and never clobbers an existing split" {
+    _isolate_ws();
+    # nothing generated at all
+    v0 = create_project("Cur NoRows", "t");
+    e0 = materialize(v0.pid, 10);
+    assert "error" in e0, e0;
+    assert "train_rows" not in e0, e0;
+
+    v = create_project("Cur NoOp", "t");
+    _seed(v.pid);
+    # every row pending → still nothing to split
+    e1 = materialize(v.pid, 10);
+    assert "error" in e1, e1;
+    assert "pending" in str(e1["error"]), e1;
+
+    # every row rejected → still nothing to split
+    decide_page(v.pid, ["r0", "r1", "r2", "r3", "r4", "r5"], "reject");
+    e2 = materialize(v.pid, 10);
+    assert "error" in e2, e2;
+
+    # build a real split, then undo every decision: the refused rebuild must leave
+    # the materialized files exactly as they were (no empty overwrite).
+    decide_page(v.pid, ["r0", "r1", "r2", "r3", "r4", "r5"], "accept");
+    ok = materialize(v.pid, 10);
+    good = int(str(ok["train_rows"])) + int(str(ok["holdout_rows"]));
+    assert good == 6, ok;
+    for rid in ["r0", "r1", "r2", "r3", "r4", "r5"] { decide_row(v.pid, rid, "reset"); }
+    e3 = materialize(v.pid, 10);
+    assert "error" in e3, e3;
+    s = curate_stats(v.pid);
+    assert int(str(s["train_rows"])) + int(str(s["holdout_rows"])) == 6, s;
+}

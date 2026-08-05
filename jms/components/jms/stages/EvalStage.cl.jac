@@ -341,11 +341,28 @@ def:pub EvalStage(project: any = None, onRefresh: any = None, active: bool = Tru
     def _evalConfig -> JsxElement {
         cr = _completedRuns();
         canStart = len(cr) > 0 and evalRunRid != "" and not startBusy and not _anyRunningEval();
+        # Disabled-reason surfacing, the BUILD TRAINING SPLIT shape (CurateStage
+        # `_footer`): one `startHint` string feeds the button's `title` (hover),
+        # and `aria-describedby` points at the visible span already stating that
+        # same reason, so a screen reader announces it with the disabled button.
+        # `else None` keeps the attribute off the DOM when there is nothing to
+        # point at (React drops null props).
+        startHint = "";
+        startHintId = "";
+        if len(cr) == 0 {
+            startHint = "No completed local-mlx run with an adapter yet — train one in the TRAIN stage.";
+            startHintId = "jms-eval-run-hint";
+        } elif evalRunRid == "" {
+            startHint = "Pick a completed run above.";
+        } elif _anyRunningEval() {
+            startHint = "an eval is running — SCORE unlocks when it finishes";
+            startHintId = "jms-eval-running-hint";
+        }
         return <div className="jms-section flex flex-col gap-3">
             <span className="jms-section-label">SCORE A RUN ON ITS HOLDOUT</span>
             <div className="flex flex-col gap-1.5">
                 <span className="jms-label">COMPLETED RUN</span>
-                {len(cr) == 0 and <span className="jms-mono-dim" style={{"color": "var(--jms-danger)"}}>No completed local-mlx run with an adapter yet — train one in the TRAIN stage.</span>}
+                {len(cr) == 0 and <span id="jms-eval-run-hint" className="jms-mono-dim" style={{"color": "var(--jms-danger)"}}>No completed local-mlx run with an adapter yet — train one in the TRAIN stage.</span>}
                 {len(cr) > 0 and <select
                     className="jms-input" style={{"width": "auto", "minWidth": "260px"}}
                     aria-label="completed run to evaluate"
@@ -382,11 +399,13 @@ def:pub EvalStage(project: any = None, onRefresh: any = None, active: bool = Tru
                 <button
                     className="jms-btn jms-btn-accent"
                     disabled={not canStart}
+                    title={startHint if startHint else "score the selected run on its holdout"}
+                    aria-describedby={startHintId if startHintId else None}
                     onClick={lambda e: MouseEvent { startEvalNow(); }}
                 >{"SCORING…" if startBusy else "SCORE ON HOLDOUT"}</button>
             </div>
             {not keyConfigured and <span className="jms-mono-dim">judge needs an Anthropic key (⚙ KEYS, top bar) — similarity runs offline</span>}
-            {_anyRunningEval() and <span className="jms-mono-dim">an eval is running — SCORE unlocks when it finishes</span>}
+            {_anyRunningEval() and <span id="jms-eval-running-hint" className="jms-mono-dim">an eval is running — SCORE unlocks when it finishes</span>}
             {startNote and <span className="jms-mono-dim" style={{"color": "var(--jms-accent)"}}>{startNote}</span>}
             {startErr and <span className="jms-mono-dim" style={{"color": "var(--jms-danger)"}}>{startErr}</span>}
         </div>;

@@ -16,8 +16,11 @@ react-error-boundary = "^5.0.0"
 react-hook-form = "^7.71.0"
 zod = "^4.3.6"
 "@hookform/resolvers" = "^5.2.2"
-tailwindcss = "latest"
-"@tailwindcss/vite" = "latest"
+# Pinned (was "latest"): a floating pin lets an unrelated `jac install` silently
+# bump Tailwind and break the CSS pipeline with no diff in this repo. These are
+# the versions actually installed under .jac/client/node_modules today.
+tailwindcss = "4.3.3"
+"@tailwindcss/vite" = "4.3.3"
 tw-animate-css = "latest"
 recharts = "latest"
 clsx = "latest"
@@ -54,28 +57,115 @@ test = "jac test"
 [serve]
 base_route_app = "app"
 
+# ==============================================================================
+# jac-scale settings. THE `[plugins.scale.*]` PREFIX IS LOAD-BEARING.
+# ==============================================================================
+# These were `[scale.microservices]` / `[scale.jwt]` / `[scale.server]` for a
+# while and were DEAD CONFIG the whole time — jaclang silently discards bare
+# top-level plugin tables. Do NOT "modernize" them back. This is the same bug
+# that took Tailwind out for an extended stretch (`[client.vite]` instead of
+# `[plugins.client.vite]`, see the note further down).
+#
+# MECHANISM (jaclang 0.16.1, jac-scale 0.2.23, jac-client 0.3.22):
+#   jaclang/project/impl/config.impl.jac:373-391 — `_parse_toml_data` populates
+#     `JacConfig.plugins` ONLY from `if "plugins" in data`. No other table name
+#     is ever copied into it. A bare top-level `[client]` / `[scale]` table is
+#     parsed by tomllib and then silently discarded — no warning, no error.
+#   jaclang/project/impl/config.impl.jac:462 — `get_plugin_config(name)` is just
+#     `self.plugins.get(name, {})`, so it can only ever see `[plugins.<name>]`.
+#   jaclang/project/impl/plugin_config.impl.jac:45-46 — every plugin resolves its
+#     settings via `get_plugin_config(self.get_plugin_name())`.
+#   jac_scale/impl/config_loader.impl.jac:2-4 — `get_plugin_name()` -> "scale",
+#     i.e. jac-scale reads `[plugins.scale]`.
+#   jac_client/plugin/impl/client.impl.jac:74 — `get_plugin_config("client")`.
+#
+# VERIFIED LIVE against this exact file (JacConfig.load('jac.toml')):
+#   c.plugins.keys()             -> ['scale', 'client']
+#   c.get_plugin_config('scale') -> {'microservices': {...}, 'jwt': {...},
+#                                    'server': {...}}     # all three present
+#   get_scale_config().get_jwt_config()['secret']     -> the JWT_SECRET value
+#   get_scale_config().get_server_config()['docs_enabled'] -> False
+# (Before the rename these were `[]`, `{}`, the public shipped default
+# 'supersecretkey_for_testing_only!', and True respectively.)
+# Re-verify with that snippet after touching anything here. A running server
+# must be RESTARTED to pick up jac.toml changes.
+#
 # Single-process monolith: client `sv import` stubs call the main server in-process.
 # Disable auto-spawn / gateway microservice mode (no sv-to-sv imports in this app).
-# Jac 0.34+: top-level `[scale.*]` / `[client.*]` (old `[plugins.*]` paths are ignored).
-[scale.microservices]
+[plugins.scale.microservices]
 enabled = false
 
 # --- Production hardening (multi-tenant, shared host) --------------------------
-# See jac guide jac-sv-deploy + jac-sv-auth. The default JWT signing secret is
-# public and MUST be overridden. Interpolated from the env at start time; set
-# JWT_SECRET in the environment (start_prod.sh / systemd EnvironmentFile).
-[scale.jwt]
-secret = "${JWT_SECRET}"
+# See jac guide jac-sv-deploy + jac-sv-auth. jac-scale's shipped default signing
+# secret ('supersecretkey_for_testing_only!', jac_scale/impl/config_loader.impl
+# .jac:9) is public, so it MUST be overridden — anyone could forge a token.
+#
+# Resolution order for `secret`, interpolated at config-load time
+# (interpolate_env_vars, config.impl.jac:6-34 — `${VAR:-default}` IS supported):
+#   1. $JWT_SECRET from the environment. Prod: REQUIRED, externally provided —
+#      start_prod.sh hard-exits if it is unset, and deploy/env.example documents
+#      it for the systemd EnvironmentFile. Dev: start.sh generates a random
+#      per-machine value once and caches it in .jac/jwt_secret (gitignored).
+#   2. The literal below, only if JWT_SECRET is somehow unset (e.g. bare
+#      `jac start` bypassing start.sh). It is committed to git and therefore
+#      NOT a secret — it exists purely so dev does not break, and so the key
+#      can never silently become the un-interpolated string "${JWT_SECRET}".
+#      Never let a real deployment reach this branch.
+# Do NOT use `${JWT_SECRET:?...}` to "fail loudly": _interpolate_recursive
+# (config.impl.jac:989-995) swallows that ValueError and hands back the raw
+# string, which is worse. Enforce required-ness in the shell, as start_prod.sh does.
+#
+# NOTE: JWT_SECRET doubles as the secret-at-rest master key when JAC_SECRET_KEY
+# is unset (crypto.sv.jac:28-33). Changing it logs everyone out AND makes values
+# encrypted under the old key undecryptable — which is why start.sh CACHES its
+# generated dev secret instead of rolling a fresh one each boot.
+[plugins.scale.jwt]
+secret = "${JWT_SECRET:-dev-only-insecure-fallback-set-JWT_SECRET}"
 
-[scale.server]
+# docs_enabled=false hides /docs, /redoc and /openapi.json. Nothing in this repo
+# fetches them (the only references are the dev-proxy entries below, which just
+# forward the paths; they 404 harmlessly), so this is safe to leave on in dev too.
+[plugins.scale.server]
 docs_enabled = false             # disable /docs, /redoc, /openapi.json in prod
 suppress_health_check_logs = true
 
-# Tailwind v4 Vite plugin — must be under [client.vite] so jac regenerates
+# HTML <head> for the page jac-client renders. `app_meta_data` is the framework's
+# own hook: HeaderBuilder._build_link_tags (jac_client/plugin/impl/client.impl
+# .jac:180-190) turns the `icon` key into `<link rel=icon href=...>`, and it is
+# read on BOTH page paths — the server-rendered base_route_app page
+# (client.impl.jac:75) and the static dist/index.html emitted by a real build
+# (targets/impl/web_target.impl.jac:236). Other supported keys, unused here:
+# title, description, keywords, author, robots, theme_color, canonical,
+# apple_touch_icon, manifest, plus any `meta_*` / `link_*` / `og_*` key.
+#
+# `/favicon.svg` resolves through jac-scale's serve_root_asset, which searches
+# dist/, assets/, public/, src/, then the project root — so it finds
+# assets/favicon.svg (serve.static.impl.jac:326-337; `.svg` is allowlisted).
+#
+# This does NOT cover `jac start --dev`: the dev index.html is written by
+# ViteBundler._ensure_dev_index_html (vite_bundler.impl.jac:1197) with a
+# hardcoded <head> and no config hook, so in dev the browser gets no <link> and
+# falls back to requesting bare `/favicon.ico`. That is why assets/ ships an
+# .ico as well as the .svg, and why `"/favicon.ico"` is in the dev proxy table
+# at the bottom of this file.
+[plugins.client.app_meta_data]
+icon = "/favicon.svg"
+
+# Tailwind v4 Vite plugin — must be under [plugins.client.vite] so jac regenerates
 # vite.dev.config.js with `import tailwindcss from '@tailwindcss/vite'` +
 # `tailwindcss()` in the plugins list. Without it, @import "tailwindcss" in
 # global.css never expands utilities and the UI renders unstyled.
-[client.vite]
+#
+# The table path is NOT `[client.vite]`. jaclang 0.16's TOML parser
+# (jaclang/project/impl/config.impl.jac) only ever populates `JacConfig.plugins`
+# from a `[plugins.*]` table — a bare top-level `[client]` table is parsed and
+# then silently dropped. `JacClientConfig.load()` reads
+# `jac_config.get_plugin_config('client')`, i.e. `[plugins.client]`. With
+# `[client.vite]` the vite config generator saw an empty dict, emitted no
+# tailwindcss() plugin, and `@tailwind utilities;` (from
+# node_modules/tailwindcss/utilities.css) survived verbatim into the bundle —
+# ZERO utility classes app-wide.
+[plugins.client.vite]
 plugins = ["tailwindcss()"]
 lib_imports = ["import tailwindcss from '@tailwindcss/vite'"]
 
@@ -90,7 +180,7 @@ lib_imports = ["import tailwindcss from '@tailwindcss/vite'"]
 # `usePolling`/`interval` are repeated because the override replaces (not
 # merges with) the hardcoded block.
 # (Upstream template: jaclang/runtimelib/client/impl/vite_bundler.impl.jac)
-[client.vite.server.watch]
+[plugins.client.vite.server.watch]
 usePolling = true
 interval = 100
 ignored = [
@@ -102,3 +192,62 @@ ignored = [
     "**/.jac/desktop_deps/**",
     "**/.jac/client/dist/**",
 ]
+
+# Dev-mode API proxy table. Same last-duplicate-key-wins override mechanism as
+# `server.watch` above: `{server_config_str}` is interpolated INSIDE `server: {}`
+# right after the generator's hardcoded `proxy: {...}`, so this block replaces it
+# wholesale — which is why all eleven upstream entries are repeated verbatim
+# instead of only the two new ones.
+#
+# WHY: `jac start --dev` runs TWO servers — Vite on :8000 (serves the client,
+# what the browser is pointed at) and the real jac-scale API on :8001. Only the
+# paths listed here reach :8001; everything else is answered by Vite's SPA
+# fallback, i.e. a 404.
+#
+#   "/cl/" — the framework's OWN client-error sink. `__jacReportError()` in
+#            .jac/client/compiled/client_runtime.js installs window.onerror +
+#            unhandledrejection + a React ErrorBoundary hook, all of which POST
+#            {message, stack, url, source, componentStack, timestamp} to
+#            `${apiBase}/cl/__error__`. jac-scale DOES implement that endpoint
+#            (JacAPIServerCore._register_client_error_endpoint — source-maps the
+#            stack back to .jac files, rate-limits, logs via `logger.error`), but
+#            it was unreachable in dev because "/cl" was missing from this table.
+#            Every browser-side crash report 404'd instead of being logged.
+#            `cl_route_prefix` defaults to "cl" (jaclang/project/config.jac); if
+#            [serve] ever sets it, this key must follow.
+#
+#   "/favicon.ico", "/favicon.svg" — the backend's serve_root_asset handles
+#            root-level assets (assets/, public/, dist/, ...), but Vite runs with
+#            `publicDir: false`, so in dev these requests never leave :8000.
+#            Both icons now exist (assets/favicon.svg is the source, the .ico is
+#            a raster of it). Without the ".svg" entry a dev request for it does
+#            not 404 — it hits Vite's SPA fallback and returns index.html with
+#            `Content-Type: text/html`, i.e. a "200" that is not an image, which
+#            is a worse failure to debug than a 404. The dev <head> is hardcoded
+#            (no <link>) so only ".ico" is fetched today; ".svg" is here so dev
+#            and prod agree if that ever changes.
+#
+# Keys are written as TOML literal strings that INCLUDE the double quotes
+# ('"/cl"' -> the key `"/cl"`) because _format_config_object emits dict keys raw:
+# a bare `/cl` key would render as `/cl: {` — a JS syntax error that takes the
+# whole dev server down. Do not drop the inner quotes.
+#
+# Port 8001 is hardcoded because the generator interpolates its own `api_port`
+# and this override cannot see it; 8001 is the project-wide convention
+# (start_prod.sh: API_PORT="${JAC_API_PORT:-8001}").
+# (Upstream template: jaclang/runtimelib/client/impl/vite_bundler.impl.jac)
+[plugins.client.vite.server.proxy]
+'"/walker"' = { target = "http://localhost:8001", changeOrigin = true }
+'"/function"' = { target = "http://localhost:8001", changeOrigin = true }
+'"/user"' = { target = "http://localhost:8001", changeOrigin = true }
+'"/introspect"' = { target = "http://localhost:8001", changeOrigin = true }
+'"/static"' = { target = "http://localhost:8001", changeOrigin = true }
+'"/docs"' = { target = "http://localhost:8001", changeOrigin = true }
+'"/openapi.json"' = { target = "http://localhost:8001", changeOrigin = true }
+'"/admin"' = { target = "http://localhost:8001", changeOrigin = true }
+'"/graph"' = { target = "http://localhost:8001", changeOrigin = true }
+'"/redoc"' = { target = "http://localhost:8001", changeOrigin = true }
+'"/assets"' = { target = "http://localhost:8001", changeOrigin = true }
+'"/cl/"' = { target = "http://localhost:8001", changeOrigin = true }
+'"/favicon.ico"' = { target = "http://localhost:8001", changeOrigin = true }
+'"/favicon.svg"' = { target = "http://localhost:8001", changeOrigin = true }

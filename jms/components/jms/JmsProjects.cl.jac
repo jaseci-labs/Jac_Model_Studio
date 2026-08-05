@@ -43,6 +43,7 @@ from inside the detail view would need a new callback threaded through a
 component this file does not own. Ceiling: you rename from the list, then open."""
 
 import from react { useEffect }
+import from ...hooks.useConfirmReset { useConfirmReset }
 sv import from ...jms_projects {
     create_project, list_projects, get_project, delete_project,
     rename_project, duplicate_project,
@@ -190,6 +191,11 @@ def:pub JmsProjects(onOpen: any = None, group: str = "") -> JsxElement {
         load();
         return lambda {};
     }, [group]);
+
+    # An armed DELETE ("SURE?") disarms itself on Escape, on a pointer-down
+    # outside the button, or after 4s — see hooks/useConfirmReset. Without it the
+    # armed card stayed armed forever and a later stray click deleted a project.
+    useConfirmReset(confirmId, lambda -> None { confirmId = ""; });
 
     # Restore the search + sort choice once, on mount only.
     useEffect(lambda {
@@ -527,6 +533,7 @@ def:pub JmsProjects(onOpen: any = None, group: str = "") -> JsxElement {
                     <span className="jms-mono-dim">{str(d["created"])[:10]}</span>
                     <button
                         className={"jms-btn" + (" jms-btn-danger" if confirmId == pid else "")}
+                        data-confirm-armed={"1" if confirmId == pid else None}
                         onClick={lambda e: MouseEvent {
                             e.stopPropagation();
                             removeProj(pid);

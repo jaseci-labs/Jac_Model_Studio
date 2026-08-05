@@ -150,8 +150,19 @@ def:pub JmsShell(onHub: any = None) -> JsxElement {
         jmsWorkspace = wid;
     }
 
+    """Palette entry ("Workspaces settings drawer") — open-only on purpose."""
     def openWsSettings -> None {
         wsSettingsOpen = True;
+    }
+
+    """The ⚙ WORKSPACES bar button. Same bug as AppShell's: it was wired to
+    `openWsSettings`, so a second click on the toggle was a no-op and only
+    ✕ / Esc / the scrim could close the drawer. The toggle only actually WORKS
+    because JmsWorkspaceSettings' overlay starts at --topbar-h instead of
+    inset-0 — while it was `fixed inset-0`, the drawer panel painted over this
+    very button and swallowed the second click."""
+    def toggleWsSettings -> None {
+        wsSettingsOpen = not wsSettingsOpen;
     }
 
     """Opening the palette re-reads the project list so a project created since
@@ -288,7 +299,7 @@ def:pub JmsShell(onHub: any = None) -> JsxElement {
                 layout={jmsLayout}
                 workspace={jmsWorkspace}
                 onWorkspace={switchWs}
-                onSettings={openWsSettings}
+                onSettings={toggleWsSettings}
                 onHub={onHub}
                 onKeys={lambda -> None { keyModalOpen = True; }}
                 backLabel="‹ HOME"

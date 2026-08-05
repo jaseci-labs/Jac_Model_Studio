@@ -12,10 +12,59 @@ _WORKSPACE_DEFAULT="$(dirname "$_STUDIO_DIR")"
 export JAC_STUDIO_WORKSPACE="${JAC_STUDIO_WORKSPACE:-$_WORKSPACE_DEFAULT}"
 export JAC_STUDIO_DATA_ROOT="${JAC_STUDIO_DATA_ROOT:-$JAC_STUDIO_WORKSPACE}"
 
+# --- Open-file ceiling (must be raised BEFORE the process exists) -------------
+# UPSTREAM BUG (jaclang): `--dev` makes jaclang watch the WHOLE project via
+# `JacFileWatcher(watch_paths=[base])` — recursive, no ignore list
+# (jaclang/cli/commands/impl/execution.impl.jac). On macOS watchdog uses its
+# kqueue backend, which needs ONE OPEN FD PER WATCHED FILE AND DIRECTORY.
+# Measured with lsof on a live dev server: 17,481 fds held at idle, 11,113 of
+# them inside .jac/client/node_modules (es-toolkit alone 3,976). That is the fd
+# floor before the app serves a single request.
+#
+# NOTE the `[client.vite.server.watch].ignored` list in jac.toml is unrelated to
+# this: it governs the Vite *node child*, which holds only ~50 fds. The leak is
+# entirely on the Python side and cannot be configured away from this repo.
+#
+# launchd gives GUI-launched processes a soft limit of 256 (`launchctl limit
+# maxfiles`), so the watcher alone exhausts it and the first local model load
+# dies with `[Errno 24] Too many open files` — after which EVERY endpoint 500s
+# until a restart. Raising it here covers the watcher itself; the in-process
+# fallback in inference.sv.jac (_raise_fd_limit) cannot retroactively fix opens
+# that already failed during boot. macOS caps any request at kern.maxfilesperproc
+# (184320 here); 65536 is ample and leaves ~48k headroom over the watcher.
+# `-S` matters: bare `ulimit -n N` in bash sets the HARD limit too, permanently
+# capping this process at N. `-S` raises only the soft limit and leaves hard
+# alone, so the fallback below can still reach for the hard ceiling.
+if ! ulimit -S -n 65536 2>/dev/null; then
+  ulimit -S -n "$(ulimit -Hn)" 2>/dev/null || true
+fi
+echo "[start.sh] open-file limit: soft=$(ulimit -Sn) hard=$(ulimit -Hn)"
+
 # Local single-user desktop: the client auto-provisions one implicit local user
 # and skips the login screen (see frontend.cl.jac / auth.local_mode). Production
 # (start_prod.sh) deliberately leaves this unset so the real login gate shows.
 export JAC_LOCAL_USER="${JAC_LOCAL_USER:-1}"
+
+# JWT signing secret for dev. jac.toml's [plugins.scale.jwt] interpolates
+# ${JWT_SECRET:-...} at config load, and jac-scale's own default is the public,
+# git-committed 'supersecretkey_for_testing_only!'. Generate a random per-machine
+# value once and CACHE it under .jac/ (gitignored) so it is stable across
+# restarts: JWT_SECRET is also the secret-at-rest master key when JAC_SECRET_KEY
+# is unset (crypto.sv.jac), so a fresh value each boot would log the user out
+# every restart AND make already-encrypted Spheron credentials undecryptable.
+# Prod does the opposite on purpose: start_prod.sh REQUIRES an externally
+# provided JWT_SECRET and never generates one.
+_JWT_FILE="$_STUDIO_DIR/.jac/jwt_secret"
+if [[ -z "${JWT_SECRET:-}" && ! -s "$_JWT_FILE" ]]; then
+  mkdir -p "$(dirname "$_JWT_FILE")"
+  # `head -c 32 /dev/urandom | xxd` fallback keeps this working without openssl.
+  { openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | xxd -p | tr -d '\n'; } > "$_JWT_FILE"
+  chmod 600 "$_JWT_FILE"
+fi
+if [[ -s "$_JWT_FILE" ]]; then
+  export JWT_SECRET="${JWT_SECRET:-$(cat "$_JWT_FILE")}"
+fi
+unset _JWT_FILE
 
 # Desktop target runs the sv codespace in-process on an isolated, bundled Python
 # (under ~/.cache/jac/rt/<hash>/site). jaclang's wheel declares no deps, so that

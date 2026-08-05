@@ -44,8 +44,24 @@ def _usableToken(tok: any) -> bool {
 
 """Re-mint the implicit local-desktop JWT. No-op (returns False) in prod.
 
-Drops any stale token before re-minting so a token from a prior server process
-cannot strand the gate on <Login/> in a 401 storm."""
+MINT FIRST, THEN SWAP — never the other way round. An earlier shape called
+`jacLogout()` *before* awaiting `local_session()`, which left localStorage with
+no `jac_token` for the ~1 RTT the mint takes. `__doFuncFetch` reads the token at
+call time, so every request that started inside that window went out with no
+`Authorization` header and came back 401. That is the whole cold-start bug: on
+first paint `frontend.cl.jac`'s `[authTick, loggedIn]` effect fires
+`touchSession()` (→ here) in the same commit that mounts <Landing/>, whose
+`loadGlance()` is already walking `list_projects` → `list_runs` → `list_evals`.
+React runs child effects before parent effects, so loadGlance starts first and
+its later awaits land squarely inside the hole — hence the red
+`POST /function/list_evals 401` on every fresh load, self-healing on the next
+call because by then the token is back.
+
+The pre-clear bought nothing: `local_session()` is `def:pub` (auth.sv.jac) and
+never looks at the caller's token, so a stale JWT cannot block the mint. The
+stale-token protection it was written for is preserved — just moved to the mint
+FAILURE path, which is the only branch where a dead token would actually strand
+the gate on <Login/>."""
 async def:pub refreshLocalSession() -> bool {
     lm: bool = False;
     try {
@@ -56,18 +72,23 @@ async def:pub refreshLocalSession() -> bool {
     if not lm {
         return False;
     }
-    # Drop the stale JWT from a prior server process (secret rotates on
-    # restart → 401 storms) before asking for a fresh one.
+    tok: any = None;
+    try {
+        tok = await local_session();
+    } except Exception {
+        tok = None;
+    }
+    if _usableToken(tok) {
+        # Atomic swap: the old token stayed valid right up to this write, so no
+        # concurrent request ever saw a token-less localStorage.
+        __setLocalStorage("jac_token", str(tok).strip());
+        return True;
+    }
+    # Mint failed — NOW drop whatever is there (typically a JWT from a prior
+    # server process, whose signing secret rotated on restart) so the gate falls
+    # through to <Login/> instead of 401-storming against a dead token.
     try {
         jacLogout();
-    } except Exception {}
-    try {
-        tok: any = None;
-        tok = await local_session();
-        if _usableToken(tok) {
-            __setLocalStorage("jac_token", str(tok).strip());
-            return True;
-        }
     } except Exception {}
     return False;
 }

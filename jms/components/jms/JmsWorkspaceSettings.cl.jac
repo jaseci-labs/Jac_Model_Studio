@@ -23,6 +23,7 @@ returns to the ⚙ WORKSPACES trigger on close.
 focus + restore is the accessible floor without a shared hook module."""
 
 import from react { useEffect }
+import from ...hooks.useConfirmReset { useConfirmReset }
 sv import from ..jms_workspaces { create_jms_workspace, update_jms_workspace, delete_jms_workspace }
 
 glob ACCENTS: list[str] = ["ws01", "ws02", "ws03", "ws04", "ws05", "ws06"];
@@ -144,11 +145,23 @@ def:pub JmsWorkspaceSettings(
         };
     }, [open]);
 
+    # An armed DELETE ("SURE?") disarms itself on Escape, on a pointer-down
+    # outside the button, or after 4s — see hooks/useConfirmReset. This drawer is
+    # the 4th site of the two-click pattern (JmsProjects / Evals /
+    # WorkspaceSettings are the others) and was the one left sticky-armed: a
+    # workspace could sit armed indefinitely and a later stray click at the same
+    # screen position deleted it. Sits ABOVE the early return below — it wraps a
+    # useEffect and must run on every render.
+    useConfirmReset(confirmId, lambda -> None { confirmId = ""; });
+
     if not open or layout is None { return <></>; }
 
     wsList: list = list(layout["workspaces"]);
 
-    return <div className="fixed inset-0 z-50 flex">
+    # Same offset as the Experiments twin: starts below the top bar (--topbar-h,
+    # global.css) so the ⚙ WORKSPACES trigger isn't buried under this panel and
+    # a second click on it actually toggles the drawer shut.
+    return <div className="fixed inset-x-0 bottom-0 top-[var(--topbar-h)] z-50 flex">
         <div
             className="flex-1 g-scrim reveal-fade"
             onClick={lambda e: MouseEvent { onClose(); }}
@@ -196,7 +209,7 @@ def:pub JmsWorkspaceSettings(
                             }}
                         </div>
                         {if editing {
-                            <div className="flex gap-2">
+                            <div key="rename-row" className="flex gap-2">
                                 <input
                                     className="jms-input"
                                     value={editLabel}
@@ -216,7 +229,7 @@ def:pub JmsWorkspaceSettings(
                             skip;
                         }}
                         {if not editing {
-                            <div className="flex items-center justify-between gap-2">
+                            <div key="actions-row" className="flex items-center justify-between gap-2">
                                 <span className="jms-label">{label}</span>
                                 <div className="flex gap-1">
                                     <button
@@ -226,6 +239,7 @@ def:pub JmsWorkspaceSettings(
                                     <button
                                         className={"jms-btn" + (" jms-btn-danger" if arming else "")}
                                         disabled={busy}
+                                        data-confirm-armed={"1" if arming else None}
                                         aria-label={("Confirm delete workspace " if arming else "Delete workspace ") + label}
                                         onClick={lambda e: MouseEvent { removeWs(wid); }}
                                     >{"SURE?" if arming else "DELETE"}</button>

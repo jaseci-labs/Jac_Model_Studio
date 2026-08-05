@@ -44,9 +44,9 @@ bug class:
 
 Drawer a11y: `role="dialog" aria-modal="true"`, Escape closes (document keydown,
 removed in the effect cleanup), focus moves onto the drawer on open and returns
-to the ✦ launcher on close.
-# ponytail: no focus trap — Tab can still leave the drawer. Escape + initial
-focus + restore is the accessible floor without a shared hook module.
+to the ✦ launcher on close, and Tab / Shift-Tab are trapped inside the drawer by
+hooks/useFocusTrap — the shared hook module that "no focus trap" note used to be
+waiting on.
 """
 
 import from react { useEffect, useRef }
@@ -54,6 +54,7 @@ sv import from ..assistant {
     assistant_providers, assistant_context, set_openai_key
 }
 sv import from ..jms_llm { set_anthropic_key }
+import from ..hooks.useFocusTrap { useFocusTrap }
 sv import from ..persistence {
     list_chats, create_chat, get_messages, add_message, delete_chat
 }
@@ -73,6 +74,19 @@ def _modelsFor(providers: list[dict], pid: str) -> list[str] {
         }
     }
     return [];
+}
+
+"""The 'this provider needs a key' copy, phrased the way the rest of the app
+phrases it (GenerateStage: "Set an Anthropic key (⚙ KEYS, top bar) to draft with
+Claude.") and matching `assistant.sv.jac`'s own server-side refusal."""
+def _noKeyHint(pid: str) -> str {
+    if pid == "claude" {
+        return "Set an Anthropic key (⚙ KEYS, top bar) to chat with Claude.";
+    }
+    if pid == "openai" {
+        return "Set an OpenAI key (⚙ KEYS, top bar) to chat with OpenAI.";
+    }
+    return "This provider needs an API key — add one in ⚙ KEYS.";
 }
 
 """The `providers` entry for `pid`, or None while still loading / unknown id."""
@@ -179,12 +193,15 @@ def:pub AssistantPanel(pageContext: str = "") -> JsxElement {
         keyBusy: bool = False,
         keyErr: str = "",
         pendingAction: dict = {},
-        actionNote: str = "";
+        actionNote: str = "",
+        sendErr: str = "";
 
     # Refs, not state — see the module docstring. Written and read back in the
     # same tick, and `navIvRef` must be readable from the unmount cleanup.
     loadedRef: any = useRef(False);
     navIvRef: any = useRef(None);
+    # The drawer container, for the focus trap and for the open-effect's focus().
+    panelRef: any = useRef(None);
 
     """Stop the __jmsNav poller if one is running (idempotent)."""
     def stopNavPoll -> None {
@@ -278,6 +295,7 @@ def:pub AssistantPanel(pageContext: str = "") -> JsxElement {
         provider = pid;
         keyInput = "";
         keyErr = "";
+        sendErr = "";
         mdls = _modelsFor(providers, pid);
         modelId = str(mdls[0]) if len(mdls) > 0 else "";
     }
@@ -486,11 +504,25 @@ def:pub AssistantPanel(pageContext: str = "") -> JsxElement {
 
     async def send(text: str) -> None {
         prompt = text.strip();
-        info = _providerInfo(providers, provider);
-        gated = bool(info and bool(info["requires_key"]) and not bool(info["configured"]));
-        if not prompt or streaming or not modelId or gated {
+        if not prompt or streaming {
             return;
         }
+        # Key check BEFORE dispatch, off the same source of truth the picker uses
+        # (`assistant_providers().configured` — set/env key). Refusing here is
+        # visible: it used to be a silent `return`, so picking an unconfigured
+        # provider and hitting send looked like nothing happened at all. The
+        # server re-checks authoritatively (assistant.sv.jac) — this is only the
+        # fast, local half.
+        info = _providerInfo(providers, provider);
+        if info and bool(info["requires_key"]) and not bool(info["configured"]) {
+            sendErr = _noKeyHint(provider);
+            return;
+        }
+        if not modelId {
+            sendErr = "Pick a model for this provider first.";
+            return;
+        }
+        sendErr = "";
         draft = "";
         streaming = True;
         pendingAction = {};
@@ -602,7 +634,12 @@ def:pub AssistantPanel(pageContext: str = "") -> JsxElement {
                     if evt == "end" {
                         streamEnded = True;
                     } elif evt == "error" {
-                        errtext = str(data) if data else "stream failed";
+                        # jaclang's sentinel frame carries the producer's RAW
+                        # Python exception in `data` — never put that in the
+                        # transcript. The server logs the detail; the user gets
+                        # a clean line. (Frames the endpoint yields itself are
+                        # already sanitized server-side — see _clean_error.)
+                        errtext = "the assistant stream failed — check the studio log";
                         streamEnded = True;
                     } elif data {
                         try {
@@ -679,13 +716,18 @@ def:pub AssistantPanel(pageContext: str = "") -> JsxElement {
             if str(e.key) == "Escape" { widgetOpen = False; }
         };
         doc.addEventListener("keydown", onKey);
-        panel: any = doc.getElementById("assistant-drawer");
+        panel: any = panelRef.current;
         if panel { panel.focus(); }
         return lambda {
             doc.removeEventListener("keydown", onKey);
             if prev { prev.focus(); }
         };
     }, [widgetOpen]);
+
+    # Tab / Shift-Tab cycle inside the drawer. MUST stay below the effect above —
+    # effects run in declaration order and the trap assumes the drawer already
+    # focused itself. See hooks/useFocusTrap.
+    useFocusTrap(panelRef, widgetOpen);
 
     curModels: list[str] = _modelsFor(providers, provider);
     curInfo: dict | None = _providerInfo(providers, provider);
@@ -706,13 +748,19 @@ def:pub AssistantPanel(pageContext: str = "") -> JsxElement {
         >✦</button>
 
         {if widgetOpen {
-            <div className="fixed inset-0 z-50 flex">
+            # Every element pushed inside a `{if …}` / `{for …}` view block lands
+            # in an ARRAY child (compiles to `__jacJsx(null, {}, [kids])`), so React
+            # demands a `key` on each one — a keyless single-element branch warns
+            # exactly like a keyless list. Hence the literal keys throughout this
+            # render (same convention as WorkspaceSettings.cl.jac).
+            <div key="assistant-shell" className="fixed inset-0 z-50 flex">
                 <div
                     className="flex-1 g-scrim reveal-fade"
                     onClick={closeWidget}
                 />
                 <aside
                     id="assistant-drawer"
+                    ref={panelRef}
                     role="dialog"
                     aria-modal="true"
                     aria-label="AI assistant"
@@ -734,13 +782,13 @@ def:pub AssistantPanel(pageContext: str = "") -> JsxElement {
                     </div>
 
                     {if historyOpen {
-                        <div className="flex-1 overflow-y-auto border-b border-border px-4 py-3">
+                        <div key="history" className="flex-1 overflow-y-auto border-b border-border px-4 py-3">
                             <button
                                 onClick={lambda e: MouseEvent { newChat(); }}
                                 className="exp-btn exp-btn-accent mb-2 w-full"
                             >+ NEW CHAT</button>
                             {if len(chats) == 0 {
-                                <p className="stat-line">no saved chats yet</p>
+                                <p key="nochats" className="stat-line">no saved chats yet</p>
                                 skip;
                             }}
                             {for c in chats {
@@ -761,7 +809,7 @@ def:pub AssistantPanel(pageContext: str = "") -> JsxElement {
                     }}
 
                     {if not historyOpen {
-                        <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-4 py-3">
+                        <div key="providers" className="flex flex-wrap items-center gap-1.5 border-b border-border px-4 py-3">
                             {for p in providers {
                                 pid = str(p["id"]);
                                 <button
@@ -775,7 +823,7 @@ def:pub AssistantPanel(pageContext: str = "") -> JsxElement {
                     }}
 
                     {if not historyOpen and not needsKey and len(curModels) > 0 {
-                        <div className="border-b border-border px-4 py-2">
+                        <div key="modelpick" className="border-b border-border px-4 py-2">
                             <select
                                 value={modelId}
                                 aria-label="Assistant model"
@@ -790,14 +838,14 @@ def:pub AssistantPanel(pageContext: str = "") -> JsxElement {
                         skip;
                     }}
                     {if not historyOpen and not needsKey and len(curModels) == 0 {
-                        <div className="border-b border-border px-4 py-2">
+                        <div key="nomodels" className="border-b border-border px-4 py-2">
                             <span className="stat-line">no models available for this provider</span>
                         </div>
                         skip;
                     }}
 
                     {if not historyOpen and needsKey {
-                        <div className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-4">
+                        <div key="connect" className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-4">
                             <h3 className="text-sm font-medium text-foreground">{"Connect " + connectLabel}</h3>
                             <p className="stat-line">Enter your API key to continue.</p>
                             <input
@@ -820,11 +868,11 @@ def:pub AssistantPanel(pageContext: str = "") -> JsxElement {
                     }}
 
                     {if not historyOpen and not needsKey {
-                        <Thread messages={messages} labels={{}} onSave={None} />
+                        <Thread key="thread" messages={messages} labels={{}} onSave={None} />
                         skip;
                     }}
                     {if not historyOpen and not needsKey and "action" in pendingAction {
-                        <div className="border-t border-border px-4 py-3">
+                        <div key="confirm" className="border-t border-border px-4 py-3">
                             <p className="stat-line mb-2">⚑ {_actionLabel(pendingAction)}</p>
                             <div className="flex gap-2">
                                 <button
@@ -840,13 +888,20 @@ def:pub AssistantPanel(pageContext: str = "") -> JsxElement {
                         skip;
                     }}
                     {if not historyOpen and not needsKey and actionNote and "action" not in pendingAction {
-                        <div className="border-t border-border px-4 py-2">
+                        <div key="note" className="border-t border-border px-4 py-2">
                             <span className="stat-line">{actionNote}</span>
+                        </div>
+                        skip;
+                    }}
+                    {if not historyOpen and sendErr {
+                        <div key="senderr" role="alert" className="border-t border-border px-4 py-2">
+                            <span className="stat-line" style={{"color": "var(--danger)"}}>{sendErr}</span>
                         </div>
                         skip;
                     }}
                     {if not historyOpen and not needsKey {
                         <Composer
+                            key="composer"
                             value={draft} busy={streaming} categories={[]}
                             onSet={updateDraft}
                             onSend={send}

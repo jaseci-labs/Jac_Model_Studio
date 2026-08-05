@@ -239,6 +239,12 @@ def:pub CurateStage(project: any = None, onRefresh: any = None) -> JsxElement {
         return _toInt(_g(stats, "rejected", "0"));
     }
 
+    """Rows that would actually land in a split: accepted + edited. `edited` counts
+    because materialize treats it as accepted-with-edit."""
+    def _curatedCount -> int {
+        return _toInt(_g(stats, "accepted", "0")) + _toInt(_g(stats, "edited", "0"));
+    }
+
     async def regenRejected -> None {
         regenBusy = True;
         err = "";
@@ -260,6 +266,16 @@ def:pub CurateStage(project: any = None, onRefresh: any = None) -> JsxElement {
     }
 
     async def buildSplit -> None {
+        # Same shape as SourcesStage.addSrc's "path required": refuse client-side
+        # so a build that can only produce an empty split never leaves the browser.
+        # jms_curate.materialize refuses it server-side too — this is the no-wasted-
+        # call half.
+        if _curatedCount() == 0 {
+            err = "no curated rows to split — accept or edit some rows first";
+            matResult = None;
+            confirmMat = False;
+            return;
+        }
         trainExists = _toInt(_g(stats, "train_rows", "0")) > 0;
         if trainExists and not confirmMat {
             confirmMat = True;
@@ -269,7 +285,15 @@ def:pub CurateStage(project: any = None, onRefresh: any = None) -> JsxElement {
         err = "";
         res: any = None;
         try { res = await materialize(_pid(), _toInt(holdoutStr)); } except Exception { err = "build failed"; matBusy = False; return; }
-        if res and "error" in res { err = str(res["error"]); matBusy = False; confirmMat = False; return; }
+        # Clear the previous run's "train N · holdout M" line: leaving it up next to
+        # a refusal reads as if the build half-succeeded.
+        if res and "error" in res {
+            err = str(res["error"]);
+            matResult = None;
+            matBusy = False;
+            confirmMat = False;
+            return;
+        }
         matResult = res;
         confirmMat = False;
         await loadPage();
@@ -418,18 +442,37 @@ def:pub CurateStage(project: any = None, onRefresh: any = None) -> JsxElement {
         nPending = len(_pendingOnPage());
         nRej = _rejectedCount();
         running = _genRunning();
+        # Disabled-reason surfacing, the same shape as BUILD TRAINING SPLIT
+        # below: the reason is the button's `title` (hover), and where a visible
+        # span already states it, `aria-describedby` ties the two together for
+        # screen readers. `else None` keeps the attribute off the DOM when there
+        # is nothing to point at (React drops null props).
+        acceptHint = "No pending rows on this page — nothing left to accept here." if nPending == 0 else "";
+        regenHint = "";
+        regenHintId = "";
+        if regenBusy {
+            regenHint = "Queuing a regeneration job…";
+        } elif nRej == 0 {
+            regenHint = "No rejected rows — reject a row first to regenerate it.";
+        } elif running {
+            regenHint = "a gen job is running — regenerate unlocks when it finishes";
+            regenHintId = "jms-curate-regen-hint";
+        }
         return <div className="flex flex-wrap items-center gap-2">
             <button
                 className="jms-btn"
                 disabled={nPending == 0}
+                title={acceptHint if acceptHint else "accept every pending row on this page"}
                 onClick={lambda e: MouseEvent { acceptAllOnPage(); }}
             >ACCEPT ALL ON PAGE{" (" + str(nPending) + ")" if nPending > 0 else ""}</button>
             <button
                 className="jms-btn"
                 disabled={nRej == 0 or running or regenBusy}
+                title={regenHint if regenHint else "re-synthesize the rejected rows"}
+                aria-describedby={regenHintId if regenHintId else None}
                 onClick={lambda e: MouseEvent { regenRejected(); }}
             >{"REGENERATING…" if regenBusy else "REGENERATE REJECTED (" + str(nRej) + ")"}</button>
-            {running and <span className="jms-mono-dim">a gen job is running — regenerate unlocks when it finishes</span>}
+            {running and <span id="jms-curate-regen-hint" className="jms-mono-dim">a gen job is running — regenerate unlocks when it finishes</span>}
             {regenJid and <span className="jms-mono-dim" style={{"color": "var(--jms-ok)"}}>regen job {regenJid} started — watch the GENERATE tab</span>}
         </div>;
     }
@@ -538,6 +581,23 @@ def:pub CurateStage(project: any = None, onRefresh: any = None) -> JsxElement {
     }
 
     def _footer -> JsxElement {
+        # Disabled-with-the-reason-stated, the same guard shape GenerateStage uses
+        # for DRAFT PLAN (canDraft + hint): with nothing accepted or edited there is
+        # no split to build, so say so instead of shipping a `train 0 · holdout 0`.
+        nCur = _curatedCount();
+        nPend = _toInt(_g(stats, "pending", "0"));
+        matHint = "";
+        # `stats` is None until the first load lands — do not flash "nothing to
+        # split" at a user whose counts simply have not arrived yet.
+        if nCur == 0 and not loading {
+            if _toInt(_g(stats, "total", "0")) == 0 {
+                matHint = "Nothing to split — generate some rows in the GENERATE tab first.";
+            } elif nPend > 0 {
+                matHint = "Nothing curated yet — accept or edit some of the " + str(nPend) + " pending rows first.";
+            } else {
+                matHint = "Every row is rejected — accept or edit at least one row to build a split.";
+            }
+        }
         matLabel = "BUILDING…" if matBusy else ("CLICK AGAIN TO OVERWRITE" if confirmMat else "BUILD TRAINING SPLIT");
         return <div className="jms-section flex flex-col gap-3">
             <span className="jms-section-label">TRAINING SPLIT</span>
@@ -555,13 +615,16 @@ def:pub CurateStage(project: any = None, onRefresh: any = None) -> JsxElement {
                 </div>
                 <button
                     className="jms-btn jms-btn-accent"
-                    disabled={matBusy}
+                    disabled={bool(matBusy or loading or nCur == 0)}
+                    title={matHint if matHint else "carve the accepted + edited rows into train.jsonl / holdout.jsonl"}
+                    aria-describedby={"jms-curate-split-hint" if matHint else None}
                     onClick={lambda e: MouseEvent { buildSplit(); }}
                 >{matLabel}</button>
                 {matResult and <span className="jms-mono-dim" style={{"color": "var(--jms-ok)"}}>
                     train {_g(matResult, "train_rows", "0")} · holdout {_g(matResult, "holdout_rows", "0")}
                 </span>}
             </div>
+            {matHint and <span id="jms-curate-split-hint" className="jms-mono-dim" style={{"color": "var(--jms-danger)"}}>{matHint}</span>}
             {confirmMat and <span className="jms-mono-dim" style={{"color": "var(--jms-danger)"}}>a split already exists — click again to overwrite train.jsonl + holdout.jsonl</span>}
         </div>;
     }

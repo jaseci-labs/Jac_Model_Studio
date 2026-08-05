@@ -2,9 +2,9 @@
 
 Dialog semantics: `role="dialog" aria-modal="true"`, Escape closes (document
 keydown, removed in the effect cleanup), focus moves onto the drawer on open and
-returns to the ⚙ WORKSPACES trigger on close.
-# ponytail: no focus trap — Tab can still leave the drawer. Escape + initial
-focus + restore is the accessible floor without a shared hook module.
+returns to the ⚙ WORKSPACES trigger on close. Tab / Shift-Tab are trapped inside
+the drawer by hooks/useFocusTrap (the drawer is `aria-modal`, so the page behind
+it is inert scenery — focus has no business going there).
 
 Selection: the drawer opens with a workspace ALREADY selected (see `_activeWs`
 and `_resolveWs`). It used to open with `selected == ""`, which hid the entire
@@ -12,7 +12,7 @@ editor — LABEL/ACCENT/MODEL/FILES/SAVE/↑/↓/DELETE and every section editor
 inside `{if wd {...}}` / the `secList` loop, so an empty selection rendered a
 drawer that looked like it had no edit, reorder or delete features at all."""
 
-import from react { useEffect }
+import from react { useEffect, useRef }
 sv import from ..workspace {
     ui_layout, section_types,
     create_workspace, update_workspace, delete_workspace, reorder_workspaces,
@@ -20,6 +20,8 @@ sv import from ..workspace {
 }
 sv import from ..models { list_models, ModelView }
 import from .shared.Field { Field, TextInput }
+import from ..hooks.useConfirmReset { useConfirmReset }
+import from ..hooks.useFocusTrap { useFocusTrap }
 
 def _wsById(layout: any, wid: str) -> dict | None {
     for ws in list(layout["workspaces"]) {
@@ -94,6 +96,8 @@ def:pub WorkspaceSettings(
         flash: str = "",
         err: str = "",
         busy: bool = False;
+
+    panelRef: any = useRef(None);
 
     def secLabel(sid: str, fallback: str) -> str {
         if sid in secEdits {
@@ -381,13 +385,29 @@ def:pub WorkspaceSettings(
             if str(e.key) == "Escape" { onClose(); }
         };
         doc.addEventListener("keydown", onKey);
-        panel: any = doc.getElementById("exp-ws-settings");
+        panel: any = panelRef.current;
         if panel { panel.focus(); }
         return lambda {
             doc.removeEventListener("keydown", onKey);
             if prev { prev.focus(); }
         };
     }, [open]);
+
+    # Tab / Shift-Tab now cycle inside the drawer instead of walking out into the
+    # page behind it. MUST stay below the effect above: the trap's stand-down /
+    # reclaim logic assumes the drawer has already focused itself, and effects
+    # run in declaration order. See hooks/useFocusTrap.
+    useFocusTrap(panelRef, open);
+
+    # An armed DELETE / ✕ ("SURE?") disarms itself on Escape, on a pointer-down
+    # outside the button, or after 4s — see hooks/useConfirmReset. Without it the
+    # armed button stayed armed forever and a later stray click deleted a
+    # workspace (and every section under it) or a section. Both calls sit ABOVE
+    # the early return below: they wrap useEffect and must run every render.
+    # `confirmWs` is a bool, so it is passed as the selected id / "" — the hook
+    # keys its timer on the string, and "" means nothing is armed.
+    useConfirmReset(selected if confirmWs else "", lambda -> None { confirmWs = False; });
+    useConfirmReset(confirmSec, lambda -> None { confirmSec = ""; });
 
     if not open or layout is None { return <></>; }
 
@@ -401,13 +421,20 @@ def:pub WorkspaceSettings(
         or filesStr != _filesToStr(list(wd["files"]))
     );
 
-    return <div className="fixed inset-0 z-50 flex">
+    # Starts BELOW the top bar (--topbar-h, global.css) rather than at inset-0:
+    # the panel used to paint over its own ⚙ WORKSPACES trigger, so a second
+    # click on the toggle hit the panel header instead and the drawer could only
+    # be closed by ✕ / Esc / the scrim. Offsetting the whole overlay — scrim
+    # included — is what keeps the trigger both visible and hit-testable; the
+    # trade-off is that the bar stays interactive while the drawer is open.
+    return <div className="fixed inset-x-0 bottom-0 top-[var(--topbar-h)] z-50 flex">
         <div
             className="flex-1 g-scrim reveal-fade"
             onClick={lambda (e: MouseEvent) { onClose(); }}
         />
         <aside
             id="exp-ws-settings"
+            ref={panelRef}
             role="dialog"
             aria-modal="true"
             aria-label="Workspaces and sections"
@@ -502,6 +529,7 @@ def:pub WorkspaceSettings(
                             <button
                                 onClick={removeWorkspace}
                                 disabled={busy}
+                                data-confirm-armed={"1" if confirmWs else None}
                                 aria-label={("Confirm delete workspace " if confirmWs else "Delete workspace ") + wsName}
                                 className={"exp-btn exp-btn-danger" + (" exp-btn-active" if confirmWs else "")}
                             >{"SURE?" if confirmWs else "DELETE"}</button>
@@ -553,6 +581,7 @@ def:pub WorkspaceSettings(
                             <button
                                 onClick={lambda { removeSection(sid); }}
                                 disabled={busy}
+                                data-confirm-armed={"1" if confirmSec == sid else None}
                                 aria-label={("Confirm delete section " if confirmSec == sid else "Delete section ") + sid}
                                 className={"exp-btn exp-btn-danger" + (" exp-btn-active" if confirmSec == sid else "")}
                             >{"SURE?" if confirmSec == sid else "✕"}</button>

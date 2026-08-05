@@ -198,12 +198,28 @@ body {
    itself is the existing .exp-hoverable + Tailwind utilities in
    WorkspaceBar.cl.jac; this owns only the bar frame. */
 /* padding matches jms.css's .jms-topbar exactly — same header height both surfaces */
+/* --topbar-h is the bar's height as a TOKEN, not a magic number: the ⚙ WORKSPACES
+   drawers (WorkspaceSettings / JmsWorkspaceSettings) offset their own top edge by
+   exactly this, so the bar — and therefore the ⚙ WORKSPACES button that opens
+   them — stays visible and CLICKABLE while the drawer is open. Before that, the
+   right-hand drawer panel rendered on top of its own trigger (both `fixed inset-0
+   z-50`, panel x:1152→1600 vs button x:1443→1568), elementFromPoint at the gear
+   returned the panel header, and a second click could never reach the toggle.
+   Pinning min-height here is what stops the two from drifting apart: the natural
+   height is 61.5px (14px padding ×2 + a 33px .exp-btn + the 1px rule), rounded up
+   to 62 so the drawer's top edge leaves no sub-pixel seam. z-index is deliberately
+   NOT the fix: .exp-topbar sets backdrop-filter, which makes it a stacking context
+   (so a z-index on the button alone can never escape it), and raising the whole
+   62px bar above z-50 would bury the drawer's own 49px header row — ✕ included —
+   and every other z-50 overlay's top edge (AssistantPanel, ApiKeyModal, Gallery). */
+:root { --topbar-h: 62px; }
 .exp-topbar, .jms-topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   flex-shrink: 0;
+  min-height: var(--topbar-h);
   padding: 14px clamp(16px, 2.5vw, 32px);
   background: var(--bar);
   backdrop-filter: var(--blur);

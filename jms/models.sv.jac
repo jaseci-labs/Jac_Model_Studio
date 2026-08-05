@@ -117,8 +117,15 @@ def list_models() -> list[ModelView] {
     return out;
 }
 
-"""The currently-resident model: {id, resident_gb}. Drives the model-pill LOADED
-badge and the sidebar MEM gauge. Empty id + 0.0 when nothing is loaded."""
+"""The currently-resident model plus process fd health:
+{id, resident_gb, fd_boot_limit, fd_soft, fd_hard, fd_target}. Drives the
+model-pill LOADED badge and the sidebar MEM gauge. Empty id + 0.0 when nothing
+is loaded.
+
+The fd_* keys expose the open-file ceiling this process actually achieved at
+boot (see inference._fd_info) so the fd-exhaustion fix is verifiable from the
+API instead of needing `lsof` on the live pid. Additive only — id/resident_gb
+are unchanged for existing callers."""
 def loaded_model() -> dict {
     return inference.loaded_info();
 }
@@ -134,6 +141,14 @@ def warm_model(model_id: str) -> dict {
     if not model_available(m) {
         return {"id": model_id, "load_s": 0.0, "error": f"model not found on disk: {model_id}"};
     }
-    s = inference.load_sync(model_id, str(model_path(m)));
+    # load_sync raises on a genuinely failed load (e.g. OSError [Errno 24] Too
+    # many open files) and on model-lock timeout. Honour this function's stated
+    # {id, load_s, error} contract instead of letting it escape as a 500 — a
+    # failed warm must degrade to an error message for THIS request only.
+    try {
+        s = inference.load_sync(model_id, str(model_path(m)));
+    } except Exception as e {
+        return {"id": model_id, "load_s": 0.0, "error": str(e)};
+    }
     return {"id": model_id, "load_s": s, "error": ""};
 }

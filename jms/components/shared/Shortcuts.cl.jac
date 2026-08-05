@@ -14,12 +14,12 @@ Exports:
 Dialog semantics follow ApiKeyModal.cl.jac: role="dialog" aria-modal="true",
 Escape closes via a document keydown that IS removed in the effect cleanup,
 focus moves onto the card on open and is restored to the previous element on
-close.
-# ponytail: no focus trap (same ceiling as ApiKeyModal) — Tab can still walk out
-to the page behind. Escape + initial focus + restore is the floor.
+close, plus Tab / Shift-Tab trapped inside the card by hooks/useFocusTrap (same
+treatment as ApiKeyModal, which is where that shared hook is documented).
 """
 
-import from react { useEffect }
+import from react { useEffect, useRef }
+import from ...hooks.useFocusTrap { useFocusTrap }
 
 """One row per binding. `keys` is rendered as chips split on ' '."""
 def:pub shortcutRows() -> list {
@@ -68,6 +68,8 @@ def:pub toggleTheme() -> None {
 }
 
 def:pub ShortcutSheet(open: bool = False, onClose: any = None) -> JsxElement {
+    panelRef: any = useRef(None);
+
     def _close -> None {
         if onClose is not None { onClose(); }
     }
@@ -80,13 +82,18 @@ def:pub ShortcutSheet(open: bool = False, onClose: any = None) -> JsxElement {
             if str(e.key) == "Escape" { _close(); }
         };
         doc.addEventListener("keydown", onKey);
-        panel: any = doc.getElementById("jms-shortcuts-dialog");
+        panel: any = panelRef.current;
         if panel { panel.focus(); }
         return lambda {
             doc.removeEventListener("keydown", onKey);
             if prev { prev.focus(); }
         };
     }, [open]);
+
+    # Tab / Shift-Tab cycle inside the sheet. MUST stay below the effect above —
+    # effects run in declaration order and the trap assumes the sheet already
+    # focused itself. See hooks/useFocusTrap.
+    useFocusTrap(panelRef, open);
 
     if not open { return <></>; }
 
@@ -97,6 +104,7 @@ def:pub ShortcutSheet(open: bool = False, onClose: any = None) -> JsxElement {
         />
         <div
             id="jms-shortcuts-dialog"
+            ref={panelRef}
             role="dialog"
             aria-modal="true"
             aria-label="Keyboard shortcuts"

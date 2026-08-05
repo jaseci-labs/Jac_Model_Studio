@@ -335,7 +335,12 @@ def _final_row(row: dict, rid: str, st: str, decisions: dict) -> dict {
 (edited content wins, underscore keys stripped). Deterministic carve:
 sha1(_id)%100 < holdout_pct → holdout, else train. Writes dataset/train.jsonl +
 dataset/holdout.jsonl. Returns {train_rows, holdout_rows, skipped_rejected,
-skipped_pending}."""
+skipped_pending}.
+
+REFUSES a no-op build: with nothing accepted or edited there is no split to make,
+and the two writes below would replace an existing train.jsonl + holdout.jsonl
+with EMPTY files. It returns {"error": ...} before either write instead of
+reporting a useless `train 0 · holdout 0`."""
 def materialize(pid: str, holdout_pct: int = 10) -> dict {
     p = _find_project(pid);
     if p is None { return {"error": "unknown project"}; }
@@ -358,6 +363,19 @@ def materialize(pid: str, holdout_pct: int = 10) -> dict {
         bucket = int(hashlib.sha1(rid.encode()).hexdigest(), 16) % 100;
         if bucket < hp { holdout.append(line); }
         else { train.append(line); }
+    }
+    # No-op guard, BEFORE any write. Nothing accepted or edited means there is no
+    # split to build, and writing anyway would clobber a previously materialized
+    # train.jsonl / holdout.jsonl with empty files.
+    if len(train) == 0 and len(holdout) == 0 {
+        detail = "";
+        if len(raw) > 0 {
+            detail = (" — " + str(skipped_pending) + " pending, "
+                      + str(skipped_rejected) + " rejected, 0 accepted");
+        }
+        return {
+            "error": "no curated rows to split — accept or edit some rows first" + detail
+        };
     }
     # Atomic: a trainer reading dataset/train.jsonl while a rebuild is in flight
     # sees the previous complete split, never a truncated one.

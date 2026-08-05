@@ -81,17 +81,24 @@ def _dashFor(key: str) -> str {
 
 # Custom tooltip: lists EVERY series at the hovered rung, with an explicit N/A
 # (dim, dotted swatch) for any series that had no eval there. Recharts clones
-# this element injecting active/payload/label; `keys` is the full series list.
-def _LadderTip(props: dict) -> JsxElement {
-    if not props.get("active") { return <span></span>; }
-    payload: list = list(props["payload"] or []);
-    keys: list = list(props["keys"] or []);
+# this element injecting active/payload/label; `seriesKeys` is the full series
+# list. Must stay PascalCase — JSX treats a lowercase/underscore tag name as a
+# raw HTML element, which silently kills the tooltip.
+def LadderTip(
+    seriesKeys: any = None,
+    active: any = False,
+    payload: any = None,
+    label: any = None
+) -> JsxElement {
+    if not active { return <span></span>; }
+    rows: list = list(payload or []);
+    keys: list = list(seriesKeys or []);
     present: dict = {};
-    for p in payload {
+    for p in rows {
         if p.get("value") != None { present[str(p.get("dataKey"))] = p.get("value"); }
     }
     return <div className="rounded-sm border border-input bg-background px-2.5 py-2" style={{"fontFamily": MONO, "fontSize": 11}}>
-        <div className="micro-label mb-1 text-muted-foreground">rung {props.get("label")} · pass@1</div>
+        <div className="micro-label mb-1 text-muted-foreground">rung {label} · pass@1</div>
         {for k in keys {
             <div key={k} className="flex items-center justify-between gap-4 leading-5">
                 <span className="flex items-center gap-1.5">
@@ -114,7 +121,7 @@ def _ladderChart(props: dict) -> JsxElement {
                 <CartesianGrid stroke={gridStroke()} vertical={False} />
                 <XAxis dataKey="x" tick={tick()} tickLine={False} axisLine={{"stroke": axisStroke()}} />
                 <YAxis tick={tick()} tickLine={False} axisLine={False} width={40} domain={[0, 100]} ticks={PCT_TICKS} unit="%" />
-                <Tooltip cursor={tipCursor()} content={<_LadderTip keys={keys}/>} />
+                <Tooltip cursor={tipCursor()} content={<LadderTip seriesKeys={keys}/>} />
                 <Legend wrapperStyle={{"fontFamily": MONO, "fontSize": 10, "color": "var(--muted-foreground)"}} />
                 {for k in keys {
                     <Line key={k} type="monotone" dataKey={k} stroke={_colorFor(k)} strokeDasharray={_dashFor(k)} strokeWidth={1.8} dot={{"r": 3.2, "fill": _colorFor(k), "strokeWidth": 0}} activeDot={{"r": 4.5}} isAnimationActive={False} connectNulls={False} />

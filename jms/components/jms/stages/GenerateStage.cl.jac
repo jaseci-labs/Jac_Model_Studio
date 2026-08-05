@@ -446,6 +446,12 @@ def:pub GenerateStage(project: any = None, onRefresh: any = None, active: bool =
             canDraft = False;
             hint = "No local MLX model available — load one in the chat app first.";
         }
+        # Disabled-reason surfacing, the BUILD TRAINING SPLIT shape (CurateStage
+        # `_footer`): the same `hint` string is the button's `title` (hover) AND
+        # the visible span, wired together by `aria-describedby` so a screen
+        # reader announces the reason with the disabled button. The `else None`
+        # keeps the attribute off the DOM when there is no hint to point at
+        # (React drops null props).
         return <div className="jms-section flex flex-col gap-3">
             <span className="jms-section-label">DRAFT A PLAN</span>
             <div className="flex flex-wrap items-center gap-3">
@@ -472,10 +478,12 @@ def:pub GenerateStage(project: any = None, onRefresh: any = None, active: bool =
                 <button
                     className="jms-btn jms-btn-accent"
                     disabled={drafting or not canDraft}
+                    title={hint if hint else "draft a plan from the sources you attached"}
+                    aria-describedby={"jms-gen-draft-hint" if hint else None}
                     onClick={lambda e: MouseEvent { draftNow(); }}
                 >{"DRAFTING…" if drafting else "DRAFT PLAN"}</button>
             </div>
-            {hint and <span className="jms-mono-dim" style={{"color": "var(--jms-danger)"}}>{hint}</span>}
+            {hint and <span id="jms-gen-draft-hint" className="jms-mono-dim" style={{"color": "var(--jms-danger)"}}>{hint}</span>}
             {draftErr and <span className="jms-mono-dim" style={{"color": "var(--jms-danger)"}}>{draftErr}</span>}
             {drafting and <span className="jms-mono-dim">Grounding in your sources and asking the model — this can take 30-60s…</span>}
         </div>;
