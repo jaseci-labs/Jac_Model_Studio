@@ -118,7 +118,7 @@ def list_models() -> list[ModelView] {
 }
 
 """The currently-resident model plus process fd health:
-{id, resident_gb, fd_boot_limit, fd_soft, fd_hard, fd_target}. Drives the
+{id, resident_gb, fd_boot_limit, fd_soft, fd_hard, fd_target, fd_guard}. Drives the
 model-pill LOADED badge and the sidebar MEM gauge. Empty id + 0.0 when nothing
 is loaded.
 

@@ -358,6 +358,15 @@ def:pub EvalStage(project: any = None, onRefresh: any = None, active: bool = Tru
             startHint = "an eval is running — SCORE unlocks when it finishes";
             startHintId = "jms-eval-running-hint";
         }
+        # Same shape for the JUDGE metric chip: it is disabled until an Anthropic
+        # key is configured (the judge IS a Claude call), so one string feeds both
+        # the chip's `title` and the visible span below that `aria-describedby`
+        # points at. Empty when a key is set — the chip is enabled and needs no
+        # reason.
+        judgeHint = "";
+        if not keyConfigured {
+            judgeHint = "Set an Anthropic key (⚙ KEYS, top bar) to judge with Claude — similarity runs offline.";
+        }
         return <div className="jms-section flex flex-col gap-3">
             <span className="jms-section-label">SCORE A RUN ON ITS HOLDOUT</span>
             <div className="flex flex-col gap-1.5">
@@ -373,7 +382,7 @@ def:pub EvalStage(project: any = None, onRefresh: any = None, active: bool = Tru
                         <option key={_g(r, "rid", "")} value={_g(r, "rid", "")}>{_g(r, "rid", "")} · {_g(r, "base_model", "")}</option>
                     }}
                 </select>}
-                {_anySpheron() and <span className="jms-mono-dim">spheron runs aren't chattable/evaluable here — their base weights aren't local</span>}
+                {_anySpheron() and <span className="jms-mono-dim">cluster runs aren't chattable/evaluable here — their base weights aren't local</span>}
             </div>
             <div className="flex flex-wrap items-end gap-3">
                 <div className="flex flex-col gap-1.5">
@@ -382,6 +391,8 @@ def:pub EvalStage(project: any = None, onRefresh: any = None, active: bool = Tru
                         <button
                             className={"jms-btn" + (" jms-btn-accent" if metric == "judge" else "")}
                             disabled={not keyConfigured}
+                            title={judgeHint if judgeHint else "score with Claude as an LLM judge"}
+                            aria-describedby={"jms-eval-judge-hint" if judgeHint else None}
                             onClick={lambda e: MouseEvent { metric = "judge"; }}
                         >JUDGE</button>
                         <button
@@ -404,7 +415,7 @@ def:pub EvalStage(project: any = None, onRefresh: any = None, active: bool = Tru
                     onClick={lambda e: MouseEvent { startEvalNow(); }}
                 >{"SCORING…" if startBusy else "SCORE ON HOLDOUT"}</button>
             </div>
-            {not keyConfigured and <span className="jms-mono-dim">judge needs an Anthropic key (⚙ KEYS, top bar) — similarity runs offline</span>}
+            {judgeHint and <span id="jms-eval-judge-hint" className="jms-mono-dim">{judgeHint}</span>}
             {_anyRunningEval() and <span id="jms-eval-running-hint" className="jms-mono-dim">an eval is running — SCORE unlocks when it finishes</span>}
             {startNote and <span className="jms-mono-dim" style={{"color": "var(--jms-accent)"}}>{startNote}</span>}
             {startErr and <span className="jms-mono-dim" style={{"color": "var(--jms-danger)"}}>{startErr}</span>}

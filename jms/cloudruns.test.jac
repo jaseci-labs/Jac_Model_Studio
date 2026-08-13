@@ -4,12 +4,19 @@ Covers the pure pieces the supervisor contract depends on: runspec
 construction (uploads/pull/policy), the detached computation (fabricated
 status dict + dead/live pids), opts→CLI-flag rendering, dataset default
 resolution from [cloudrun], and start_remote_run's validation gate (which
-must reject bad cfgs before any Spheron call or supervisor spawn). No
-supervisors or deployments are created. Run with `jac test cloudruns.sv.jac`.
+must reject bad cfgs before any cluster lookup or supervisor spawn), plus the
+cluster_id → runspec.ssh_override wiring against a REAL Cluster + SshKey pair
+built in a temp key dir (JMS_SSH_KEY_DIR, same isolation clusters.test.jac
+uses). No supervisors are spawned and nothing is provisioned. Run with
+`jac test cloudruns.sv.jac`.
 """
 
 import os;
+import shutil;
+import tempfile;
 import time;
+import from pathlib { Path }
+import from clusters { Cluster, SshKey, cluster_ssh_override }
 
 test "runspec construction: uploads/pull/policy/remote_dir from cfg" {
     cfg: dict = {
@@ -130,8 +137,61 @@ test "start_remote_run validation gate rejects before any side effects" {
     assert not bool(r4["ok"]);
     assert "base_model" in str(r4["error"]);
 
-    # valid identity but no offer → rejected before any Spheron call
+    # valid identity but no cluster → rejected before any cluster lookup
     r5 = start_remote_run({"name": "ok-name", "mode": "sft", "base_model": "org/m"});
     assert not bool(r5["ok"]);
-    assert "offer" in str(r5["error"]);
+    assert "cluster_id required" in str(r5["error"]);
+
+    # a cluster_id that resolves to nothing (deleted / never existed) → refused
+    # with the reconnect hint, still before any dataset touch or spawn.
+    r6 = start_remote_run({
+        "name": "ok-name", "mode": "sft", "base_model": "org/m",
+        "cluster_id": "no-such-cluster"
+    });
+    assert not bool(r6["ok"]);
+    assert "CLUSTERS tab" in str(r6["error"]);
+}
+
+"""A resolvable Cluster + SshKey pair on the caller's root, keyed to a temp key
+dir. Mirrors clusters.test.jac's JMS_SSH_KEY_DIR isolation so the developer's
+real ~/.jms/ssh_keys is never touched; the private key is a stub file (nothing
+here connects to anything)."""
+def _fake_cluster(kid: str, cid: str, host: str, port: int, user: str) -> str {
+    d = tempfile.mkdtemp(prefix="jms-cloudruns-keys-");
+    os.environ["JMS_SSH_KEY_DIR"] = d;
+    (Path(d) / kid).write_text("stub-private-key");
+    k = SshKey(key_id=kid, label="cr-test", public_key="ssh-ed25519 AAAA", fingerprint="SHA256:x", created_at="2026-01-01T00:00:00Z");
+    root ++> k;
+    c = Cluster(cluster_id=cid, label="cr-test-box", host=host, port=port, user=user, key_id=kid, created_at="2026-01-01T00:00:00Z");
+    root ++> c;
+    return d;
+}
+
+def _drop_fake_cluster(d: str) -> None {
+    try {
+        shutil.rmtree(d, ignore_errors=True);
+    } except Exception {}
+    if "JMS_SSH_KEY_DIR" in os.environ {
+        del os.environ["JMS_SSH_KEY_DIR"];
+    }
+}
+
+test "a saved cluster resolves into the runspec's ssh_override" {
+    kid = "abcdef0123456789abcdef0123456789";
+    d = _fake_cluster(kid, "cr-cluster-1", "203.0.113.10", 2222, "root");
+    try {
+        ovr = cluster_ssh_override("cr-cluster-1");
+        assert ovr == f"ssh -i {str(Path(d) / kid)} -p 2222 root@203.0.113.10", ovr;
+        # exactly what start_remote_run does: the resolved command rides in via
+        # _build_runspec's ssh_override passthrough, on a COPY of cfg.
+        cfg: dict = {"name": "cl-run", "mode": "sft"};
+        spec = _build_runspec({**cfg, "ssh_override": ovr}, "rid-c", "", 0.0, "cmd");
+        assert str(spec["ssh_override"]) == ovr, spec;
+        # no VM was deployed: the marketplace fields are empty/zero.
+        assert str(spec["deployment_id"]) == "", spec;
+        assert float(str(spec["hourly_rate"])) == 0.0, spec;
+        assert "ssh_override" not in cfg, cfg;   # caller's dict untouched
+    } finally {
+        _drop_fake_cluster(d);
+    }
 }

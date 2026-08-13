@@ -21,6 +21,18 @@ _WORKSPACE_DEFAULT="$(dirname "$_STUDIO_DIR")"
 export JAC_STUDIO_WORKSPACE="${JAC_STUDIO_WORKSPACE:-$_WORKSPACE_DEFAULT}"
 export JAC_STUDIO_DATA_ROOT="${JAC_STUDIO_DATA_ROOT:-$JAC_STUDIO_WORKSPACE}"
 
+# SQLite concurrency hardening — see scripts/pysite/sitecustomize.py for the
+# full root-cause writeup. Short version: jac-scale opens a NEW sqlite
+# connection to .jac/data/anchor_store.db per HTTP request and re-runs a schema
+# write on it, both jaclang connect sites keep the stdlib 5s busy timeout, and
+# users.db is left in DELETE journal mode by SQLAlchemy — so two concurrent
+# browser sessions made unrelated read endpoints 500 with
+# "sqlite3.OperationalError: database is locked". None of that is reachable
+# from jac.toml, so the wrapper is installed via PYTHONPATH/sitecustomize,
+# which CPython imports before any jac code runs. Must stay exported (detached
+# worker subprocesses inherit it and hit the same databases).
+export PYTHONPATH="$_STUDIO_DIR/scripts/pysite${PYTHONPATH:+:$PYTHONPATH}"
+
 # Open-file ceiling. Prod runs without --dev so there is no project file watcher,
 # but a resident MLX model load still opens many safetensors shards + tokenizer
 # files, and a service manager (launchd/systemd) can hand this process a soft

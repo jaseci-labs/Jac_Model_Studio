@@ -43,29 +43,25 @@ import from cptsft {
 # Streaming chat endpoint — consumed by a raw fetch reader on the client (not an
 # `sv import` RPC stub), so register it explicitly at the top level.
 import from chat { chat_stream }
-# Spheron GPU cloud (REST API) — full deployment lifecycle: search offers/
-# providers, deploy instances, list/get/ssh, terminate (+ rename + can-terminate),
-# SSH-key management, and a cloud-init dispatch bridge that deploys a fresh
-# instance with a training command baked into runcmd.
-import from spheron {
-    spheron_status, spheron_credential_status, spheron_providers,
-    search_gpus,
-    # create_gpu_instance is deliberately NOT registered: no client calls it, but as an
-    # HTTP endpoint it lets a caller deploy a billing GPU VM with no supervisor and no
-    # CloudRun node tracking it. Still used server-side (cloudruns.sv.jac:398,
-    # spheron.sv.jac:920) — the function is untouched, only its HTTP exposure is gone.
-    spheron_instances, spheron_instance, spheron_ssh,
-    destroy_gpu_instance, can_terminate_gpu_instance, rename_gpu_instance,
-    spheron_ssh_keys, add_spheron_ssh_key,
-    set_spheron_key, clear_spheron_key,
-    dispatch_training_job, list_spheron_dispatches, get_spheron_dispatch, stop_spheron_dispatch
+# BYO GPU clusters (clusters.sv.jac) — the vendor-neutral replacement for the
+# deleted Spheron marketplace flow: generate an ed25519 keypair locally, paste the
+# PUBLIC half into any GPU console (Spheron / RunPod / Lambda / bare metal), paste
+# the ssh link back, and JMS parses + probes + stores it as a reusable Cluster.
+#
+# `cluster_ssh_override` is deliberately NOT registered: it returns a filesystem
+# path to PRIVATE key material inside an ssh command, so it must never be
+# HTTP-reachable. It is the server-side contract cloudruns/jms_train call directly
+# to fill runspec.json's ssh_override.
+import from clusters {
+    generate_ssh_key, list_ssh_keys, delete_ssh_key,
+    add_cluster, list_clusters, retest_cluster, rename_cluster, remove_cluster
 }
 # Supervised remote GPU runs (cloudruns.sv.jac + remote/supervisor.py): start a
-# Spheron VM run under a detached local supervisor, poll status.json, stop /
-# reattach / re-pull / panic-terminate. Consumed by the Cloud section's RUNS tab.
+# run on a saved cluster under a detached local supervisor, poll status.json,
+# stop / reattach / re-pull. Consumed by the Cloud section's RUNS tab.
 import from cloudruns {
     start_remote_run, run_status, list_cloud_runs,
-    stop_run, reattach_run, pull_artifacts, terminate_run_vm
+    stop_run, reattach_run, pull_artifacts
 }
 # JMS product surface: per-user project management + source scanning (graph-backed,
 # root ++> JmsProject ++> JmsSource). Consumed by the JmsProjects / JmsProject /
@@ -123,8 +119,8 @@ import from jms_curate {
     curate_stats, curate_rows, decide_row, decide_page, rejected_ids, materialize
 }
 # JMS TRAIN stage: LoRA finetuning on a project's curated dataset. Two backends —
-# local-mlx (mlx_lm.lora under the heavy GPU lock) + spheron (remote VM run
-# delegated to cloudruns). Consumed by TrainStage via `sv import` RPC stubs.
+# local-mlx (mlx_lm.lora under the heavy GPU lock) + spheron (a run on a saved BYO
+# cluster, delegated to cloudruns). Consumed by TrainStage via `sv import` stubs.
 import from jms_train {
     start_train, train_status, stop_train, list_train_runs
 }

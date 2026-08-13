@@ -1,53 +1,57 @@
-"""CLOUD section — Spheron GPU deployments + supervised remote training runs.
+"""CLOUD section — BYO GPU clusters + supervised remote training runs.
 
-INSTANCES: list / refresh / destroy (Spheron has no start/stop/reboot — only
-terminate, so the lifecycle UI is just DESTROY, guarded by can-terminate).
-RUNS: configure a remote SFT run (offer + base model + LoRA/steps opts), START
-it — the server deploys a Spheron VM and spawns remote/supervisor.py detached,
-which owns the run end-to-end (upload data → bootstrap → launch → monitor →
-pull adapter → terminate VM). This tab polls the supervisor's status.json:
-phase timeline, live train.log tail, cost line, and a loud billing alert when
-the supervisor died while the VM may still be billing (REATTACH resumes it).
-SETUP: per-user API key, SSH-key management, and account balance.
+CLUSTERS: bring your own box. Step 1 generates an ed25519 keypair on THIS
+machine (only the public half ever leaves it) — paste that public key into
+whichever GPU console you like (Spheron, RunPod, Lambda, or a bare-metal box's
+~/.ssh/authorized_keys). Step 2 pastes back the ssh link the vendor handed you;
+JMS parses it, probes it once and saves it as a reusable cluster. A cluster that
+does not answer yet is SAVED ANYWAY and shown as unreachable — a fresh VM is
+usually still booting — RETEST re-probes it later. No API key, no billing, no
+vendor SDK anywhere in the loop: the box is the user's own hardware.
+RUNS: configure a remote SFT run (saved cluster + base model + LoRA/steps opts),
+START it — the server resolves the cluster into an ssh command, writes
+runspec.json and spawns remote/supervisor.py detached, which owns the run
+end-to-end (upload data → bootstrap → launch → monitor → pull adapter). This tab
+polls the supervisor's status.json: phase timeline, live train.log tail, and a
+loud alert when the supervisor lost contact while the job may still be running
+on the user's box (REATTACH resumes it).
 """
 
 import from react { useEffect }
-sv import from ...spheron {
-    spheron_status, spheron_credential_status, spheron_providers,
-    set_spheron_key, clear_spheron_key,
-    spheron_instances, spheron_instance, destroy_gpu_instance, can_terminate_gpu_instance,
-    spheron_ssh_keys, add_spheron_ssh_key,
-    search_gpus
+sv import from ...clusters {
+    generate_ssh_key, list_ssh_keys, delete_ssh_key,
+    add_cluster, list_clusters, retest_cluster, rename_cluster, remove_cluster
 }
 sv import from ...cloudruns {
     start_remote_run, run_status, list_cloud_runs,
-    stop_run, reattach_run, pull_artifacts, terminate_run_vm
+    stop_run, reattach_run, pull_artifacts
 }
+import from ...hooks.useConfirmReset { useConfirmReset }
 import from ..shared.SubTabs { SubTabs }
 import from ..shared.Field { Field, TextInput, Segmented }
 import from ..shared.StatusGlyph { StatusGlyph }
 import from ..shared.LogView { LogView }
 
-glob TABS: list[str] = ["INSTANCES", "RUNS", "SETUP"];
+glob TABS: list[str] = ["CLUSTERS", "RUNS"];
+
+# CLUSTERS is a two-step wizard: make a key, then connect a box with it.
+glob STEPS: list[str] = ["SSH KEY", "CONNECT"];
 
 # Supervisor phases → display chips (monitor shows as TRAIN).
 glob PHASE_ORDER: list[str] = ["wait_vm", "provision", "launch", "monitor", "pull", "terminate"];
-glob PHASE_LABELS: list[str] = ["WAIT VM", "PROVISION", "LAUNCH", "TRAIN", "PULL", "TERMINATE"];
+glob PHASE_LABELS: list[str] = ["WAIT BOX", "PROVISION", "LAUNCH", "TRAIN", "PULL", "RELEASE"];
 
-def _instLabel(inst: any) -> str {
-    did = str(inst["id"]) or "—";
-    gpu = str(inst["gpu_name"]);
-    state = str(inst["cur_state"]);
-    return f"#{did} · {gpu} · {state}";
+def _clusterAddr(c: any) -> str {
+    u = str(c["user"]);
+    h = str(c["host"]);
+    p = str(c["port"]);
+    return f"{u}@{h}:{p}";
 }
 
-def _offerLabel(o: any) -> str {
-    gpu = str(o["gpu_name"]);
-    prov = str(o["provider"]);
-    region = str(o["region"]);
-    price = float(str(o["dph_total"]));
-    itype = str(o["instance_type"]);
-    return f"{gpu} · {prov} · {region} · ${price}/hr · {itype}";
+"""ISO timestamp → just the date part (created_at / last_test_at are display-only)."""
+def _day(ts: str) -> str {
+    s = str(ts);
+    return s.split("T")[0] if s else "—";
 }
 
 """Index of the run's current phase in PHASE_ORDER (terminal/finalize → past
@@ -72,24 +76,27 @@ def _costLine(run: any) -> str {
 }
 
 def:pub Cloud(active: bool) -> JsxElement {
-    has tab: str = "instances";
-    has cred: any = None;
-    has account: any = None;
-    has providers: list = [];
-    has instances: list = [];
-    has selInstance: str = "";
-    has instDetail: any = None;
-    has canTerm: any = None;
-    # Offer search (RUNS deploys a fresh instance from a chosen offer).
-    has offerQuery: str = "rtx-4090";
-    has offerType: str = "DEDICATED";
-    has offers: list = [];
-    has selOfferId: str = "";
+    has tab: str = "clusters";
+    # CLUSTERS tab — wizard step + key/cluster inventories.
+    has step: str = "SSH KEY";
     has sshKeys: list = [];
-    has selSshKeyId: str = "";
-    # SSH-key upload form.
-    has newKeyName: str = "";
-    has newKeyBody: str = "";
+    has newKeyLabel: str = "";
+    # Last generate_ssh_key() result — its public_key is shown in a copy box
+    # until dismissed. Public material only; the private half never leaves disk.
+    has freshKey: any = None;
+    has copiedId: str = "";
+    has confirmDeleteKey: str = "";
+    has clusterList: list = [];
+    has newClusterLabel: str = "";
+    has linkText: str = "";
+    has newClusterKeyId: str = "";
+    # add_cluster() result: ok=True with test_ok=False is "saved, not up yet".
+    has addResult: any = None;
+    has confirmRemoveCluster: str = "";
+    has renameId: str = "";
+    has renameText: str = "";
+    # RUNS tab — a run targets one saved cluster.
+    has selClusterId: str = "";
     # Cloud-run config form (sft only for now — see cloudruns.start_remote_run).
     has formName: str = "qwen-cloud";
     has formModelId: str = "Qwen/Qwen3-Coder-30B-A3B-Instruct";
@@ -105,120 +112,71 @@ def:pub Cloud(active: bool) -> JsxElement {
     has runs: list = [];
     has selRunId: str = "";
     has runDetail: any = None;
-    has confirmTerm: bool = False;
-    has apiKey: str = "";
     has error: str = "";
     has busy: bool = False;
 
-    async def _loadCred() -> None {
+    # NB: every loader auto-selects off a LOCAL binding of the fetched list, not
+    # off the `has` field it just assigned. A `has` write is a React setState —
+    # the field still holds the previous render's value for the rest of this
+    # function, so `sshKeys`/`clusterList`/`runs` read back stale here. The old
+    # INSTANCES/RUNS code read the field and only ever auto-selected on the NEXT
+    # poll tick; CLUSTERS does not poll at all, so it would never have selected.
+    async def _loadKeys() {
         try {
-            cred = await spheron_credential_status();
-        } except Exception {}
-    }
-    async def _loadAccount() -> None {
-        try {
-            account = await spheron_status();
-        } except Exception {}
-    }
-    async def _loadProviders() -> None {
-        try {
-            r = await spheron_providers();
-            if bool(r["ok"]) { providers = list(r["providers"]); }
-        } except Exception {}
-    }
-    async def _loadInstances() -> None {
-        try {
-            r = await spheron_instances();
+            r = await list_ssh_keys();
             if bool(r["ok"]) {
-                instances = list(r["instances"]);
-                if selInstance == "" and len(instances) > 0 {
-                    selInstance = str(instances[0]["id"]);
+                ks = list(r["keys"]);
+                sshKeys = ks;
+                # Re-seed the CONNECT picker when it is unset OR still points at
+                # a key that has since been deleted (add_cluster would reject it
+                # with a bare "unknown ssh key").
+                live = [str(k["key_id"]) for k in ks];
+                if newClusterKeyId not in live {
+                    newClusterKeyId = str(ks[0]["key_id"]) if len(ks) > 0 else "";
                 }
             }
         } except Exception {}
     }
-    async def _loadSshKeys() -> None {
+    async def _loadClusters() {
         try {
-            r = await spheron_ssh_keys();
+            r = await list_clusters();
             if bool(r["ok"]) {
-                sshKeys = list(r["keys"]);
-                if selSshKeyId == "" and len(sshKeys) > 0 {
-                    selSshKeyId = str(sshKeys[0]["id"]);
+                cs = list(r["clusters"]);
+                clusterList = cs;
+                live = [str(c["cluster_id"]) for c in cs];
+                if selClusterId not in live {
+                    selClusterId = str(cs[0]["cluster_id"]) if len(cs) > 0 else "";
                 }
             }
         } except Exception {}
     }
-    async def _loadRuns() -> None {
+    async def _loadRuns() {
         try {
             r = await list_cloud_runs();
-            runs = list(r["runs"]);
-            if selRunId == "" and len(runs) > 0 {
-                selRunId = str(runs[0]["run_id"]);
+            rs = list(r["runs"]);
+            runs = rs;
+            if selRunId == "" and len(rs) > 0 {
+                selRunId = str(rs[0]["run_id"]);
             }
         } except Exception {}
     }
-    async def _pollRun() -> None {
+    async def _pollRun() {
         if selRunId == "" { return; }
         try {
             r = await run_status(selRunId);
             if bool(r["ok"]) { runDetail = r["run"]; }
         } except Exception {}
     }
-    async def _pollInstance() -> None {
-        if selInstance == "" { return; }
-        try {
-            r = await spheron_instance(selInstance);
-            if bool(r["ok"]) { instDetail = r["instance"]; }
-        } except Exception {}
-        try {
-            ct = await can_terminate_gpu_instance(selInstance);
-            canTerm = ct if bool(ct["ok"]) else None;
-        } except Exception {
-            canTerm = None;
-        }
-    }
-    async def _runSearch() -> None {
-        busy = True;
-        error = "";
-        try {
-            r = await search_gpus(search=offerQuery, instance_type=offerType, limit=12);
-            if bool(r["ok"]) {
-                offers = list(r["offers"]);
-                if selOfferId == "" and len(offers) > 0 {
-                    selOfferId = str(offers[0]["id"]);
-                }
-            } else {
-                error = str(r["error"]);
-            }
-        } except Exception {
-            error = "search failed";
-        }
-        busy = False;
-    }
 
+    # CLUSTERS is not a live view — nothing here changes without a user action,
+    # so it refreshes on tab-enter and after every mutation instead of polling.
+    # The cluster list is also loaded for RUNS, which needs the target picker.
     useEffect(lambda {
         if active {
-            _loadCred(); _loadAccount(); _loadProviders(); _loadSshKeys();
+            _loadClusters();
+            if tab == "clusters" { _loadKeys(); }
         }
-    }, [active]);
-
-    useEffect(lambda {
-        iv: any = None;
-        if active and tab == "instances" {
-            _loadInstances();
-            iv = setInterval(lambda { _loadInstances(); }, 8000);
-        }
-        return lambda { if iv is not None { clearInterval(float(str(iv))); } };
     }, [active, tab]);
-
-    useEffect(lambda {
-        iv: any = None;
-        if active and tab == "instances" and selInstance != "" {
-            _pollInstance();
-            iv = setInterval(lambda { _pollInstance(); }, 5000);
-        }
-        return lambda { if iv is not None { clearInterval(float(str(iv))); } };
-    }, [active, tab, selInstance]);
 
     useEffect(lambda {
         iv: any = None;
@@ -238,89 +196,153 @@ def:pub Cloud(active: bool) -> JsxElement {
         return lambda { if iv is not None { clearInterval(float(str(iv))); } };
     }, [active, tab, selRunId]);
 
-    def onTab(t: str) -> None { tab = t.lower(); }
-    def pickInstance(did: str) -> None { selInstance = did; instDetail = None; canTerm = None; }
-    def pickOffer(oid: str) -> None { selOfferId = oid; }
-    def pickSshKey(kid: str) -> None { selSshKeyId = kid; }
-    def pickRun(rid: str) -> None { selRunId = rid; runDetail = None; confirmTerm = False; }
-    def updateOpt(key: str, value: str) -> None {
+    # Armed destructive confirms ("⚠ CONFIRM DELETE KEY?" / "⚠ CONFIRM REMOVE?")
+    # disarm themselves on Escape, on a pointer-down outside the button, or after
+    # 4s — see hooks/useConfirmReset. Without it a button stayed armed forever and
+    # a later stray click on the same spot silently destroyed a key / cluster.
+    # Both states hold the armed ID (not a bool), so arming a DIFFERENT row
+    # re-fires the effect and restarts that row's timer; "" means nothing armed.
+    # (bare `lambda {}`, not `lambda -> None {}` as in the sibling call sites, so
+    # this file stays at its zero-new-diagnostic W3037 baseline.)
+    useConfirmReset(confirmDeleteKey, lambda { confirmDeleteKey = ""; });
+    useConfirmReset(confirmRemoveCluster, lambda { confirmRemoveCluster = ""; });
+
+    def onTab(t: str) { tab = t.lower(); }
+    def pickCluster(cid: str) { selClusterId = cid; }
+    def pickRun(rid: str) { selRunId = rid; runDetail = None; }
+    def updateOpt(key: str, value: str) {
         updated: dict = {**cloudOpts};
         updated[key] = value;
         cloudOpts = updated;
     }
+    def copyText(text: str, marker: str) {
+        nav: any = navigator;
+        nav.clipboard.writeText(text);
+        copiedId = marker;
+        setTimeout(lambda { copiedId = ""; }, 1400);
+    }
 
-    def _selectedOffer() -> dict {
-        for o in offers {
-            if str(o["id"]) == selOfferId { return {**o}; }
+    def _selectedCluster() -> dict {
+        for c in clusterList {
+            if str(c["cluster_id"]) == selClusterId { return {**c}; }
         }
         return {};
     }
 
-    async def doSaveKey() -> None {
-        if not apiKey.strip() { error = "enter an API key"; return; }
+    def _clusterById(cid: str) -> dict {
+        for c in clusterList {
+            if str(c["cluster_id"]) == cid { return {**c}; }
+        }
+        return {};
+    }
+
+    async def doGenerateKey() {
         busy = True;
         error = "";
         try {
-            await set_spheron_key(apiKey.strip());
-            apiKey = "";
-            await _loadCred();
-            await _loadAccount();
-        } except Exception {
-            error = "key save failed";
-        }
-        busy = False;
-    }
-    async def doClearKey() -> None {
-        busy = True;
-        try {
-            await clear_spheron_key();
-            await _loadCred();
-            await _loadAccount();
-        } except Exception {}
-        busy = False;
-    }
-    async def doAddSshKey() -> None {
-        if not newKeyName.strip() or not newKeyBody.strip() {
-            error = "name and public key required";
-            return;
-        }
-        busy = True;
-        error = "";
-        try {
-            r = await add_spheron_ssh_key(newKeyName.strip(), newKeyBody.strip());
+            r = await generate_ssh_key(newKeyLabel.strip());
             if bool(r["ok"]) {
-                newKeyName = "";
-                newKeyBody = "";
-                await _loadSshKeys();
+                freshKey = r;
+                newKeyLabel = "";
+                await _loadKeys();
             } else {
                 error = str(r["error"]);
             }
         } except Exception {
-            error = "ssh key add failed";
+            error = "key generation failed";
         }
         busy = False;
     }
-    async def doDestroy() -> None {
-        if selInstance == "" { return; }
+    async def doDeleteKey(kid: str) {
+        if kid == "" { return; }
+        if confirmDeleteKey != kid { confirmDeleteKey = kid; return; }
+        confirmDeleteKey = "";
         busy = True;
         error = "";
         try {
-            r = await destroy_gpu_instance(selInstance);
+            r = await delete_ssh_key(kid);
             if not bool(r["ok"]) { error = str(r["error"]); }
-            await _loadInstances();
-            await _pollInstance();
+            await _loadKeys();
         } except Exception {
-            error = "destroy failed";
+            error = "key delete failed";
         }
         busy = False;
     }
-    async def doStartRun() -> None {
-        if selOfferId == "" { error = "search and pick an offer first"; return; }
-        if selSshKeyId == "" { error = "add/select an SSH key in SETUP first"; return; }
-        offer = _selectedOffer();
-        if len(offer) == 0 { error = "offer not found"; return; }
-        os_options = list(offer["os_options"]) if "os_options" in offer else [];
-        operating_system = str(os_options[0]) if len(os_options) > 0 else "ubuntu22.04";
+    async def doAddCluster() {
+        if not newClusterLabel.strip() { error = "name this cluster first"; return; }
+        if not linkText.strip() { error = "paste the ssh link your vendor gave you"; return; }
+        if newClusterKeyId == "" { error = "generate an SSH key first"; return; }
+        busy = True;
+        error = "";
+        addResult = None;
+        try {
+            r = await add_cluster(newClusterLabel.strip(), linkText.strip(), newClusterKeyId);
+            if bool(r["ok"]) {
+                # ok + test_ok=False is the NORMAL "saved but still booting"
+                # outcome — surfaced as an inline status, never as an error.
+                addResult = r;
+                newClusterLabel = "";
+                linkText = "";
+                await _loadClusters();
+            } else {
+                error = str(r["error"]);
+            }
+        } except Exception {
+            error = "could not save that cluster";
+        }
+        busy = False;
+    }
+    async def doRetest(cid: str) {
+        if cid == "" { return; }
+        busy = True;
+        error = "";
+        try {
+            r = await retest_cluster(cid);
+            if not bool(r["ok"]) { error = str(r["error"]); }
+            await _loadClusters();
+        } except Exception {
+            error = "retest failed";
+        }
+        busy = False;
+    }
+    async def doRename(cid: str) {
+        if cid == "" { return; }
+        if not renameText.strip() { error = "name cannot be empty"; return; }
+        busy = True;
+        error = "";
+        try {
+            r = await rename_cluster(cid, renameText.strip());
+            if bool(r["ok"]) {
+                renameId = "";
+                renameText = "";
+                await _loadClusters();
+            } else {
+                error = str(r["error"]);
+            }
+        } except Exception {
+            error = "rename failed";
+        }
+        busy = False;
+    }
+    async def doRemoveCluster(cid: str) {
+        if cid == "" { return; }
+        if confirmRemoveCluster != cid { confirmRemoveCluster = cid; return; }
+        confirmRemoveCluster = "";
+        busy = True;
+        error = "";
+        try {
+            r = await remove_cluster(cid);
+            if not bool(r["ok"]) { error = str(r["error"]); }
+            # _loadClusters re-seeds selClusterId whenever it no longer names a
+            # live cluster, so removing the selected one needs nothing extra.
+            await _loadClusters();
+        } except Exception {
+            error = "remove failed";
+        }
+        busy = False;
+    }
+    async def doStartRun() {
+        if selClusterId == "" { error = "no clusters yet — add one in the CLUSTERS tab"; return; }
         opts: dict = {};
         for k in cloudOpts.keys() {
             v = str(cloudOpts[k]).strip();
@@ -333,17 +355,7 @@ def:pub Cloud(active: bool) -> JsxElement {
                 "name": formName,
                 "mode": "sft",
                 "base_model": formModelId,
-                "offer": {
-                    "offer_id": str(offer["id"]),
-                    "gpu_type": str(offer["gpu_type"]),
-                    "gpu_count": int(str(offer["num_gpus"])),
-                    "region": str(offer["region"]),
-                    "os": operating_system,
-                    "instance_type": str(offer["instance_type"]),
-                    "hourly_rate": float(str(offer["dph_total"])),
-                    "provider": str(offer["provider"])
-                },
-                "ssh_key_id": selSshKeyId,
+                "cluster_id": selClusterId,
                 "opts": opts,
                 "policy": {
                     "auto_terminate": "on_success" if autoTerm else "never",
@@ -362,7 +374,7 @@ def:pub Cloud(active: bool) -> JsxElement {
         }
         busy = False;
     }
-    async def doStopRun() -> None {
+    async def doStopRun() {
         if selRunId == "" { return; }
         busy = True;
         try {
@@ -378,7 +390,7 @@ def:pub Cloud(active: bool) -> JsxElement {
         }
         busy = False;
     }
-    async def doReattach() -> None {
+    async def doReattach() {
         if selRunId == "" { return; }
         busy = True;
         error = "";
@@ -395,7 +407,7 @@ def:pub Cloud(active: bool) -> JsxElement {
         }
         busy = False;
     }
-    async def doPull() -> None {
+    async def doPull() {
         if selRunId == "" { return; }
         busy = True;
         error = "";
@@ -408,130 +420,188 @@ def:pub Cloud(active: bool) -> JsxElement {
         }
         busy = False;
     }
-    async def doTerminateVm() -> None {
-        if selRunId == "" { return; }
-        if not confirmTerm { confirmTerm = True; return; }
-        confirmTerm = False;
-        busy = True;
-        error = "";
-        try {
-            r = await terminate_run_vm(selRunId);
-            if bool(r["ok"]) {
-                runDetail = r["run"];
-                await _loadRuns();
-            } else {
-                error = str(r["error"]);
-            }
-        } except Exception {
-            error = "terminate failed";
-        }
-        busy = False;
-    }
 
-    def _setup() -> JsxElement {
-        configured = bool(cred) and bool(cred["configured"]);
-        source = str(cred["source"]) if cred else "none";
-        acctOk = bool(account) and bool(account["ok"]);
+    # NOTE: nested JSX-returning defs compile to props components — call them
+    # with a dict ({"k": key}), the same way _runRow/_phaseChips are called.
+    def _keyCard(k: any) -> JsxElement {
         btn = "exp-btn ";
-        return <div className="flex flex-col gap-4 p-4">
-            <div className="relative exp-panel p-4 pt-5">
-                <span className="micro-label absolute -top-2 left-3 bg-background px-2">CREDENTIALS</span>
-                <div className="flex flex-wrap items-center gap-3">
-                    <StatusGlyph status={"running" if acctOk else "idle"} showLabel={True} />
-                    <span className="font-mono text-[11px] text-muted-foreground">source · {source}</span>
-                    {acctOk and bool(account) and <span className="font-mono text-[11px] text-muted-foreground">
-                        balance ${str(account["balance"])} · {str(account["team_name"])}
-                    </span>}
-                </div>
-                {len(providers) > 0 and <p className="stat-line mt-2 text-muted-foreground">providers · {", ".join([str(p) for p in providers])}</p>}
-                {not configured and <p className="stat-line mt-2 text-muted-foreground">set SPHERON_API_KEY in the environment or paste a per-user key below</p>}
+        kid = str(k["key_id"]);
+        armed = confirmDeleteKey == kid;
+        pub = str(k["public_key"]);
+        return <div key={kid} className="flex flex-col gap-1.5 rounded-lg border border-border px-3 py-2">
+            <div className="flex flex-wrap items-baseline gap-2">
+                <span className="font-mono text-xs text-foreground">{str(k["label"])}</span>
+                <span className="font-mono text-[10px] text-muted-foreground break-all">{str(k["fingerprint"])}</span>
+                <span className="font-mono text-[10px] text-muted-foreground/80">{_day(str(k["created_at"]))}</span>
             </div>
-
-            <div className="relative exp-panel p-4 pt-5">
-                <span className="micro-label absolute -top-2 left-3 bg-background px-2">API KEY</span>
-                <Field label="SPHERON API KEY">
-                    <TextInput value={apiKey} onSet={lambda (v: str) { apiKey = v; }} placeholder="paste key (never echoed back)" mono={True} />
-                </Field>
-                <div className="mt-3 flex gap-2">
-                    <button onClick={lambda (e: MouseEvent) { doSaveKey(); }} disabled={busy} className={btn + "text-foreground"}>SAVE KEY</button>
-                    <button onClick={lambda (e: MouseEvent) { doClearKey(); }} disabled={busy} className={btn + "text-muted-foreground"}>CLEAR USER KEY</button>
-                </div>
+            <div className="flex flex-wrap gap-2">
+                <button
+                    onClick={lambda (e: MouseEvent) { copyText(pub, kid); }}
+                    aria-label={"Copy public key for " + str(k["label"])}
+                    className={btn + "text-foreground"}>
+                    {"✓ COPIED" if copiedId == kid else "⧉ COPY PUBLIC KEY"}
+                </button>
+                <button
+                    onClick={lambda (e: MouseEvent) { doDeleteKey(kid); }}
+                    disabled={busy}
+                    data-confirm-armed={"1" if armed else None}
+                    aria-label={"Confirm delete key " + str(k["label"]) if armed else "Delete key " + str(k["label"])}
+                    className={btn + ("border-danger text-danger" if armed else "text-muted-foreground")}>
+                    {"⚠ CONFIRM DELETE KEY?" if armed else "✕ DELETE"}
+                </button>
             </div>
-
-            <div className="relative exp-panel p-4 pt-5">
-                <span className="micro-label absolute -top-2 left-3 bg-background px-2">SSH KEYS</span>
-                <p className="stat-line text-muted-foreground">required to deploy — add your public key once, then reuse it</p>
-                <div className="mt-2 flex flex-col gap-1">
-                    {len(sshKeys) == 0 and <span className="stat-line text-muted-foreground/80">no keys uploaded</span>}
-                    {for k in sshKeys {
-                        kid = str(k["id"]);
-                        <button
-                            key={kid}
-                            onClick={lambda (e: MouseEvent) { pickSshKey(kid); }}
-                            className={"exp-hoverable rounded-lg border px-3 py-1 text-left font-mono text-xs transition-colors " + (
-                                "border-accent bg-accent/15 text-foreground" if selSshKeyId == kid
-                                else "border-border text-muted-foreground hover:border-input"
-                            )}
-                        >
-                            {str(k["name"])} · {str(k["fingerprint"])}
-                        </button>
-                    }}
-                </div>
-                <div className="mt-3 flex flex-col gap-2">
-                    <Field label="NAME">
-                        <TextInput value={newKeyName} onSet={lambda (v: str) { newKeyName = v; }} placeholder="studio-key" mono={True} />
-                    </Field>
-                    <Field label="PUBLIC KEY">
-                        <TextInput value={newKeyBody} onSet={lambda (v: str) { newKeyBody = v; }} placeholder="ssh-ed25519 AAAA... user@host" mono={True} />
-                    </Field>
-                    <button onClick={lambda (e: MouseEvent) { doAddSshKey(); }} disabled={busy} className={btn + "text-foreground"}>ADD KEY</button>
-                </div>
-            </div>
-            {error and <p className="stat-line text-danger">{error}</p>}
         </div>;
     }
 
-    # NOTE: this pane renders `error` like _setup()/_runs() do. It used not to,
-    # so a failed TERMINATE / can_terminate showed the user absolutely nothing.
-    def _instances() -> JsxElement {
+    def _clusterCard(c: any) -> JsxElement {
         btn = "exp-btn ";
-        termBlocked = bool(canTerm) and not bool(canTerm["can_terminate"]);
-        return <div className="flex items-start gap-4 p-4 pt-5">
-            <div className="relative flex min-w-0 flex-1 flex-col gap-3 exp-panel p-4 pt-5">
-                <span className="micro-label absolute -top-2 left-3 bg-background px-2">YOUR DEPLOYMENTS</span>
-                {len(instances) == 0 and <span className="stat-line text-muted-foreground/80">no deployments · start a run from the RUNS tab</span>}
-                <div className="flex flex-col gap-1">
-                    {for inst in instances {
-                        did = str(inst["id"]);
-                        <button
-                            key={did}
-                            onClick={lambda (e: MouseEvent) { pickInstance(did); }}
-                            className={"exp-hoverable rounded-lg border px-3 py-2 text-left font-mono text-xs transition-colors " + (
-                                "border-accent bg-accent/15 text-foreground" if selInstance == did
-                                else "border-border text-muted-foreground hover:border-input"
-                            )}
-                        >
-                            {_instLabel(inst)}
-                        </button>
-                    }}
-                </div>
+        cid = str(c["cluster_id"]);
+        armed = confirmRemoveCluster == cid;
+        reachable = bool(c["last_test_ok"]);
+        editing = renameId == cid;
+        keyLabel = str(c["key_label"]) or "key deleted";
+        return <div key={cid} className="flex flex-col gap-1.5 rounded-lg border border-border px-3 py-2">
+            <div className="flex flex-wrap items-baseline gap-2">
+                <span className="font-mono text-xs text-foreground">{str(c["label"])}</span>
+                <span className={"font-mono text-[10px] " + (
+                    "text-ok" if reachable else "text-muted-foreground"
+                )}>
+                    {"● reachable" if reachable else "○ unreachable"}
+                </span>
+                <span className="font-mono text-[10px] text-muted-foreground break-all">{_clusterAddr(c)}</span>
+                <span className="font-mono text-[10px] text-muted-foreground/80">key · {keyLabel}</span>
+            </div>
+            {str(c["last_test_msg"]) and <span className="stat-line text-muted-foreground/80">
+                {str(c["last_test_msg"])} · tested {_day(str(c["last_test_at"]))}
+            </span>}
+            {editing and <div className="flex items-end gap-2">
+                <Field label="NEW NAME">
+                    <TextInput value={renameText} onSet={lambda (v: str) { renameText = v; }} placeholder="my-4090-box" mono={True} />
+                </Field>
+                <button onClick={lambda (e: MouseEvent) { doRename(cid); }} disabled={busy} className={btn + "text-foreground"}>SAVE</button>
+                <button onClick={lambda (e: MouseEvent) { renameId = ""; renameText = ""; }} className={btn + "text-muted-foreground"}>CANCEL</button>
+            </div>}
+            <div className="flex flex-wrap gap-2">
+                <button onClick={lambda (e: MouseEvent) { doRetest(cid); }} disabled={busy}
+                    aria-label={"Retest connection to " + str(c["label"])}
+                    className={btn + "text-foreground"}>↻ RETEST</button>
+                {not editing and <button
+                    onClick={lambda (e: MouseEvent) { renameId = cid; renameText = str(c["label"]); }}
+                    aria-label={"Rename " + str(c["label"])}
+                    className={btn + "text-muted-foreground"}>✎ RENAME</button>}
+                <button
+                    onClick={lambda (e: MouseEvent) { doRemoveCluster(cid); }}
+                    disabled={busy}
+                    data-confirm-armed={"1" if armed else None}
+                    aria-label={"Confirm remove cluster " + str(c["label"]) if armed else "Remove cluster " + str(c["label"])}
+                    className={btn + ("border-danger text-danger" if armed else "text-muted-foreground")}>
+                    {"⚠ CONFIRM REMOVE?" if armed else "✕ REMOVE"}
+                </button>
+            </div>
+        </div>;
+    }
+
+    def _stepKey() -> JsxElement {
+        btn = "exp-btn ";
+        return <div className="relative exp-panel p-4 pt-5">
+            <span className="micro-label absolute -top-2 left-3 bg-background px-2">STEP 1 · SSH KEY</span>
+            <p className="stat-line text-muted-foreground">
+                generated here, on your machine — only the PUBLIC half ever leaves it. make a new one anytime.
+            </p>
+            <div className="mt-3 flex items-end gap-2">
+                <Field label="KEY NAME (NO SPACES)">
+                    <TextInput value={newKeyLabel} onSet={lambda (v: str) { newKeyLabel = v; }} placeholder="my-gpu-box" mono={True} />
+                </Field>
+                <button onClick={lambda (e: MouseEvent) { doGenerateKey(); }} disabled={busy} className={btn + "text-foreground"}>+ GENERATE NEW KEY</button>
             </div>
 
-            <div className="relative flex min-w-0 flex-1 flex-col gap-3 exp-panel p-4 pt-5">
-                <span className="micro-label absolute -top-2 left-3 bg-background px-2">DEPLOYMENT DETAIL</span>
-                {selInstance == "" and <span className="stat-line text-muted-foreground/80">select a deployment</span>}
-                {selInstance != "" and bool(instDetail) and <>
-                    <StatusGlyph status={str(instDetail["cur_state"])} showLabel={True} />
-                    <span className="font-mono text-[11px] text-muted-foreground">os · {str(instDetail["image"])}</span>
-                    <span className="font-mono text-[11px] text-muted-foreground">hourly · ${str(instDetail["dph_total"])}</span>
-                    {str(instDetail["ssh_addr"]) and <span className="font-mono text-[11px] text-muted-foreground break-all">ssh · {str(instDetail["ssh_addr"])}</span>}
-                    {termBlocked and bool(canTerm) and <span className="font-mono text-[11px] text-muted-foreground">min runtime · {str(canTerm["time_remaining"])}s remaining</span>}
-                    <div className="mt-2 flex flex-wrap gap-2">
-                        <button onClick={lambda (e: MouseEvent) { doDestroy(); }} disabled={busy or termBlocked} className={btn + "text-muted-foreground"}>✕ TERMINATE</button>
-                    </div>
-                </>}
-                {error and <p key="insterr" className="stat-line text-danger">{error}</p>}
+            {bool(freshKey) and <div className="mt-3 rounded-md border border-accent bg-accent/10 p-3">
+                <p className="font-mono text-[11px] font-bold text-foreground">PUBLIC KEY · {str(freshKey["label"])}</p>
+                <p className="stat-line mt-1 text-muted-foreground">
+                    paste this into your GPU vendor's console (Spheron, RunPod, Lambda, your own box's ~/.ssh/authorized_keys — anywhere) when you create the instance
+                </p>
+                <pre className="exp-panel mt-2 overflow-x-auto p-2 font-mono text-[10px] leading-relaxed text-foreground break-all whitespace-pre-wrap">{str(freshKey["public_key"])}</pre>
+                <div className="mt-2 flex flex-wrap gap-2">
+                    <button
+                        onClick={lambda (e: MouseEvent) { copyText(str(freshKey["public_key"]), "fresh"); }}
+                        aria-label="Copy the freshly generated public key"
+                        className={btn + "text-foreground"}>
+                        {"✓ COPIED" if copiedId == "fresh" else "⧉ COPY PUBLIC KEY"}
+                    </button>
+                    <button onClick={lambda (e: MouseEvent) { freshKey = None; step = "CONNECT"; }} className={btn + "text-muted-foreground"}>NEXT · CONNECT A BOX →</button>
+                </div>
+            </div>}
+
+            <div className="mt-3 flex flex-col gap-2">
+                {len(sshKeys) == 0 and <span className="stat-line text-muted-foreground/80">no keys yet · generate one above</span>}
+                {[_keyCard({"k": k}) for k in sshKeys if k]}
             </div>
+        </div>;
+    }
+
+    def _stepConnect() -> JsxElement {
+        btn = "exp-btn ";
+        return <div className="relative exp-panel p-4 pt-5">
+            <span className="micro-label absolute -top-2 left-3 bg-background px-2">STEP 2 · CONNECT</span>
+            <p className="stat-line text-muted-foreground">
+                once the box is up with your public key installed, paste the ssh link the vendor gave you
+            </p>
+            <div className="mt-3 flex flex-col gap-2">
+                <Field label="CLUSTER NAME (NO SPACES)">
+                    <TextInput value={newClusterLabel} onSet={lambda (v: str) { newClusterLabel = v; }} placeholder="my-4090-box" mono={True} />
+                </Field>
+                <Field label="SSH LINK / COMMAND" htmlFor="cloud-link">
+                    <textarea
+                        id="cloud-link"
+                        rows={2}
+                        aria-label="ssh link or command from your GPU vendor"
+                        value={linkText}
+                        onChange={lambda (e: ChangeEvent) { linkText = str(e.target.value); }}
+                        placeholder="ssh root@203.0.113.10 -p 2222"
+                        className="exp-input resize-none font-mono"
+                    ></textarea>
+                </Field>
+                <Field label="SSH KEY" htmlFor="cloud-key">
+                    <select
+                        id="cloud-key"
+                        aria-label="ssh key installed on this box"
+                        value={newClusterKeyId}
+                        onChange={lambda (e: ChangeEvent) { newClusterKeyId = str(e.target.value); }}
+                        className="exp-input font-mono"
+                    >
+                        {for k in sshKeys {
+                            <option key={str(k["key_id"])} value={str(k["key_id"])}>{str(k["label"])}</option>
+                        }}
+                    </select>
+                </Field>
+                {len(sshKeys) == 0 and <span className="stat-line text-muted-foreground/80">no keys yet — generate one in STEP 1 first</span>}
+                <button
+                    onClick={lambda (e: MouseEvent) { doAddCluster(); }}
+                    disabled={busy or len(sshKeys) == 0}
+                    className={btn + "self-start text-foreground"}>TEST &amp; SAVE</button>
+            </div>
+            {bool(addResult) and <p className="stat-line mt-2" style={{
+                "color": "var(--ok)" if bool(addResult["test_ok"]) else "var(--text-muted)"
+            }}>
+                {"✓ saved · reachable" if bool(addResult["test_ok"]) else "saved — " + str(addResult["test_message"]) + " · RETEST it below once the box finishes booting"}
+            </p>}
+        </div>;
+    }
+
+    def _clusters() -> JsxElement {
+        return <div className="flex flex-col gap-4 p-4">
+            <Segmented options={STEPS} value={step} onSet={lambda (v: str) { step = v; addResult = None; }} />
+            {step == "SSH KEY" and _stepKey()}
+            {step == "CONNECT" and _stepConnect()}
+
+            <div className="relative exp-panel p-4 pt-5">
+                <span className="micro-label absolute -top-2 left-3 bg-background px-2">SAVED CLUSTERS</span>
+                {len(clusterList) == 0 and <span className="stat-line text-muted-foreground/80">no clusters yet · finish both steps above</span>}
+                <div className="mt-2 flex flex-col gap-2">
+                    {[_clusterCard({"c": c}) for c in clusterList if c]}
+                </div>
+            </div>
+            {error and <p className="stat-line" style={{"color": "var(--danger)"}}>{error}</p>}
         </div>;
     }
 
@@ -576,7 +646,7 @@ def:pub Cloud(active: bool) -> JsxElement {
                 <span className={dotCls}></span>
                 <span className="font-mono text-xs text-foreground">{str(run["name"])}</span>
                 <span className="font-mono text-[10px] text-muted-foreground">{status}</span>
-                {alert and <span className="rounded border border-danger bg-danger/10 px-1.5 font-mono text-[9px] text-danger">BILLING?</span>}
+                {alert and <span className="rounded border border-danger bg-danger/10 px-1.5 font-mono text-[9px] text-danger">NO CONTACT</span>}
             </div>
             {_phaseChips({"run": run})}
             <span className="font-mono text-[10px] text-muted-foreground">{_costLine(run)}</span>
@@ -592,8 +662,15 @@ def:pub Cloud(active: bool) -> JsxElement {
         status = str(run["status"]);
         detached = bool(run["detached"]);
         alert = bool(run["billing_alert"]);
+        onCluster = _clusterById(str(run["cluster_id"]));
+        # `"label" in onCluster`, NOT `len(onCluster) > 0`: a Jac dict compiles to a
+        # plain JS object and `len()` compiles to `.length`, which is `undefined` on
+        # one — so the length test is silently always-false and this fell back to the
+        # raw cluster_id hash forever. Key-membership is the dict-safe spelling (same
+        # as the `"step" in prog` tests just below).
+        clusterName = str(onCluster["label"]) if "label" in onCluster else (str(run["cluster_id"]) or "—");
         prog: dict = {**run["progress"]};
-        step = str(prog["step"]) if "step" in prog else "0";
+        step_n = str(prog["step"]) if "step" in prog else "0";
         maxSteps = str(prog["max_steps"]) if "max_steps" in prog else "0";
         loss = str(prog["loss"]) if "loss" in prog and prog["loss"] is not None else "—";
         evalLoss = str(prog["eval_loss"]) if "eval_loss" in prog and prog["eval_loss"] is not None else "—";
@@ -603,25 +680,22 @@ def:pub Cloud(active: bool) -> JsxElement {
         isTerminal = status == "done" or status == "failed" or status == "stopped";
         return <>
             {alert and <div className="rounded-md border border-danger bg-danger/10 p-3">
-                <p className="font-mono text-[11px] font-bold text-danger">DETACHED — VM MAY STILL BE BILLING</p>
-                <p className="stat-line mt-1 text-danger">supervisor died with the run non-terminal · reattach to resume, or terminate the VM</p>
+                <p className="font-mono text-[11px] font-bold text-danger">DETACHED — SUPERVISOR LOST CONTACT</p>
+                <p className="stat-line mt-1" style={{"color": "var(--danger)"}}>the job may still be running on your cluster · reattach to resume supervising it, or stop it once reattached</p>
                 <button onClick={lambda (e: MouseEvent) { doReattach(); }} disabled={busy} className={btn + "mt-2 border-danger text-danger"}>↻ REATTACH</button>
             </div>}
             <div className="flex items-center gap-3">
                 <StatusGlyph status={"failed" if status == "detached" else status} showLabel={True} />
-                <span className="font-mono text-[11px] text-muted-foreground">{str(run["name"])} · {str(run["mode"])} · dep {str(run["deployment_id"])}</span>
+                <span className="font-mono text-[11px] text-muted-foreground">{str(run["name"])} · {str(run["mode"])} · on {clusterName}</span>
             </div>
             {_phaseChips({"run": run})}
-            <span className="font-mono text-[11px] text-muted-foreground">{_costLine(run)}{" · vm terminated" if bool(run["vm_terminated"]) else ""}</span>
-            <span className="font-mono text-[11px] text-muted-foreground">step {step}/{maxSteps} · loss {loss} · eval {evalLoss}</span>
+            <span className="font-mono text-[11px] text-muted-foreground">{_costLine(run)}</span>
+            <span className="font-mono text-[11px] text-muted-foreground">step {step_n}/{maxSteps} · loss {loss} · eval {evalLoss}</span>
             {str(run["message"]) and <span className="font-mono text-[11px] text-muted-foreground">{str(run["message"])}</span>}
             {str(run["error"]) and <span className="font-mono text-[11px] text-danger">{str(run["error"])}</span>}
             <LogView text={str(run["log_tail"]) or "no train.log yet"} maxH="14rem" />
             <div className="flex flex-wrap gap-2">
                 <button onClick={lambda (e: MouseEvent) { doStopRun(); }} disabled={busy or isTerminal or detached} className={btn + "text-muted-foreground"}>■ STOP</button>
-                <button onClick={lambda (e: MouseEvent) { doTerminateVm(); }} disabled={busy or bool(run["vm_terminated"])} className={btn + ("border-danger text-danger" if confirmTerm else "text-muted-foreground")}>
-                    {"⚠ CONFIRM TERMINATE VM?" if confirmTerm else "✕ TERMINATE VM"}
-                </button>
                 {isTerminal and not pulled and <button onClick={lambda (e: MouseEvent) { doPull(); }} disabled={busy} className={btn + "text-foreground"}>⇩ PULL ARTIFACTS</button>}
             </div>
             {pulled and adapterDir and <span className="font-mono text-[11px] text-muted-foreground break-all">adapter · {adapterDir}</span>}
@@ -630,53 +704,30 @@ def:pub Cloud(active: bool) -> JsxElement {
 
     def _runs() -> JsxElement {
         btn = "exp-btn ";
-        selOffer = _selectedOffer();
+        selCluster = _selectedCluster();
+        # Key-membership, not `len(selCluster) > 0` — see the note in _runDetailPane:
+        # `len()` on a dict compiles to `.length` and is always undefined, which kept
+        # the "runs on <cluster>" confirmation line permanently hidden.
+        hasSelCluster = "label" in selCluster;
         return <div className="flex flex-col gap-4 p-4">
             <div className="flex items-start gap-4">
                 <div className="relative flex min-w-0 flex-1 flex-col gap-3 exp-panel p-4 pt-5">
                     <span className="micro-label absolute -top-2 left-3 bg-background px-2">RUN.CONFIG</span>
 
-                    <Field label="OFFER SEARCH">
-                        <div className="flex gap-2">
-                            <TextInput value={offerQuery} onSet={lambda (v: str) { offerQuery = v; }} placeholder="rtx-4090" mono={True} />
-                            <Segmented options={["DEDICATED", "SPOT", "CLUSTER"]} value={offerType} onSet={lambda (v: str) { offerType = v; }} />
-                            <button onClick={lambda (e: MouseEvent) { _runSearch(); }} disabled={busy} className={btn + "text-foreground"}>SEARCH</button>
-                        </div>
-                    </Field>
-
-                    {len(offers) > 0 and <Field label="OFFER">
+                    <Field label="CLUSTER">
                         <div className="flex flex-col gap-1">
-                            {for o in offers {
-                                oid = str(o["id"]);
+                            {len(clusterList) == 0 and <span className="stat-line text-muted-foreground/80">no clusters yet — add one in the CLUSTERS tab</span>}
+                            {for c in clusterList {
+                                cid = str(c["cluster_id"]);
                                 <button
-                                    key={oid}
-                                    onClick={lambda (e: MouseEvent) { pickOffer(oid); }}
-                                    className={"exp-hoverable rounded-lg border px-3 py-1 font-mono text-xs transition-colors " + (
-                                        "border-accent bg-accent/15 text-foreground" if selOfferId == oid
+                                    key={cid}
+                                    onClick={lambda (e: MouseEvent) { pickCluster(cid); }}
+                                    className={"exp-hoverable rounded-lg border px-3 py-1 text-left font-mono text-xs transition-colors " + (
+                                        "border-accent bg-accent/15 text-foreground" if selClusterId == cid
                                         else "border-input text-muted-foreground hover:text-foreground/80"
                                     )}
                                 >
-                                    {_offerLabel(o)}
-                                </button>
-                            }}
-                        </div>
-                    </Field>}
-                    {len(offers) == 0 and <p className="stat-line text-muted-foreground/80">search to load offers, then pick one</p>}
-
-                    <Field label="SSH KEY">
-                        <div className="flex flex-col gap-1">
-                            {len(sshKeys) == 0 and <span className="stat-line text-muted-foreground/80">no keys — add one in SETUP</span>}
-                            {for k in sshKeys {
-                                kid = str(k["id"]);
-                                <button
-                                    key={kid}
-                                    onClick={lambda (e: MouseEvent) { pickSshKey(kid); }}
-                                    className={"exp-hoverable rounded-lg border px-3 py-1 font-mono text-xs transition-colors " + (
-                                        "border-accent bg-accent/15 text-foreground" if selSshKeyId == kid
-                                        else "border-input text-muted-foreground hover:text-foreground/80"
-                                    )}
-                                >
-                                    {str(k["name"])}
+                                    {("● " if bool(c["last_test_ok"]) else "○ ") + str(c["label"])} · {_clusterAddr(c)}
                                 </button>
                             }}
                         </div>
@@ -690,7 +741,7 @@ def:pub Cloud(active: bool) -> JsxElement {
                         <TextInput value={formModelId} onSet={lambda (v: str) { formModelId = v; }} placeholder="org/model" mono={True} />
                     </Field>
 
-                    <p className="stat-line text-muted-foreground">dataset · mlx train/valid splits from [cloudrun] workspace config (uploaded to the VM as data/*.jsonl)</p>
+                    <p className="stat-line text-muted-foreground">dataset · mlx train/valid splits from [cloudrun] workspace config (uploaded to the cluster as data/*.jsonl)</p>
 
                     <div className="grid grid-cols-3 gap-2">
                         {for key in ["lora_r", "lora_alpha", "lora_dropout", "max_steps", "lr", "per_device_batch_size", "grad_accum", "max_seq_len", "eval_every"] {
@@ -701,15 +752,15 @@ def:pub Cloud(active: bool) -> JsxElement {
                     </div>
 
                     <div className="flex items-center gap-4">
-                        <Field label="AUTO-TERMINATE VM">
+                        <Field label="AUTO-RELEASE ON FINISH">
                             <button
                                 onClick={lambda (e: MouseEvent) { autoTerm = not autoTerm; }}
                                 className={"exp-hoverable rounded-lg border px-3 py-1 font-mono text-[10px] transition-colors " + (
                                     "border-ok bg-ok/10 text-ok" if autoTerm
-                                    else "border-danger bg-danger/10 text-danger"
+                                    else "border-input text-muted-foreground"
                                 )}
                             >
-                                {"ON (terminate on finish)" if autoTerm else "OFF — VM stays up + billing"}
+                                {"ON (release the box on finish)" if autoTerm else "OFF — leave the box as it is"}
                             </button>
                         </Field>
                         <Field label="MAX WALL CLOCK (MIN)">
@@ -717,12 +768,12 @@ def:pub Cloud(active: bool) -> JsxElement {
                         </Field>
                     </div>
 
-                    {len(selOffer) > 0 and <p className="stat-line text-muted-foreground">deploys {_offerLabel(selOffer)} · supervisor uploads data + train_sft.py, monitors, pulls adapter</p>}
+                    {hasSelCluster and <p className="stat-line text-muted-foreground">runs on {str(selCluster["label"])} ({_clusterAddr(selCluster)}) · supervisor uploads data + train_sft.py, monitors, pulls adapter</p>}
 
                     <div className="flex gap-2">
-                        <button onClick={lambda (e: MouseEvent) { doStartRun(); }} disabled={busy or selOfferId == "" or selSshKeyId == ""} className={btn + "text-foreground"}>▶ START REMOTE SFT</button>
+                        <button onClick={lambda (e: MouseEvent) { doStartRun(); }} disabled={busy or selClusterId == ""} className={btn + "text-foreground"}>▶ START REMOTE SFT</button>
                     </div>
-                    {error and <p className="stat-line text-danger">{error}</p>}
+                    {error and <p className="stat-line" style={{"color": "var(--danger)"}}>{error}</p>}
                 </div>
 
                 <div className="relative flex min-w-0 flex-1 flex-col gap-3 exp-panel p-4 pt-5">
@@ -744,12 +795,11 @@ def:pub Cloud(active: bool) -> JsxElement {
     return <div className="flex h-full min-w-0 flex-1 flex-col">
         <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
             <SubTabs tabs={TABS} active={tab.upper()} onTab={onTab} />
-            <span className="micro-label text-muted-foreground/80">SPHERON</span>
+            <span className="micro-label text-muted-foreground/80">BYO CLUSTER</span>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto">
-            {tab == "instances" and _instances()}
+            {tab == "clusters" and _clusters()}
             {tab == "runs" and _runs()}
-            {tab == "setup" and _setup()}
         </div>
     </div>;
 }

@@ -110,11 +110,102 @@ def _raise_fd_limit() -> int {
             continue;
         }
     }
+    # Last resort: every ladder rung was above this process's hard limit, so take
+    # the hard limit itself. Without this the function returns the ORIGINAL soft
+    # limit while leaving free headroom on the table — e.g. a process stuck at
+    # soft=2048/hard=4096 (see the mlx_lm clamp documented below) would keep 2048
+    # even though 4096 is available for the asking.
+    if hard != resource.RLIM_INFINITY and hard > soft {
+        try {
+            resource.setrlimit(resource.RLIMIT_NOFILE, (hard, hard));
+            sys.stderr.write(
+                f"[inference] WARNING: open-file soft limit raised only to the hard cap {hard}, below the {_FD_TARGET} this app needs. Something lowered this process's HARD limit (mlx_lm does exactly that — see _install_fd_guard); an unprivileged process cannot raise it back. Large model loads may fail with [Errno 24] Too many open files.\n"
+            );
+            return int(hard);
+        } except Exception {}
+    }
     sys.stderr.write(
         f"[inference] WARNING: open-file soft limit is {soft}, below the {_FD_TARGET} this app needs (the jac --dev file watcher alone holds ~17.5k fds). Local model loads will likely fail with [Errno 24] Too many open files. Raise it before launch: `ulimit -n 65536` (start.sh does this).\n"
     );
     return int(soft);
 }
+
+"""The real `resource.setrlimit`, captured before we shadow it below."""
+glob _ORIG_SETRLIMIT: any = resource.setrlimit;
+
+"""max() over rlimit values, treating RLIM_INFINITY as the largest. A plain
+`max()` is wrong: RLIM_INFINITY is a sentinel, not a magnitude (it is -1 on
+Linux), so it has to be tested for identity rather than compared."""
+def _rlim_max(a: any, b: any) -> any {
+    if a == resource.RLIM_INFINITY or b == resource.RLIM_INFINITY {
+        return resource.RLIM_INFINITY;
+    }
+    return a if a > b else b;
+}
+
+"""Monotonic RLIMIT_NOFILE: a request may raise the ceiling, never lower it.
+
+Merges the caller's (soft, hard) with the values already in force and keeps the
+maximum of each, so a genuine raise still goes through untouched while a
+lowering request degrades to a no-op. Non-NOFILE resources are passed straight
+to the real setrlimit — this is a targeted guard, not a general veto. Exceptions
+still propagate (the ladder in _raise_fd_limit depends on setrlimit raising when
+a value is refused)."""
+def _guarded_setrlimit(res: any, limits: any) {
+    if res != resource.RLIMIT_NOFILE {
+        _ORIG_SETRLIMIT(res, limits);
+        return;
+    }
+    cur: any = resource.getrlimit(res);
+    _ORIG_SETRLIMIT(
+        res, (_rlim_max(cur[0], limits[0]), _rlim_max(cur[1], limits[1]))
+    );
+}
+
+"""Install the monotonic guard. Returns True if RLIMIT_NOFILE is now protected.
+
+MEASURED ROOT CAUSE #2 (2026-08-10). loaded_model() reported fd_boot_limit=65536
+but fd_soft=2048 / fd_hard=4096 live, on a server that start_prod.sh had booted
+with `ulimit -S -n 65536` (soft=65536 hard=unlimited, confirmed in the boot log).
+Nothing forks or re-execs — the drop happens IN this process, at line 36 of
+`mlx_lm/utils.py` (mlx_lm 0.31.3), which runs unconditionally at import:
+
+    # For large models with lots of files
+    resource.setrlimit(resource.RLIMIT_NOFILE, (2048, 4096))
+
+Upstream means it as a RAISE — macOS hands launchd children a soft limit of 256
+— but it is written as an unconditional SET, so any process that already raised
+its own ceiling gets silently DOWNGRADED the first time anything touches mlx_lm.
+That is the exact gap between fd_boot_limit (measured at this module's import,
+before mlx) and fd_soft (measured live, after some request pulled mlx_lm in).
+
+The damage cannot be undone after the fact: the clamp also drops the HARD limit
+from unlimited to 4096, and an unprivileged process may only ever LOWER a hard
+limit — re-raising fails with `ValueError: not allowed to raise maximum limit`
+(verified on this box). So _raise_fd_limit() cannot repair it; the write has to
+be intercepted before it lands.
+
+Hence a `glob` initializer, ordered BEFORE _FD_BOOT_LIMIT and therefore before
+any body-level `import from mlx_lm` in this module — the guard is in place from
+server boot, and mlx_lm's clamp becomes a no-op here while still working
+normally on a genuinely 256-limited process. Never raises: a failure to install
+leaves the pre-existing behaviour, which is what we had before."""
+def _install_fd_guard() -> bool {
+    try {
+        if getattr(resource.setrlimit, "__name__", "") == "_guarded_setrlimit" {
+            return True;
+        }
+        resource.setrlimit = _guarded_setrlimit;
+        return True;
+    } except Exception as e {
+        sys.stderr.write(
+            f"[inference] WARNING: could not guard resource.setrlimit ({e}); importing mlx_lm will clamp this process to soft=2048/hard=4096 and large model loads may fail with [Errno 24] Too many open files.\n"
+        );
+        return False;
+    }
+}
+
+glob _FD_GUARD_OK: bool = _install_fd_guard();
 
 """Raise the fd ceiling ONCE at import (server boot), not only lazily before each
 model load. The old code called _raise_fd_limit() solely from inside the load
@@ -229,6 +320,12 @@ the live pid. These three numbers make it answerable from the API instead:
   fd_hard is the ceiling this process could still raise itself to, and is
   reported as -1 when it is RLIM_INFINITY (which is not JSON-representable).
 - fd_target: the headroom this app wants; fd_soft below it is the warning state.
+- fd_guard: whether the monotonic setrlimit guard installed (see
+  _install_fd_guard). False means mlx_lm's import-time clamp is live and
+  fd_soft/fd_hard will collapse to 2048/4096 on the first model touch.
+
+fd_soft < fd_boot_limit used to be an unexplained mystery; it is now a concrete
+assertion that the guard is missing or was installed too late.
 
 Deliberately NOT a live open-fd count: there is no portable cheap probe.
 `/proc/self/fd` is Linux-only (this is a macOS box) and walking `/dev/fd` would
@@ -247,7 +344,8 @@ def _fd_info() -> dict {
         "fd_boot_limit": _FD_BOOT_LIMIT,
         "fd_soft": soft,
         "fd_hard": hard,
-        "fd_target": _FD_TARGET
+        "fd_target": _FD_TARGET,
+        "fd_guard": _FD_GUARD_OK
     };
 }
 

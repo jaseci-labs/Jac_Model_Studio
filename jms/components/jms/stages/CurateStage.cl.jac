@@ -41,6 +41,7 @@ re-pulls it after a mutation so the stage rail's curate dot updates. Handlers ar
 named pick.../do.../build.../move... — never set<HasVar>."""
 
 import from react { useEffect }
+import from ....hooks.useConfirmReset { useConfirmReset }
 sv import from ....jms_curate { curate_stats, curate_rows, decide_row, decide_page, rejected_ids, materialize }
 sv import from ....jms_gen { start_gen }
 
@@ -354,6 +355,15 @@ def:pub CurateStage(project: any = None, onRefresh: any = None) -> JsxElement {
         return lambda { doc.removeEventListener("keydown", onKey); };
     }, [rows, cursor, editingId]);
 
+    # An armed BUILD TRAINING SPLIT ("CLICK AGAIN TO OVERWRITE") disarms itself on
+    # Escape, on a pointer-down outside the button, or after 4s — see
+    # hooks/useConfirmReset. Without it the footer stayed armed forever and a later
+    # stray click silently overwrote train.jsonl + holdout.jsonl with a fresh split.
+    # It wraps useEffect, so it must run every render — no early return above it.
+    # `confirmMat` is a bool; the hook keys its timer on a string, so it is passed
+    # as a constant id / "" ("" means nothing is armed).
+    useConfirmReset("split" if confirmMat else "", lambda { confirmMat = False; });
+
     # --------------------------------------------------------------- helpers ----
     def _excerpt(row: any) -> str {
         msgs = list(row["messages"]) if row and "messages" in row else [];
@@ -448,6 +458,7 @@ def:pub CurateStage(project: any = None, onRefresh: any = None) -> JsxElement {
         # screen readers. `else None` keeps the attribute off the DOM when there
         # is nothing to point at (React drops null props).
         acceptHint = "No pending rows on this page — nothing left to accept here." if nPending == 0 else "";
+        acceptHintId = "jms-curate-accept-hint" if acceptHint else "";
         regenHint = "";
         regenHintId = "";
         if regenBusy {
@@ -463,6 +474,7 @@ def:pub CurateStage(project: any = None, onRefresh: any = None) -> JsxElement {
                 className="jms-btn"
                 disabled={nPending == 0}
                 title={acceptHint if acceptHint else "accept every pending row on this page"}
+                aria-describedby={acceptHintId if acceptHintId else None}
                 onClick={lambda e: MouseEvent { acceptAllOnPage(); }}
             >ACCEPT ALL ON PAGE{" (" + str(nPending) + ")" if nPending > 0 else ""}</button>
             <button
@@ -472,6 +484,7 @@ def:pub CurateStage(project: any = None, onRefresh: any = None) -> JsxElement {
                 aria-describedby={regenHintId if regenHintId else None}
                 onClick={lambda e: MouseEvent { regenRejected(); }}
             >{"REGENERATING…" if regenBusy else "REGENERATE REJECTED (" + str(nRej) + ")"}</button>
+            {acceptHint and <span id="jms-curate-accept-hint" className="jms-mono-dim">{acceptHint}</span>}
             {running and <span id="jms-curate-regen-hint" className="jms-mono-dim">a gen job is running — regenerate unlocks when it finishes</span>}
             {regenJid and <span className="jms-mono-dim" style={{"color": "var(--jms-ok)"}}>regen job {regenJid} started — watch the GENERATE tab</span>}
         </div>;
@@ -618,6 +631,7 @@ def:pub CurateStage(project: any = None, onRefresh: any = None) -> JsxElement {
                     disabled={bool(matBusy or loading or nCur == 0)}
                     title={matHint if matHint else "carve the accepted + edited rows into train.jsonl / holdout.jsonl"}
                     aria-describedby={"jms-curate-split-hint" if matHint else None}
+                    data-confirm-armed={"1" if confirmMat else None}
                     onClick={lambda e: MouseEvent { buildSplit(); }}
                 >{matLabel}</button>
                 {matResult and <span className="jms-mono-dim" style={{"color": "var(--jms-ok)"}}>

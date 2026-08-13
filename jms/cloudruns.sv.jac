@@ -1,11 +1,14 @@
-"""studio - supervised remote GPU training runs (Spheron VM + local supervisor).
+"""studio - supervised remote GPU training runs (BYO cluster + local supervisor).
 
 Wires remote/supervisor.py (the detached per-run orchestrator) into the app:
-start_remote_run deploys a Spheron instance (budget guards in spheron.sv.jac
-apply), writes <run_dir>/runspec.json, and spawns the supervisor detached via
-jobs.spawn_detached. From then on the supervisor owns the run end-to-end
-(wait_vm → provision → launch → monitor → pull → terminate) and communicates
-only through files in the run dir:
+start_remote_run resolves a SAVED cluster (clusters.sv.jac) into an ssh command,
+writes <run_dir>/runspec.json with that command as `ssh_override`, and spawns the
+supervisor detached via jobs.spawn_detached with `--no-spheron-api`. Nothing is
+provisioned or billed here — the box is the user's own persistent hardware, so
+there is no marketplace offer, no deployment id and no vendor REST API in the
+loop. From then on the supervisor owns the run end-to-end (wait_vm → provision →
+launch → monitor → pull → terminate) and communicates only through files in the
+run dir:
 
   status.json      phase/status/heartbeat/cost/progress/artifacts (read here)
   .job-<mode>.json jobs contract (jobs.live_status resolves it)
@@ -16,8 +19,12 @@ only through files in the run dir:
 A CloudRun node on the caller's root tracks each run (multi-tenant: run dirs
 live under auth.user_results_dir()). "Detached" = status.json still says
 running BUT the heartbeat is stale (>90s) AND the supervisor pid is dead —
-the VM may still be billing, so list views carry a billing_alert flag and
-reattach_run respawns the supervisor with --resume.
+the remote job may still be burning the user's box, so list views carry a
+billing_alert flag and reattach_run respawns the supervisor with --resume.
+
+`deployment_id`/`hourly_rate` survive on the CloudRun node (and in the runspec)
+purely for schema/UI compatibility with the old marketplace flow — they are now
+always "" and 0.0.
 
 Checker notes (jaclang 0.16.1): dict/JSON values are `any` → int(str(...)) /
 float(str(...)) coercions throughout; json.loads into typed dict via dict(...).
@@ -32,10 +39,10 @@ import time;
 import audit;
 import auth;
 import backends;
+import clusters;
 import jobs;
 import metrics;
 import paths;
-import spheron;
 import workspace;
 import from pathlib { Path }
 import from uuid { uuid4 }
@@ -46,6 +53,7 @@ node CloudRun {
     has name: str = "";
     has mode: str = "sft";
     has backend: str = "spheron_gpu";
+    has cluster_id: str = "";
     has deployment_id: str = "";
     has hourly_rate: float = 0.0;
     has supervisor_pid: int = 0;
@@ -198,14 +206,17 @@ def _read_status(run_dir: Path) -> dict {
     }
 }
 
-"""One-way control file recording a server-side direct VM teardown
-(terminate_run_vm). status.json is OWNED by remote/supervisor.py, which rewrites
-it wholesale on every heartbeat — a server-side read-modify-write of that file
-races the supervisor and clobbers phase/heartbeat/cost. So the terminate signal
-goes in its own file that only this module writes and only _view reads, the same
-one-way pattern as control.json.
-ponytail: the file's mere existence is the signal (its body is informational).
-Ceiling — no timestamp is surfaced to the client; the audit log has the when."""
+"""One-way control file recording a server-side direct VM teardown.
+
+Legacy: it was written by the old `terminate_run_vm` panic button, which killed
+the marketplace VM through the vendor API. BYO clusters are the user's own
+persistent hardware — nothing to destroy — so nothing writes this file anymore,
+but _view still ORs it in so runs from the old flow keep reading correctly.
+
+status.json is OWNED by remote/supervisor.py, which rewrites it wholesale on
+every heartbeat, so this signal deliberately never lived in there (a read-modify-
+write would clobber phase/heartbeat/cost). The file's mere existence is the
+signal; its body is informational."""
 def _vm_terminated_file(run_dir: Path) -> Path {
     return run_dir / "vm-terminated.json";
 }
@@ -238,13 +249,11 @@ def _is_detached(st: dict, pid: int) -> bool {
     return not jobs.alive(pid);
 }
 
-"""Env for the spawned supervisor: resolved Spheron key + API base, plus the
-transport-shim seam (JMS_*_BIN / FAKE_REMOTE_ROOT) when set server-side."""
+"""Env for the spawned supervisor: just the transport-shim seam
+(JMS_*_BIN / FAKE_REMOTE_ROOT) when set server-side. No vendor API credentials —
+every run is --no-spheron-api and reaches its box through runspec.ssh_override."""
 def _supervisor_env() -> dict {
-    env: dict = {
-        "SPHERON_API_KEY": spheron.resolved_api_key(),
-        "SPHERON_API_URL": spheron.api_base()
-    };
+    env: dict = {};
     for k in ["JMS_SSH_BIN", "JMS_RSYNC_BIN", "JMS_SCP_BIN", "FAKE_REMOTE_ROOT"] {
         v = os.environ.get(k, "");
         if v { env[k] = v; }
@@ -254,12 +263,18 @@ def _supervisor_env() -> dict {
 
 """Spawn remote/supervisor.py detached against *run_dir*. flag: '' | '--resume'
 | '--pull-only'. stdout+stderr → <run_dir>/supervisor.log (the __EXIT__ jobs
-marker goes to run-<mode>.log, written by the supervisor itself)."""
+marker goes to run-<mode>.log, written by the supervisor itself).
+
+`--no-spheron-api` is ALWAYS passed (it is an independent store_true, so it
+composes with --resume/--pull-only): every run now reaches its box through
+runspec.ssh_override, so the supervisor must never call a vendor REST API to
+resolve a transport or to terminate — it just marks vm_terminated itself."""
 def _spawn_supervisor(run_dir: Path, flag: str = "") -> int {
     py = os.environ.get("JMS_PYTHON", "python3");
     sup = paths.studio_root() / "remote" / "supervisor.py";
     cmd = f"{shlex.quote(py)} {shlex.quote(str(sup))} --run-dir {shlex.quote(str(run_dir))}";
     if flag { cmd = f"{cmd} {flag}"; }
+    cmd = f"{cmd} --no-spheron-api";
     return jobs.spawn_detached(
         cmd,
         runlog=run_dir / "supervisor.log",
@@ -287,14 +302,9 @@ def _view(r: CloudRun, tail_n: int = 40) -> dict {
     if status in ["done", "failed", "stopped"] and r.status != status {
         r.status = status;
     }
-    # Either the supervisor recorded the teardown in status.json, or the server
-    # tore the VM down itself via terminate_run_vm (one-way control file).
+    # The supervisor records its teardown in status.json; the one-way signal file
+    # is the legacy server-side path (kept so old runs still read correctly).
     vm_terminated = (bool(st.get("vm_terminated", False)) if has_st else False) or _vm_terminated_signal(rd);
-    if vm_terminated {
-        # Supervisor deleted the VM via the API directly — release the budget
-        # guard's reservation node (idempotent).
-        spheron.mark_deployment_terminated(r.deployment_id);
-    }
     cost_raw = st.get("cost");
     cost: dict = dict(cost_raw) if isinstance(cost_raw, dict) else {
         "hourly_rate": r.hourly_rate, "elapsed_usd": 0.0, "terminated_at": ""
@@ -310,6 +320,7 @@ def _view(r: CloudRun, tail_n: int = 40) -> dict {
         "name": r.name,
         "mode": r.mode,
         "backend": r.backend,
+        "cluster_id": r.cluster_id,
         "deployment_id": r.deployment_id,
         "hourly_rate": r.hourly_rate,
         "created": r.created,
@@ -332,12 +343,16 @@ def _view(r: CloudRun, tail_n: int = 40) -> dict {
     };
 }
 
-"""Start a supervised remote SFT run. cfg:
-  {name, mode: "sft", base_model, offer: {offer_id, gpu_type, gpu_count,
-   region, os?, instance_type?, hourly_rate, provider?}, ssh_key_id?,
+"""Start a supervised remote SFT run on one of the caller's saved clusters. cfg:
+  {name, mode: "sft", base_model,
+   cluster_id  (REQUIRED str — a cluster_id from clusters.list_clusters()),
    opts: {lora/train params}?, dataset: {train_rel, valid_rel}?,
-   policy: {auto_terminate?, max_wall_clock_min?, ...}?, ssh_override?,
+   policy: {auto_terminate?, max_wall_clock_min?, ...}?,
    launch_cmd_override?  (dev/test-only: bypasses the backend template)}
+
+`cluster_id` is resolved through clusters.cluster_ssh_override() into the
+runspec's `ssh_override` (a cfg-supplied `ssh_override` is overridden by it).
+Nothing is provisioned: deployment_id stays "" and hourly_rate 0.0.
 Returns {ok, run, error}."""
 def start_remote_run(cfg: dict) -> dict {
     name = str(cfg.get("name", ""));
@@ -349,17 +364,15 @@ def start_remote_run(cfg: dict) -> dict {
     if not base_model or not jobs.safe(base_model, allow_slash=True) {
         return _err("invalid base_model");
     }
-    offer_raw = cfg.get("offer");
-    if not isinstance(offer_raw, dict) { return _err("offer required (pick one from search)"); }
-    offer: dict = dict(offer_raw);
-    offer_id = str(offer.get("offer_id", ""));
-    if not offer_id { return _err("offer.offer_id required"); }
-    hourly_rate = 0.0;
-    try {
-        hourly_rate = float(str(offer.get("hourly_rate", 0.0)));
-    } except Exception {
-        return _err("offer.hourly_rate invalid");
+    cluster_id = str(cfg.get("cluster_id", "")).strip();
+    if not cluster_id { return _err("cluster_id required (pick a saved cluster)"); }
+    ovr = clusters.cluster_ssh_override(cluster_id);
+    if not ovr {
+        return _err("cluster not found or its ssh key was deleted — reconnect it in the CLUSTERS tab");
     }
+    # No VM is deployed: the box already exists and is the user's own hardware.
+    deployment_id = "";
+    hourly_rate = 0.0;
 
     ds = _dataset_rels(cfg);
     train_rel = str(ds["train_rel"]);
@@ -395,23 +408,10 @@ def start_remote_run(cfg: dict) -> dict {
         }
     }
 
-    dep = spheron.create_gpu_instance(
-        offer_id=offer_id,
-        gpu_type=str(offer.get("gpu_type", "")),
-        gpu_count=int(str(offer.get("gpu_count", 1))),
-        region=str(offer.get("region", "")),
-        operating_system=str(offer.get("os", "ubuntu22.04")),
-        instance_type=str(offer.get("instance_type", "DEDICATED")),
-        hourly_rate=hourly_rate,
-        ssh_key_id=str(cfg.get("ssh_key_id", "")),
-        provider=str(offer.get("provider", "spheron-ai")),
-        name=name
-    );
-    if not bool(dep["ok"]) { return _err(str(dep["error"])); }
-    deployment_id = str(dep["deployment_id"]);
-
     run_id = str(uuid4());
-    spec = _build_runspec(cfg, run_id, deployment_id, hourly_rate, launch_cmd);
+    # The resolved cluster ssh command rides in through _build_runspec's existing
+    # ssh_override passthrough (copy, not mutation — cfg belongs to the caller).
+    spec = _build_runspec({**cfg, "ssh_override": ovr}, run_id, deployment_id, hourly_rate, launch_cmd);
     run_dir = _run_dir(name);
     run_dir.mkdir(parents=True, exist_ok=True);
     # Clear a previous run's state under the same name: stale status/control
@@ -430,8 +430,7 @@ def start_remote_run(cfg: dict) -> dict {
     try {
         pid = _spawn_supervisor(run_dir, "");
     } except Exception as e {
-        spheron.destroy_gpu_instance(deployment_id);  # billing safety
-        return _err(f"spawn failed (VM terminate attempted): {e}");
+        return _err(f"spawn failed: {e}");
     }
     jobs.write_job(run_dir / f".job-{mode}.json", {
         "name": name, "mode": mode, "pid": pid,
@@ -440,13 +439,15 @@ def start_remote_run(cfg: dict) -> dict {
 
     r = CloudRun(
         run_id=run_id, name=name, mode=mode, backend="spheron_gpu",
-        deployment_id=deployment_id, hourly_rate=hourly_rate,
+        cluster_id=cluster_id, deployment_id=deployment_id, hourly_rate=hourly_rate,
         supervisor_pid=pid, created=_now(), status="running"
     );
     root ++> r;
+    # cluster_id only — never the resolved ssh command, which carries a path to
+    # private key material (see clusters.cluster_ssh_override).
     audit.log("cloudrun_start", {
-        "run_id": run_id, "name": name, "deployment_id": deployment_id,
-        "hourly_rate": hourly_rate, "supervisor_pid": pid
+        "run_id": run_id, "name": name, "cluster_id": cluster_id,
+        "supervisor_pid": pid
     });
     return {"ok": True, "run": _view(r), "error": ""};
 }
@@ -470,8 +471,8 @@ def list_cloud_runs() -> dict {
 }
 
 """Graceful stop: control.json {"action":"stop"} → the supervisor pkills the
-remote job, pulls partials, terminates the VM per policy. If the supervisor is
-already dead, falls back to jobs.stop + direct VM terminate (best-effort)."""
+remote job and pulls partials. If the supervisor is already dead, falls back to
+jobs.stop (there is no VM to destroy — the cluster is the user's own box)."""
 def stop_run(run_id: str) -> dict {
     r = _find_run(run_id);
     if r is None { return _err("run not found"); }
@@ -484,11 +485,6 @@ def stop_run(run_id: str) -> dict {
     } except Exception {}
     if not jobs.alive(pid) {
         jobs.stop(rd / f".job-{r.mode}.json", rd / f"run-{r.mode}.log");
-        if r.deployment_id {
-            try {
-                spheron.destroy_gpu_instance(r.deployment_id);
-            } except Exception {}
-        }
         r.status = "stopped";
     }
     audit.log("cloudrun_stop", {"run_id": run_id, "supervisor_alive": jobs.alive(pid)});
@@ -538,28 +534,5 @@ def pull_artifacts(run_id: str) -> dict {
     }
     r.supervisor_pid = newpid;
     audit.log("cloudrun_pull", {"run_id": run_id, "supervisor_pid": newpid});
-    return {"ok": True, "run": _view(r), "error": ""};
-}
-
-"""Panic button: terminate the backing VM directly via the Spheron API,
-bypassing the supervisor. Stops all billing."""
-def terminate_run_vm(run_id: str) -> dict {
-    r = _find_run(run_id);
-    if r is None { return _err("run not found"); }
-    if not r.deployment_id { return _err("run has no deployment"); }
-    res = spheron.destroy_gpu_instance(r.deployment_id);
-    audit.log("cloudrun_terminate_vm", {"run_id": run_id, "ok": bool(res["ok"])});
-    if not bool(res["ok"]) { return _err(str(res["error"])); }
-    # Record the terminate so billing_alert clears even though no supervisor is
-    # alive to write it. This used to read-modify-write status.json — a file
-    # remote/supervisor.py OWNS and rewrites every heartbeat, so a live
-    # supervisor's phase/heartbeat/cost got clobbered by our stale copy. Write a
-    # separate one-way control file instead (same pattern as control.json) and
-    # let _view OR it into vm_terminated.
-    rd = _run_dir(r.name);
-    try {
-        rd.mkdir(parents=True, exist_ok=True);
-        _vm_terminated_file(rd).write_text(json.dumps({"vm_terminated": True, "at": _now()}));
-    } except Exception {}
     return {"ok": True, "run": _view(r), "error": ""};
 }
