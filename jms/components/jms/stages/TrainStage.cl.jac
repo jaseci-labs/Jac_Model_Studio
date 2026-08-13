@@ -1,14 +1,16 @@
 """TrainStage — the TRAIN stage panel of a JMS project.
 
-Config card: a backend toggle (LOCAL MLX / SPHERON GPU). LOCAL picks an available
-local base model from list_models; SPHERON takes a free-text HF base-model id + a
-GPU-offer picker (search_gpus by query, same pattern as Cloud.cl.jac RUNS) and a
-"runs on your Spheron account" note. Common LoRA opts (iters, batch, lr, r, alpha)
-with sensible defaults. START TRAINING is disabled while a run is training or when
-no train split is materialized (hint points back to CURATE).
+Config card: a backend toggle (LOCAL MLX / MY CLUSTER). LOCAL picks an available
+local base model from list_models; MY CLUSTER (the `"spheron"` backend token, kept
+for wire compatibility) takes a free-text HF base-model id + a picker over the
+user's own saved BYO-SSH clusters (list_clusters — created/tested in the
+EXPERIMENTS · Cloud · CLUSTERS tab, never here) and a "runs on your own cluster
+over SSH" note. Common LoRA opts (iters, batch, lr, r, alpha) with sensible
+defaults. START TRAINING is disabled while a run is training or when no train
+split is materialized (hint points back to CURATE).
 
 Runs list: rid · backend chip · base-model · status dot · elapsed · adapter ✓;
-selecting one opens a detail view (status line + spheron phase/cost, LogView tail,
+selecting one opens a detail view (status line + remote phase/cost, LogView tail,
 MonoChart loss curve, STOP). Polls list_train_runs / train_status every 3s ONLY
 while `active` (this stage is the visible one) — the interval id is effect-local
 so the cleanup can actually see it (Cloud.cl.jac pattern).
@@ -19,7 +21,7 @@ Handlers are named start.../stop.../select... — never set<HasVar>."""
 import from react { useEffect }
 sv import from ....jms_train { start_train, train_status, stop_train, list_train_runs }
 sv import from ....models { list_models }
-sv import from ....spheron { search_gpus, spheron_ssh_keys }
+sv import from ....clusters { list_clusters }
 import from ...shared.MonoChart { MonoChart }
 import from ...shared.LogView { LogView }
 
@@ -37,12 +39,8 @@ def:pub TrainStage(project: any = None, onRefresh: any = None, active: bool = Tr
         localModels: list = [],
         localModel: str = "",
         hfBase: str = "Qwen/Qwen3-0.6B",
-        offerQuery: str = "rtx-4090",
-        offers: list = [],
-        selOfferId: str = "",
-        offerBusy: bool = False,
-        sshKeys: list = [],
-        selSshKeyId: str = "",
+        clusters: list = [],
+        selClusterId: str = "",
         itersStr: str = "200",
         batchStr: str = "1",
         lrStr: str = "1e-5",
@@ -97,13 +95,13 @@ def:pub TrainStage(project: any = None, onRefresh: any = None, active: bool = Tr
         } except Exception {}
     }
 
-    async def loadSshKeys -> None {
+    async def loadClusters -> None {
         try {
-            r = await spheron_ssh_keys();
+            r = await list_clusters();
             if bool(r["ok"]) {
-                sshKeys = list(r["keys"]);
-                if selSshKeyId == "" and len(sshKeys) > 0 {
-                    selSshKeyId = str(sshKeys[0]["id"]);
+                clusters = list(r["clusters"]);
+                if selClusterId == "" and len(clusters) > 0 {
+                    selClusterId = str(clusters[0]["cluster_id"]);
                 }
             }
         } except Exception {}
@@ -111,7 +109,7 @@ def:pub TrainStage(project: any = None, onRefresh: any = None, active: bool = Tr
 
     async can with entry {
         await loadModels();
-        await loadSshKeys();
+        await loadClusters();
     }
 
     # Effect-local interval id + `active` gate: a `can with exit` cleanup closes over
@@ -124,23 +122,6 @@ def:pub TrainStage(project: any = None, onRefresh: any = None, active: bool = Tr
         }
         return lambda { if iv is not None { clearInterval(float(str(iv))); } };
     }, [active]);
-
-    async def searchOffers -> None {
-        offerBusy = True;
-        try {
-            r = await search_gpus(search=offerQuery, instance_type="DEDICATED", limit=12);
-            offers = list(r["offers"]) if r and "offers" in r else [];
-            if selOfferId == "" and len(offers) > 0 { selOfferId = str(offers[0]["id"]); }
-        } except Exception {}
-        offerBusy = False;
-    }
-
-    def _selectedOffer -> dict {
-        for o in offers {
-            if str(o["id"]) == selOfferId { return {**o}; }
-        }
-        return {};
-    }
 
     def _opts -> dict {
         iters = _toInt(itersStr);
@@ -158,29 +139,12 @@ def:pub TrainStage(project: any = None, onRefresh: any = None, active: bool = Tr
         opts = _opts();
         baseModel = localModel if backend == "local-mlx" else hfBase;
         if backend == "spheron" {
-            offer = _selectedOffer();
-            if len(offer) == 0 {
-                startErr = "search and pick a GPU offer first";
+            if selClusterId == "" {
+                startErr = "add a cluster in the EXPERIMENTS Cloud CLUSTERS tab first";
                 startBusy = False;
                 return;
             }
-            if selSshKeyId == "" {
-                startErr = "add an SSH key in the EXPERIMENTS Cloud SETUP tab first";
-                startBusy = False;
-                return;
-            }
-            os_opts = list(offer["os_options"]) if "os_options" in offer else [];
-            opts["offer"] = {
-                "offer_id": str(offer["id"]),
-                "gpu_type": str(offer["gpu_type"]),
-                "gpu_count": int(str(offer["num_gpus"])),
-                "region": str(offer["region"]),
-                "os": str(os_opts[0]) if len(os_opts) > 0 else "ubuntu22.04",
-                "instance_type": str(offer["instance_type"]),
-                "hourly_rate": float(str(offer["dph_total"])),
-                "provider": str(offer["provider"])
-            };
-            opts["ssh_key_id"] = selSshKeyId;
+            opts["cluster_id"] = selClusterId;
         }
         res: any = None;
         try {
@@ -264,7 +228,7 @@ def:pub TrainStage(project: any = None, onRefresh: any = None, active: bool = Tr
                 <button
                     className={"jms-btn" + (" jms-btn-accent" if backend == "spheron" else "")}
                     onClick={lambda e: MouseEvent { backend = "spheron"; startErr = ""; }}
-                >SPHERON GPU</button>
+                >MY CLUSTER</button>
             </div>
 
             {backend == "local-mlx" and <div className="flex flex-col gap-1.5">
@@ -292,50 +256,26 @@ def:pub TrainStage(project: any = None, onRefresh: any = None, active: bool = Tr
                         onChange={lambda e: any { hfBase = str(e.target.value); }}
                     />
                 </div>
-                <div className="flex flex-wrap items-end gap-2">
-                    <div className="flex flex-col gap-1.5">
-                        <span className="jms-label">GPU OFFER SEARCH</span>
-                        <input
-                            className="jms-input" style={{"width": "160px"}}
-                            aria-label="GPU offer search"
-                            value={offerQuery}
-                            onChange={lambda e: any { offerQuery = str(e.target.value); }}
-                        />
-                    </div>
-                    <button
-                        className="jms-btn" disabled={offerBusy}
-                        onClick={lambda e: MouseEvent { searchOffers(); }}
-                    >{"SEARCHING…" if offerBusy else "SEARCH GPUS"}</button>
-                </div>
-                {len(offers) > 0 and <div className="flex flex-col gap-1">
-                    {for o in offers {
-                        <button
-                            key={str(o["id"])}
-                            className={"jms-pill" + (" jms-pill-active" if selOfferId == str(o["id"]) else "")}
-                            onClick={lambda e: MouseEvent { selOfferId = str(o["id"]); }}
-                        >
-                            <span className="jms-pill-dot" />
-                            <span>{str(o["gpu_type"])} ×{str(o["num_gpus"])} · {str(o["region"])} · ${str(o["dph_total"])}/hr · {str(o["provider"])}</span>
-                        </button>
-                    }}
-                </div>}
                 <div className="flex flex-col gap-1.5">
-                    <span className="jms-label">SSH KEY</span>
-                    {len(sshKeys) == 0 and <span className="jms-mono-dim" style={{"color": "var(--jms-danger)"}}>no keys — add one in EXPERIMENTS · Cloud · SETUP</span>}
-                    {len(sshKeys) > 0 and <div className="flex flex-col gap-1">
-                        {for k in sshKeys {
+                    <span className="jms-label">CLUSTER</span>
+                    {len(clusters) == 0 and <span className="jms-mono-dim" style={{"color": "var(--jms-danger)"}}>no clusters — add one in EXPERIMENTS · Cloud · CLUSTERS</span>}
+                    {len(clusters) > 0 and <div className="flex flex-col gap-1">
+                        {for c in clusters {
                             <button
-                                key={str(k["id"])}
-                                className={"jms-pill" + (" jms-pill-active" if selSshKeyId == str(k["id"]) else "")}
-                                onClick={lambda e: MouseEvent { selSshKeyId = str(k["id"]); }}
+                                key={str(c["cluster_id"])}
+                                className={"jms-pill" + (" jms-pill-active" if selClusterId == str(c["cluster_id"]) else "")}
+                                onClick={lambda e: MouseEvent { selClusterId = str(c["cluster_id"]); }}
                             >
                                 <span className="jms-pill-dot" />
-                                <span>{str(k["name"])}</span>
+                                <span>
+                                    {str(c["label"])} · {str(c["user"])}@{str(c["host"])} ·
+                                    {" " + ("● reachable" if bool(c["last_test_ok"]) else "○ unreachable")}
+                                </span>
                             </button>
                         }}
                     </div>}
                 </div>
-                <span className="jms-mono-dim">runs on your Spheron account · the VM is billed until the run finishes</span>
+                <span className="jms-mono-dim">runs on your own cluster over SSH</span>
             </div>}
 
             <div className="flex flex-wrap items-end gap-3">

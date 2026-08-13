@@ -30,19 +30,9 @@ label = "Qwen · DPO"
 path = "models/qwen-jac-dpo-fused-q8"
 
 [[models.registry]]
-id = "gemma-dpo"
-label = "Gemma · DPO"
-path = "models/gemma-jac-dpo-fused-q8"
-
-[[models.registry]]
 id = "qwen-sft"
 label = "Qwen · SFT"
 path = "models/qwen-jac-fused-q8"
-
-[[models.registry]]
-id = "gemma-sft"
-label = "Gemma · SFT"
-path = "models/gemma-jac-fused-q8"
 
 [[models.registry]]
 id = "qwen3coder-rl"
@@ -58,11 +48,6 @@ path = "models/qwen-q4"
 id = "qwen-cpt-v1"
 label = "Qwen · CPT-v1"
 path = "models/qwen-cpt-v1-fused-q4"
-
-[[models.registry]]
-id = "gemma-base"
-label = "Gemma 3 · 4B"
-path = "models/gemma-3-4b"
 
 # eval holdout sets (rel to data root); keys are the client-facing holdout ids
 [models.holdouts]

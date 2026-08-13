@@ -3,7 +3,7 @@
 # in-process API + serves the cl UI via Vite on loopback, rendered in the
 # OS-native webview (WebKitGTK on Linux). `jac setup desktop` initializes the
 # target; this builds (if needed) then launches the native window. Ctrl-C stops it.
-# (For the browser/web target instead of a native window, drop `--client desktop`.)
+# (For the browser/web target instead of a native window, drop `--client web`.)
 set -e
 cd "$(dirname "$0")"
 
@@ -11,19 +11,6 @@ _STUDIO_DIR="$(pwd)"
 _WORKSPACE_DEFAULT="$(dirname "$_STUDIO_DIR")"
 export JAC_STUDIO_WORKSPACE="${JAC_STUDIO_WORKSPACE:-$_WORKSPACE_DEFAULT}"
 export JAC_STUDIO_DATA_ROOT="${JAC_STUDIO_DATA_ROOT:-$JAC_STUDIO_WORKSPACE}"
-
-# SQLite concurrency hardening — see scripts/pysite/sitecustomize.py for the
-# full root-cause writeup. Short version: jac-scale opens a NEW sqlite
-# connection to .jac/data/anchor_store.db per HTTP request and re-runs a schema
-# write on it, both jaclang connect sites keep the stdlib 5s busy timeout, and
-# users.db is left in DELETE journal mode by SQLAlchemy — so two concurrent
-# browser sessions made unrelated read endpoints 500 with
-# "sqlite3.OperationalError: database is locked". None of that is reachable
-# from jac.toml, so the wrapper is installed via PYTHONPATH/sitecustomize,
-# which CPython imports before any jac code runs. Must stay exported: the
-# desktop target runs the sv codespace in a separate bundled interpreter, and
-# detached worker subprocesses hit the same databases.
-export PYTHONPATH="$_STUDIO_DIR/scripts/pysite${PYTHONPATH:+:$PYTHONPATH}"
 
 # --- Open-file ceiling (must be raised BEFORE the process exists) -------------
 # UPSTREAM BUG (jaclang): `--dev` makes jaclang watch the WHOLE project via
@@ -157,4 +144,4 @@ while IFS= read -r -d '' _wd_jac; do
 done < <(find "$HOME/.cache/jac/rt" -name 'client_dev_common.jac' -not -path '*/.tmp.*' -print0 2>/dev/null)
 unset _wd_jac
 
-exec jac start --client desktop --dev main.jac
+exec jac start --client web --dev main.jac

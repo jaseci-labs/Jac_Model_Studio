@@ -135,9 +135,9 @@ def:pub Landing(onPick: any = None) -> JsxElement {
             <div className="jms-feature reveal jms-seq-8">
                 <div className="jms-feat-head">
                     <span className="jms-label">CLOUD · WHEN YOU WANT</span>
-                    <span className="jms-feat-tag">SPHERON</span>
+                    <span className="jms-feat-tag">BYO GPU</span>
                 </div>
-                <div className="jms-hero-sub" style={{"marginTop":"6px"}}>Burst to Spheron GPUs for heavier finetunes.</div>
+                <div className="jms-hero-sub" style={{"marginTop":"6px"}}>Bring your own GPU box over SSH for heavier finetunes.</div>
                 <span className="jms-feat-rule" />
             </div>
             <div className="jms-feature reveal jms-seq-9">

@@ -11,11 +11,13 @@ The ONLY module that touches a training backend for a JMS project. Two backends:
              a JSON config file (valid YAML: yaml.load reads it) so LoRA rank/scale
              — which have no CLI flag — can be set; CLI has no rank flag.
 
-  spheron    A remote Spheron VM run, delegated wholesale to cloudruns.sv.jac
-             (P8). The CloudRun node owns the VM lifecycle; the JmsTrainRun node
+  spheron    A remote BYO-cluster run, delegated wholesale to cloudruns.sv.jac
+             (P8). The CloudRun node owns the run lifecycle; the JmsTrainRun node
              just carries `cloud_run_id` and proxies status/cost/phase through.
              NO heavy lock (the GPU is remote). base_model is a free-text HF id.
-             The picked offer is REQUIRED (client sends it).
+             A saved `cluster_id` (clusters.sv.jac) is REQUIRED (client sends it).
+             "spheron" is a frozen internal backend token, not a vendor: nothing
+             is provisioned or billed, the box is the user's own hardware.
 
 The JmsTrainRun node lives in jms_projects.sv.jac (same one-way-import precedent
 as JmsGenJob) so get_project can list runs without importing this module. The
@@ -57,7 +59,7 @@ glob DEFAULT_NUM_LAYERS: int = 16;
 glob DEFAULT_LORA_R: int = 8;
 glob DEFAULT_LORA_SCALE: str = "16.0";   # mlx's lora_parameters.scale (~alpha)
 glob VALID_FRACTION: int = 10;           # % of train reserved as valid when holdout empty
-glob _CONTROL_KEYS: list[str] = ["offer", "launch_cmd_override", "ssh_key_id", "ssh_override", "policy"];
+glob _CONTROL_KEYS: list[str] = ["cluster_id", "launch_cmd_override", "ssh_override", "policy"];
 
 def _now() -> str {
     return datetime.datetime.now(datetime.UTC).replace(tzinfo=None).isoformat() + "Z";
@@ -178,12 +180,12 @@ def _cfg_iters(r: JmsTrainRun) -> int {
 """Start a LoRA finetune on a project's curated dataset. Guards: train.jsonl
 exists non-empty, backend ∈ {local-mlx, spheron}, no other run already running on
 this project. local-mlx additionally needs an available local base model + the
-free heavy GPU lock; spheron needs opts.offer. `opts`:
+free heavy GPU lock; spheron needs opts.cluster_id. `opts`:
 
   common:   iters, batch_size, learning_rate, num_layers, lora_r, lora_alpha
-  spheron:  offer (REQUIRED {offer_id, gpu_type, gpu_count, region, os?,
-            instance_type?, hourly_rate, provider?}), ssh_key_id?, ssh_override?,
-            policy?, launch_cmd_override? (dev/test bypass, forwarded to cloudruns)
+  spheron:  cluster_id (REQUIRED str — a saved cluster id from clusters.sv.jac,
+            resolved to an ssh command by cloudruns), policy?,
+            launch_cmd_override? (dev/test bypass, forwarded to cloudruns)
 
 Returns {ok, rid, run, error} — run is the train_status dict."""
 def start_train(pid: str, backend: str, base_model: str, opts: dict = {}) -> dict {
@@ -321,12 +323,14 @@ def _start_local(p: JmsProject, rid: str, base_model: str, opts: dict) -> dict {
 }
 
 """spheron: build the mlx data pair, then delegate to cloudruns.start_remote_run.
-offer is REQUIRED. The built train/valid abs paths become cfg.dataset (cloudruns
-accepts abs paths — they satisfy jobs.safe + paths.resolve). NO heavy lock."""
+opts.cluster_id is REQUIRED (a saved BYO cluster; cloudruns resolves it into the
+runspec's ssh_override). The built train/valid abs paths become cfg.dataset
+(cloudruns accepts abs paths — they satisfy jobs.safe + paths.resolve). NO heavy
+lock."""
 def _start_spheron(p: JmsProject, rid: str, base_model: str, opts: dict) -> dict {
-    offer_raw = opts.get("offer");
-    if not isinstance(offer_raw, dict) or len(dict(offer_raw)) == 0 {
-        return {"ok": False, "rid": "", "error": "offer required — pick a GPU offer"};
+    cluster_id = str(opts.get("cluster_id", "")).strip();
+    if not cluster_id {
+        return {"ok": False, "rid": "", "error": "cluster_id required — pick a saved cluster"};
     }
     prep = _prepare_data(p, rid);
     if int(str(prep["valid"])) == 0 {
@@ -344,11 +348,11 @@ def _start_spheron(p: JmsProject, rid: str, base_model: str, opts: dict) -> dict
         "name": _cloud_name(p, rid),
         "mode": "sft",
         "base_model": base_model,
-        "offer": dict(offer_raw),
+        "cluster_id": cluster_id,
         "opts": passthrough,
         "dataset": {"train_rel": train_abs, "valid_rel": valid_abs}
     };
-    for k in ["ssh_key_id", "ssh_override", "policy", "launch_cmd_override"] {
+    for k in ["ssh_override", "policy", "launch_cmd_override"] {
         if k in opts { cfg[k] = opts[k]; }
     }
 
@@ -361,7 +365,7 @@ def _start_spheron(p: JmsProject, rid: str, base_model: str, opts: dict) -> dict
 
     cfg_json = json.dumps({
         "iters": int(str(opts.get("max_steps", opts.get("iters", 0)))),
-        "offer": dict(offer_raw), "data": prep
+        "cluster_id": cluster_id, "data": prep
     });
     # Pointer to the out-of-project adapter dir (see _remote_ptr_file). Best
     # effort: a run that trains fine must not fail because this write did.

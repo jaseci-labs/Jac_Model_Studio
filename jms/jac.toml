@@ -4,9 +4,9 @@ version = "0.1.0"
 description = "A full-stack Jac application"
 entry-point = "main.jac"
 
-# Spheron GPU cloud integration talks to the REST API directly via stdlib urllib
-# (spheron.sv.jac), so — unlike the vastai SDK it replaced — there is no Python
-# dependency to declare here.
+# Remote GPU access is BYO-cluster over plain ssh (clusters.sv.jac shells out to
+# ssh/ssh-keygen), so — unlike the vastai SDK and the Spheron REST client it
+# replaced — there is no Python dependency to declare here.
 
 [dependencies.npm]
 react = "^18.2.0"

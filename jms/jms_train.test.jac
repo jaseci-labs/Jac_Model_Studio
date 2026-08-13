@@ -69,6 +69,18 @@ test "start_train refuses when a run is already training" {
     assert not bool(r["ok"]) and "already training" in str(r["error"]), r;
 }
 
+test "start_train spheron refuses without a cluster_id" {
+    _isolate_ws();
+    v = create_project("Train No Cluster", "test");
+    _write_train(v.slug, 3);
+    # opts carries no cluster_id → refused before any cloudruns delegation.
+    r = start_train(v.pid, "spheron", "hf/some-model", {});
+    assert not bool(r["ok"]) and "cluster_id required" in str(r["error"]), r;
+    # an unknown cluster_id gets as far as cloudruns, which can't resolve it.
+    r2 = start_train(v.pid, "spheron", "hf/some-model", {"cluster_id": "no-such-cluster"});
+    assert not bool(r2["ok"]) and "CLUSTERS tab" in str(r2["error"]), r2;
+}
+
 test "_prepare_data reserves last 10% (min 1) of train as valid when holdout empty" {
     _isolate_ws();
     v = create_project("Train Split", "test");
