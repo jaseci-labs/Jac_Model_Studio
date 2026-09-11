@@ -105,3 +105,33 @@ def _connect(*args, **kwargs):
 
 sqlite3.dbapi2.connect = _connect
 sqlite3.connect = _connect
+
+
+# --- Monotonic RLIMIT_NOFILE --------------------------------------------------
+# mlx_lm/utils.py:36 runs `resource.setrlimit(RLIMIT_NOFILE, (2048, 4096))` at
+# import, which DROPS a raised limit (and the hard cap can never be raised back).
+# server/models/inference.sv.jac installs a guard at its own import, but on a
+# cold compile cache jaclang's module resolver imports mlx_lm while compiling
+# models.sv.jac -> inference.sv.jac, before that guard exists: the process is
+# clamped, and the --dev watcher + Vite then die with [Errno 24]. Installing the
+# same guard here beats every import. The function name must stay
+# `_guarded_setrlimit` so inference.sv.jac sees it and skips its own install.
+import resource
+
+_orig_setrlimit = resource.setrlimit
+
+
+def _rlim_max(a, b):
+    if a == resource.RLIM_INFINITY or b == resource.RLIM_INFINITY:
+        return resource.RLIM_INFINITY
+    return a if a > b else b
+
+
+def _guarded_setrlimit(res, limits):
+    if res != resource.RLIMIT_NOFILE:
+        return _orig_setrlimit(res, limits)
+    cur = resource.getrlimit(res)
+    return _orig_setrlimit(res, (_rlim_max(cur[0], limits[0]), _rlim_max(cur[1], limits[1])))
+
+
+resource.setrlimit = _guarded_setrlimit
