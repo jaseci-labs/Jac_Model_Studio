@@ -102,7 +102,7 @@ cfg.dataset wins. No hard-coded fallback — an unset path fails the is_file che
 in start_remote_run with a clear message."""
 def _dataset_rels(cfg: dict) -> dict {
     d = _cloudrun_defaults();
-    # toml defaults are trusted config and may climb out of jms/ ("../..."):
+    # toml defaults are trusted config and may climb out of the repo ("../..."):
     # normalize them to absolute paths so jobs.safe's ".." guard (meant for
     # client-supplied cfg.dataset) doesn't reject them.
     train_rel = str(d.get("train_rel", ""));

@@ -8,7 +8,7 @@ missing without crashing anything.
 
 Resolution:
   1. <workspace_root>/studio.workspace.toml   (JAC_STUDIO_WORKSPACE override)
-  2. <studio_root>/studio.workspace.toml      (shipped default, jms/)
+  2. <studio_root>/studio.workspace.toml      (shipped default, repo root)
   3. empty defaults                            (neither file present)
 
 TOML (not YAML) because `jac` ships as a frozen binary whose bundled Python has

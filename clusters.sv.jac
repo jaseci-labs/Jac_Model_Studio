@@ -11,7 +11,7 @@ training run can target. No API key, no billing integration, no provider SDK.
 Key material policy
   * The PRIVATE key NEVER enters the OSP graph. It is written to
     `~/.jms/ssh_keys/<key_id>` (0600) — outside the git repo on purpose, so
-    `paths.studio_root()` (the jms/ dir, which IS inside the repo) is never a
+    `paths.studio_root()` (the repo root) is never a
     candidate. Override the directory with `JMS_SSH_KEY_DIR` (tests use this).
   * Only the PUBLIC key + its SHA256 fingerprint live on the graph. Both are
     safe to return to the client and to log — that is the whole point of a
@@ -88,7 +88,7 @@ def _now() -> str {
 
 """Directory holding private key files. `JMS_SSH_KEY_DIR` overrides (tests set
 it to a temp dir); default `~/.jms/ssh_keys`. Deliberately NOT under
-paths.studio_root() — that is the jms/ directory inside the git repo.
+paths.studio_root() — that is the git repo itself.
 
 Created 0700 on every call; makedirs' mode is umask-affected, so it is
 re-chmod'ed afterwards."""

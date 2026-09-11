@@ -1,12 +1,21 @@
-# repo-wide; jms/ has its own .gitignore
+# build/runtime state
 .env
 .venv/
 .jac/
+/data/
+node_modules/
 __pycache__/
 *.pyc
+*.db
+*.db-shm
+*.db-wal
+*.log
+logs/
 .DS_Store
 .pytest_cache/
 .playwright-mcp/
 .superpowers/
 .claude/worktrees/
-models/
+# editors
+.vscode/
+.idea/

@@ -1,4 +1,4 @@
-# Remote GPU-training script dependencies (jms/remote)
+# Remote GPU-training script dependencies (remote/)
 #
 # Pinned, mutually-compatible set (verified installable on macOS arm64 / Python 3.11,
 # CPU-only, and intended for CUDA Linux VMs).

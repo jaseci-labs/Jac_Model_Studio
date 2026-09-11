@@ -1,12 +1,12 @@
 """studio - canonical path resolution (single source of truth).
 
-Three roots, all defaulting to the jms/ directory so the app is self-contained:
+Three roots, all defaulting to the repo root so the app is self-contained:
 
 - studio_root()    — this directory (code, prompts.json, remote/, scripts/).
 - workspace_root() — base for the RELATIVE paths in studio.workspace.toml (model
                      dirs, dataset files). `JAC_STUDIO_WORKSPACE` overrides;
                      default = studio_root(). The toml is the ONLY place that
-                     names external artifacts (e.g. ../../model-experiments/...).
+                     names external artifacts (e.g. ../model-experiments/...).
 - data_root()      — everything JMS WRITES at runtime: results/, audit/,
                      projects/, examples/. `JAC_STUDIO_DATA_ROOT` overrides;
                      default = <studio_root>/data (gitignored).
@@ -57,14 +57,14 @@ def resolve(rel: str, scope: str = "workspace") -> Path {
     return workspace_root() / rel;
 }
 
-"""Optional legacy fallback: a `.venv/bin` in the parent checkout (the old
-monorepo layout). Never required — only used when it exists."""
+"""Optional fallback: a `.venv/bin` in the repo root. Never required — only
+used when it exists."""
 def _legacy_venv_bin() -> Path {
-    return studio_root().parent / ".venv" / "bin";
+    return studio_root() / ".venv" / "bin";
 }
 
 """The `jac` executable for spawning workers: next to the running interpreter,
-else on PATH, else the legacy parent `.venv` if present. "" if none found."""
+else on PATH, else the repo-root `.venv` if present. "" if none found."""
 def jac_bin() -> str {
     cand = Path(sys.executable).parent / "jac";
     if cand.exists() { return str(cand); }
@@ -75,7 +75,7 @@ def jac_bin() -> str {
 }
 
 """PATH for detached tool subprocesses (mlx_lm.lora etc.): the running
-interpreter's bin dir first, then the inherited PATH, then the legacy parent
+interpreter's bin dir first, then the inherited PATH, then the repo-root
 `.venv/bin` as a last-resort fallback when it exists."""
 def tool_path() -> str {
     parts: list[str] = [str(Path(sys.executable).parent)];

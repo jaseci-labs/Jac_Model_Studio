@@ -1,13 +1,73 @@
-# Jac Model Studio
+# Jac ML Studio (JMS)
 
-| Folder | What |
-|---|---|
-| [`jms/`](jms/README.md) | Jac ML Studio, the fullstack Jac app for dataset, train, and eval workflows |
+Local ML workbench written in pure Jac (server `.sv.jac` + React-in-Jac client
+`.cl.jac`, one codebase). Two surfaces:
 
-The fine-tuning experiments (datasets, adapters, SFT playbook) live in their own repo,
-[jaseci-labs/Jac_Model_Experiments](https://github.com/jaseci-labs/Jac_Model_Experiments).
-`jms/studio.workspace.toml` expects it checked out next to this repo, as `../model-experiments`:
+- **JMS** — projects: sources → synthesize dataset → curate → train (local MLX or
+  a BYO remote GPU) → eval → chat with the result. Plus the in-app AI assistant.
+- **Experiments** — workspaces with CHAT (registry models), DATA (dataset
+  browser) and CLOUD (BYO GPU clusters + supervised remote runs).
+
+Self-contained: runs from the repo root and only reaches outside through the
+paths in `studio.workspace.toml`. The fine-tuning experiments (datasets,
+adapters, SFT playbook) live in their own repo,
+[jaseci-labs/Jac_Model_Experiments](https://github.com/jaseci-labs/Jac_Model_Experiments);
+the shipped toml expects it checked out next to this repo:
 
     git clone https://github.com/jaseci-labs/Jac_Model_Experiments.git ../model-experiments
 
-Without it, JMS still runs, but registry models show as unavailable and datasets count 0.
+## Run
+
+    ./start.sh               # dev mode, local single user: API :8001, UI :8000 (auto-opens; JMS_NO_OPEN=1 to skip)
+
+Needs the `jac` on PATH to carry jac-scale + jac-client + mlx-lm (the uv-installed
+`jaclang` tool does). Production (multi-tenant, login gate):
+`JWT_SECRET=... ./start_prod.sh`, see `deploy/`.
+
+Native desktop window (`--client desktop`) is off: the installed jac-desktop
+0.2.0 host serves static files only and never starts the API, so the window
+loads but every call 404s.
+
+After editing a `.cl.jac` file restart the server — `--dev` compiles the client
+once at boot.
+
+## Config and data
+
+| What | Where | Override |
+|------|-------|----------|
+| Model registry, dataset files, cloud-run defaults | `studio.workspace.toml` | `$JAC_STUDIO_WORKSPACE/studio.workspace.toml` |
+| Base dir for relative paths in the toml | repo root | `JAC_STUDIO_WORKSPACE` |
+| Runtime data JMS writes: `results/` (per-user runs, GPU lock), `audit/`, `projects/`, `examples/` | `data/` (gitignored) | `JAC_STUDIO_DATA_ROOT` |
+| Graph + users DB, JWT secret | `.jac/` (gitignored) | — |
+
+The shipped toml points at a `model-experiments` checkout next to this repo (base
+Qwen3-Coder q4 + the 08 SFT adapter, 08 SFT/DPO datasets). Registry entries take
+`path` (MLX model dir) and an optional `adapter` (LoRA dir). Any path may be
+missing: the model shows as unavailable and dataset files count 0.
+
+Worker/tool binaries (`jac`, `mlx_lm.lora`) are taken from next to the running
+interpreter, then `PATH`; a `.venv/bin` in the repo root is used only as a last-resort
+fallback if it exists.
+
+## Layout
+
+- `main.jac` — registers every endpoint + mounts the client.
+- `paths.sv.jac` — the three roots (studio / workspace / data) + tool lookup.
+- `workspace.sv.jac` — toml loader + Experiments workspace graph.
+- `jms_*.sv.jac` — JMS product (projects, plan, gen, curate, train, eval, chat, llm).
+- `models` / `inference` / `chat` / `persistence` / `data` — model registry,
+  resident MLX + streaming, chat history graph, dataset browser.
+- `jobs` (detached subprocess engine + heavy GPU lock), `cloudruns` / `clusters` /
+  `backends` / `remote/` (BYO GPU runs), `auth`, `audit`, `crypto`, `assistant`.
+- `components/`, `hooks/`, `lib/` — UI. `scripts/` — workers + backup tooling.
+- `docs/{plans,specs,blog}` — design history.
+
+## Test
+
+    jac test <module>.test.jac     # one annex; run each *.test.jac (no server needed)
+    ./smoke.sh                     # while the browser-target server is up
+    JAC_API=http://localhost:8001 ./smoke_auth.sh
+
+Tests redirect `JAC_STUDIO_WORKSPACE` / `JAC_STUDIO_DATA_ROOT` to temp dirs. Don't
+`jac run` app modules from the repo root while a server is up — it writes the
+live `.jac/data` graph.
