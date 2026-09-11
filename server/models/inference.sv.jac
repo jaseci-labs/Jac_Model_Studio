@@ -52,6 +52,20 @@ start failing too. Time out and return a clean error instead. Generous because a
 cold load of a large model legitimately takes minutes."""
 glob _LOCK_TIMEOUT_S: float = 600.0;
 
+"""Server-side ceiling on generated tokens per request. The chat MAX_TOKENS slider
+tops out at 4096 (chat/Rail.cl.jac); every other caller sends <= 1536. Without a
+cap a client-chosen value held the single model lock (and the GPU) as long as it
+liked."""
+glob MAX_TOKENS_CAP: int = 4096;
+
+"""Clamp a client-supplied max_tokens into [1, MAX_TOKENS_CAP]."""
+def clamp_max_tokens(n: int) -> int {
+    v = int(n);
+    if v < 1 { return 1; }
+    if v > MAX_TOKENS_CAP { return MAX_TOKENS_CAP; }
+    return v;
+}
+
 def _now() -> float { return time.monotonic(); }
 
 def _elapsed(t0: float) -> float { return time.monotonic() - t0; }
@@ -430,7 +444,7 @@ def stream_chat(
         # Hoist the native generator into a local before iterating — a yield over
         # an inline native call crashes the type checker (jaclang 0.16.1).
         gen: any = stream_generate(
-            _S["model"], _S["tokenizer"], ptoks, max_tokens=max_tokens, sampler=sampler
+            _S["model"], _S["tokenizer"], ptoks, max_tokens=clamp_max_tokens(max_tokens), sampler=sampler
         );
         acc = "";
         ntok: any = 0;

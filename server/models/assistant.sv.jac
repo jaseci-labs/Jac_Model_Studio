@@ -685,7 +685,7 @@ def _stream_api(
         yield {"kind": "load", "load_s": 0.0, "model_id": model_id};
         resp: any = litellm.completion(
             model=model_str, messages=grounded, stream=True,
-            api_key=key, max_tokens=max_tokens, temperature=temperature
+            api_key=key, max_tokens=inference.clamp_max_tokens(max_tokens), temperature=temperature
         );
         text = "";
         ntok = 0;
