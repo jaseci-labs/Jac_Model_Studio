@@ -34,6 +34,7 @@ token, {kind:"done",...} last, {kind:"error",text} on any guard/generation error
 """
 
 import json;
+import from server.core { jobs }
 import from server.core { paths }
 import from server.models { inference }
 import from pathlib { Path }
@@ -78,6 +79,10 @@ def _resolve_run(pid: str, rid: str) -> dict {
         proj: dict = {};
         try { proj = dict(json.loads(pj.read_text())); } except Exception { continue; }
         if str(proj.get("pid", "")) != pid { continue; }
+        # rid is joined straight onto the path and there is no graph check here,
+        # so a traversal/absolute rid would reach ANOTHER project's (or user's)
+        # run dir. jms_train rids are single safe tokens (uuid hex).
+        if not jobs.safe(rid) { return {"ok": False, "error": "unknown run: " + rid}; }
         run_dir = pj.parent / "runs" / rid;
         cfg = run_dir / "mlx_config.json";
         if not cfg.exists() {
