@@ -108,3 +108,19 @@ test "_build_row defaults difficulty and source to em-dash when meta is absent" 
     assert row.difficulty == "—", row.difficulty;
     assert row.source == "—", row.source;
 }
+
+import os;
+import tempfile;
+
+test "add_examples rejects non-object JSON lines instead of raising" {
+    # `"messages" not in 5` raised TypeError (a 500) and a bare JSON string
+    # "messages" passed the substring check and was appended as a row.
+    os.environ["JAC_STUDIO_DATA_ROOT"] = tempfile.mkdtemp(prefix="studio-data-");
+    r = add_examples("sft", "5\n[1, 2]\n\"messages\"\nnull");
+    assert r["added"] == 0, r;
+    assert len(r["errors"]) == 4, r;
+    r2 = add_examples("dpo", "7\n\"prompt chosen rejected\"");
+    assert r2["added"] == 0 and len(r2["errors"]) == 2, r2;
+    ok = add_examples("sft", "{\"messages\": []}");
+    assert ok["added"] == 1, ok;
+}

@@ -286,6 +286,10 @@ def add_examples(target: str, jsonl: str) -> dict {
             errors.append(f"line {n}: not valid JSON");
             continue;
         }
+        if not isinstance(rec, dict) {
+            errors.append(f"line {n}: row must be a JSON object");
+            continue;
+        }
         if is_dpo {
             if not ("prompt" in rec and "chosen" in rec and "rejected" in rec) {
                 errors.append(f"line {n}: DPO row needs prompt/chosen/rejected");
