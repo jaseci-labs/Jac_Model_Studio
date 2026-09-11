@@ -32,9 +32,11 @@ import from threading { Lock }
 glob _heavy_mutex: any = Lock();
 
 """True iff *s* is safe to embed in a shell command. Allowlist [A-Za-z0-9_.-]
-(plus / when allow_slash); any `..` path segment is always rejected."""
+(plus / when allow_slash); any `..` path segment is always rejected, and a bare
+`.`/`..` is never a safe single path token (it names the parent/current dir)."""
 def safe(s: str, allow_slash: bool = False) -> bool {
     if not s { return False; }
+    if s in [".", ".."] { return False; }
     if allow_slash {
         for segment in s.split("/") {
             if segment == ".." { return False; }

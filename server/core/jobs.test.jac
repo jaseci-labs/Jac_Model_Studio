@@ -55,3 +55,17 @@ test "a stale lock (dead pid, no job file) self-heals" {
     assert cur is not None and str(cur.get("holder", "")) == "test:fresh", cur;
     try { lf.unlink(); } except Exception {}
 }
+
+test "safe rejects bare dot tokens that name the current/parent dir" {
+    # `..` as a single token passed the no-slash allowlist, so a cloud-run name of
+    # ".." resolved <user_results_dir>/.. = the SHARED users/ dir (escaping the
+    # per-user namespace); "." resolved the user dir itself.
+    assert not safe(".."), "bare .. must be rejected";
+    assert not safe("."), "bare . must be rejected";
+    assert not safe("..", allow_slash=True);
+    assert not safe(".", allow_slash=True);
+    assert safe("a.b"), "dots inside a name stay fine";
+    assert safe("..a"), "a leading-dot name that is not a dir alias stays fine";
+    assert safe("x/y.jsonl", allow_slash=True);
+    assert not safe("x/../y", allow_slash=True);
+}
