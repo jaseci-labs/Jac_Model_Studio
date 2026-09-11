@@ -377,6 +377,19 @@ def heavy_acquire(holder: str, job_file: Path | None = None, runlog: Path | None
     }
 }
 
+"""Label of the live heavy-slot holder, "" when the slot is free. Read-only (never
+takes the guard file). For in-process model users — chat, MLX plan drafts, warm —
+that must not load a model into this server while a train/eval/gen job owns the
+GPU + RAM. They CHECK instead of acquiring: a chat model stays resident after the
+request, so holding the slot for it would block training indefinitely."""
+def heavy_busy() -> str {
+    try {
+        cur = read_job(_heavy_lock_file());
+        if cur is not None and _heavy_live(cur) { return str(cur.get("holder", "?")); }
+    } except Exception {}
+    return "";
+}
+
 """Best-effort release: drop the lock if *holder* still owns it. (Stale locks
 also self-heal on the next heavy_acquire, so missing a release is harmless.)"""
 def heavy_release(holder: str) {

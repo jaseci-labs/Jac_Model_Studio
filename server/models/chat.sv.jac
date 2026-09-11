@@ -10,6 +10,7 @@ Frames: {kind:"load",load_s,model_id} once, {kind:"token",token,text} per token,
 {kind:"done",text,tokens,tps,load_s,gen_s} last, {kind:"error",text} on failure.
 """
 
+import from server.core { jobs }
 import from server.models { inference }
 import server.models.models as models;  # not `import from server.models { models }`: jac check resolves that to the package
 
@@ -17,6 +18,13 @@ def chat_stream(
     messages: list[dict], model_id: str,
     temperature: float = 0.2, top_p: float = 0.9, max_tokens: int = 1024
 ) -> any {
+    # Loading/running a model in this server while a train/eval/gen job owns the
+    # GPU slot can OOM the box (48 GB). Check, don't acquire — see jobs.heavy_busy.
+    busy = jobs.heavy_busy();
+    if busy {
+        yield {"kind": "error", "text": f"GPU busy: {busy} is running — chat is paused until it finishes"};
+        return;
+    }
     m = models.model_by_id(model_id);
     if not m {
         yield {"kind": "error", "text": f"unknown model_id: {model_id}"};

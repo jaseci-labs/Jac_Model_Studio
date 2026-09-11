@@ -93,3 +93,13 @@ test "a detached claim is held while its job file is still being spawned" {
     assert g3["ok"], g3;
     try { lf.unlink(); } except Exception {}
 }
+
+test "heavy_busy names a live holder and is blank when the slot is free" {
+    lf = _heavy_lock_file();
+    try { lf.unlink(); } except Exception {}
+    assert heavy_busy() == "", heavy_busy();
+    assert heavy_acquire("test:busy")["ok"];
+    assert heavy_busy() == "test:busy", heavy_busy();
+    heavy_release("test:busy");
+    assert heavy_busy() == "", heavy_busy();
+}

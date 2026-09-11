@@ -47,3 +47,17 @@ test "_resolve_run refuses a rid that traverses into another project" {
         assert not bool(r["ok"]), (rid, r);
     }
 }
+
+import from server.core { jobs }
+
+test "jms_chat_stream refuses while a heavy GPU job holds the slot" {
+    os.environ["JAC_STUDIO_DATA_ROOT"] = tempfile.mkdtemp(prefix="jms-chat-busy-");
+    assert jobs.heavy_acquire("test:train")["ok"];
+    try {
+        frames = list(jms_chat_stream("aaaaaaaaaaaa", "111111111111", []));
+        assert str(frames[0]["kind"]) == "error", frames;
+        assert "GPU busy" in str(frames[0]["text"]), frames;
+    } finally {
+        jobs.heavy_release("test:train");
+    }
+}

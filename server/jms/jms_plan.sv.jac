@@ -32,6 +32,7 @@ import json;
 import os;
 import threading;
 import datetime;
+import from server.core { jobs }
 import from server.models { inference }
 import server.models.models as models;  # not `import from server.models { models }`: jac check resolves that to the package
 import from server.jms { jms_llm }
@@ -331,6 +332,9 @@ def _try_parse(txt: str) -> dict | None {
 """Draft via the resident local MLX model. One retry on a JSON parse miss.
 Returns {ok, plan, error}."""
 def _draft_mlx(p: JmsProject, model: str, grounding: str) -> dict {
+    # Loads a model into THIS server: respect the heavy GPU slot (jobs.heavy_busy).
+    busy = jobs.heavy_busy();
+    if busy { return {"ok": False, "plan": {}, "error": f"GPU busy: {busy} is running — try the draft when it finishes"}; }
     m = models.model_by_id(model);
     if not m { return {"ok": False, "plan": {}, "error": "unknown local model: " + model}; }
     if not models.model_available(m) { return {"ok": False, "plan": {}, "error": "local model not on disk: " + model}; }

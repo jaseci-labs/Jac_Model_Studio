@@ -17,6 +17,7 @@ import time;
 import datetime;
 import from server.core { auth }
 import from server.core { crypto }
+import from server.core { jobs }
 import server.models.models as models;  # not `import from server.models { models }`: jac check resolves that to the package
 import from server.models { inference }
 import from server.jms.jms_llm { resolved_anthropic_key, llm_status }
@@ -639,6 +640,12 @@ def _stream_local(
     grounded: list[dict], model_id: str,
     temperature: float, top_p: float, max_tokens: int
 ) -> any {
+    # Same heavy-slot check as chat.chat_stream (see jobs.heavy_busy).
+    busy = jobs.heavy_busy();
+    if busy {
+        yield {"kind": "error", "text": f"GPU busy: {busy} is running — local chat is paused until it finishes"};
+        return;
+    }
     try {
         m = models.model_by_id(model_id);
         if not m {

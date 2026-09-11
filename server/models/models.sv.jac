@@ -137,6 +137,12 @@ def loaded_model() -> dict {
 until resident; the client shows elapsed via its own timer. Returns
 {id, load_s, error} — error is "" on success, a message otherwise."""
 def warm_model(model_id: str) -> dict {
+    # Imported here, not at module top: jobs imports this module.
+    import from server.core { jobs }
+    busy = jobs.heavy_busy();
+    if busy {
+        return {"id": model_id, "load_s": 0.0, "error": f"GPU busy: {busy} is running — try again when it finishes"};
+    }
     m = model_by_id(model_id);
     if not m {
         return {"id": model_id, "load_s": 0.0, "error": f"unknown model_id: {model_id}"};

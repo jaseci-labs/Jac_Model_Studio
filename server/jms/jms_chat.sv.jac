@@ -117,6 +117,12 @@ def jms_chat_stream(
     pid: str, rid: str, messages: list[dict],
     temperature: float = 0.2, top_p: float = 0.9, max_tokens: int = 1024
 ) -> any {
+    # Same heavy-slot check as chat.chat_stream (see jobs.heavy_busy).
+    busy = jobs.heavy_busy();
+    if busy {
+        yield {"kind": "error", "text": f"GPU busy: {busy} is running — chat is paused until it finishes"};
+        return;
+    }
     res = _resolve_run(pid, rid);
     if not bool(res["ok"]) {
         yield {"kind": "error", "text": str(res["error"])};
