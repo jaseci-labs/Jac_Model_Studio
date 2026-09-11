@@ -97,11 +97,18 @@ def _find_run(run_id: str) -> CloudRun | None {
     return None;
 }
 
-"""Dataset rels (data_root-relative): [cloudrun] toml defaults, cfg.dataset wins."""
+"""Dataset paths (workspace_root-relative or absolute): [cloudrun] toml defaults,
+cfg.dataset wins. No hard-coded fallback — an unset path fails the is_file check
+in start_remote_run with a clear message."""
 def _dataset_rels(cfg: dict) -> dict {
     d = _cloudrun_defaults();
-    train_rel = str(d.get("train_rel", "model-experiments/01-sft-dpo/dataset/mlx/train.jsonl"));
-    valid_rel = str(d.get("valid_rel", "model-experiments/01-sft-dpo/dataset/mlx/valid.jsonl"));
+    # toml defaults are trusted config and may climb out of jms/ ("../..."):
+    # normalize them to absolute paths so jobs.safe's ".." guard (meant for
+    # client-supplied cfg.dataset) doesn't reject them.
+    train_rel = str(d.get("train_rel", ""));
+    valid_rel = str(d.get("valid_rel", ""));
+    if train_rel { train_rel = str(paths.resolve(train_rel).resolve()); }
+    if valid_rel { valid_rel = str(paths.resolve(valid_rel).resolve()); }
     raw = cfg.get("dataset");
     if isinstance(raw, dict) {
         ds = dict(raw);
@@ -177,8 +184,8 @@ def _build_runspec(cfg: dict, run_id: str, deployment_id: str, hourly_rate: floa
         "hourly_rate": hourly_rate,
         "remote_dir": f"{remote_base}-{name}",
         "uploads": [
-            {"local": str(paths.resolve(str(ds["train_rel"]), "data")), "remote": "data/train.jsonl"},
-            {"local": str(paths.resolve(str(ds["valid_rel"]), "data")), "remote": "data/valid.jsonl"},
+            {"local": str(paths.resolve(str(ds["train_rel"]))), "remote": "data/train.jsonl"},
+            {"local": str(paths.resolve(str(ds["valid_rel"]))), "remote": "data/valid.jsonl"},
             {"local": str(sr / "remote" / "bootstrap.sh"), "remote": "bootstrap.sh"},
             {"local": str(sr / "remote" / "train_sft.py"), "remote": "train_sft.py"},
             {"local": str(sr / "remote" / "requirements.txt"), "remote": "requirements.txt"}
@@ -380,10 +387,10 @@ def start_remote_run(cfg: dict) -> dict {
     if not jobs.safe(train_rel, allow_slash=True) or not jobs.safe(valid_rel, allow_slash=True) {
         return _err("invalid dataset rel");
     }
-    if not paths.resolve(train_rel, "data").is_file() {
+    if not train_rel or not paths.resolve(train_rel).is_file() {
         return _err(f"train dataset missing: {train_rel}");
     }
-    if not paths.resolve(valid_rel, "data").is_file() {
+    if not valid_rel or not paths.resolve(valid_rel).is_file() {
         return _err(f"valid dataset missing: {valid_rel}");
     }
 

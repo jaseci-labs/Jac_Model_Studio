@@ -1,16 +1,21 @@
-"""studio - canonical path resolution.
+"""studio - canonical path resolution (single source of truth).
 
-Single source of truth for studio_root, workspace_root, data_root, and jacgen
-script paths. Overrides via JAC_STUDIO_WORKSPACE and JAC_STUDIO_DATA_ROOT; without
-them both default to the parent of jms when 01-sft-dpo exists there
-(jac_ml_studio repo layout).
+Three roots, all defaulting to the jms/ directory so the app is self-contained:
+
+- studio_root()    — this directory (code, prompts.json, remote/, scripts/).
+- workspace_root() — base for the RELATIVE paths in studio.workspace.toml (model
+                     dirs, dataset files). `JAC_STUDIO_WORKSPACE` overrides;
+                     default = studio_root(). The toml is the ONLY place that
+                     names external artifacts (e.g. ../model-experiments/...).
+- data_root()      — everything JMS WRITES at runtime: results/, audit/,
+                     projects/, examples/. `JAC_STUDIO_DATA_ROOT` overrides;
+                     default = <studio_root>/data (gitignored).
 """
 
 import os;
+import sys;
+import shutil;
 import from pathlib { Path }
-
-glob JACGEN_REL: str = "model-experiments/01-sft-dpo/sft_dpo/jacgen";
-glob _WORKSPACE_MARKER: str = "model-experiments/01-sft-dpo";
 
 def studio_root() -> Path {
     return Path(os.path.dirname(os.path.abspath(__file__)));
@@ -18,28 +23,30 @@ def studio_root() -> Path {
 
 def workspace_root() -> Path {
     env = os.environ.get("JAC_STUDIO_WORKSPACE", "");
-    if env {
-        return Path(env);
-    }
-    candidate = studio_root().parent;
-    if (candidate / _WORKSPACE_MARKER).is_dir() {
-        return candidate;
-    }
-    dr = os.environ.get("JAC_STUDIO_DATA_ROOT", "");
-    if dr {
-        return Path(dr);
-    }
-    return candidate;
+    return Path(env) if env else studio_root();
 }
 
 def data_root() -> Path {
     env = os.environ.get("JAC_STUDIO_DATA_ROOT", "");
-    if env {
-        return Path(env);
-    }
-    return workspace_root();
+    return Path(env) if env else studio_root() / "data";
 }
 
+"""Shared results tree: per-user runs (users/<uid>/), the GPU heavy lock."""
+def results_dir() -> Path {
+    return data_root() / "results";
+}
+
+def audit_dir() -> Path {
+    return data_root() / "audit";
+}
+
+"""JMS project homes: <data_root>/projects/<slug>/."""
+def projects_dir() -> Path {
+    return data_root() / "projects";
+}
+
+"""Resolve a path from studio.workspace.toml (relative to workspace_root, or
+absolute as-is). scope "data" / "studio" pick the other roots."""
 def resolve(rel: str, scope: str = "workspace") -> Path {
     if scope == "data" {
         return data_root() / rel;
@@ -50,13 +57,31 @@ def resolve(rel: str, scope: str = "workspace") -> Path {
     return workspace_root() / rel;
 }
 
-"""Relative path to a jacgen script (e.g. eval_probe.jac)."""
-def jacgen_script(name: str) -> str {
-    script = name if name.endswith(".jac") else f"{name}.jac";
-    return f"{JACGEN_REL}/{script}";
+"""Optional legacy fallback: a `.venv/bin` in the parent checkout (the old
+monorepo layout). Never required — only used when it exists."""
+def _legacy_venv_bin() -> Path {
+    return studio_root().parent / ".venv" / "bin";
 }
 
-"""Relative path to a jacgen builder stage (stage name without .jac)."""
-def jacgen_stage(stage: str) -> str {
-    return jacgen_script(stage);
+"""The `jac` executable for spawning workers: next to the running interpreter,
+else on PATH, else the legacy parent `.venv` if present. "" if none found."""
+def jac_bin() -> str {
+    cand = Path(sys.executable).parent / "jac";
+    if cand.exists() { return str(cand); }
+    w = shutil.which("jac");
+    if w { return str(w); }
+    lv = _legacy_venv_bin() / "jac";
+    return str(lv) if lv.exists() else "";
+}
+
+"""PATH for detached tool subprocesses (mlx_lm.lora etc.): the running
+interpreter's bin dir first, then the inherited PATH, then the legacy parent
+`.venv/bin` as a last-resort fallback when it exists."""
+def tool_path() -> str {
+    parts: list[str] = [str(Path(sys.executable).parent)];
+    cur = os.environ.get("PATH", "");
+    if cur { parts.append(cur); }
+    lv = _legacy_venv_bin();
+    if lv.is_dir() { parts.append(str(lv)); }
+    return ":".join(parts);
 }

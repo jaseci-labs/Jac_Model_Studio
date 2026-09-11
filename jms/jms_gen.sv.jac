@@ -160,8 +160,7 @@ def _latest_job(p: JmsProject) -> JmsGenJob | None {
 
 # --------------------------------------------------------------- jac binary ----
 """The STUDIO server's own jac executable for spawning the worker — the venv
-running this process (sys.executable-adjacent), falling back to PATH. NOT
-models.jac_bin(), which is the DATA venv's jac (a different environment)."""
+running this process (sys.executable-adjacent), falling back to PATH."""
 def _jac_bin() -> str {
     cand = Path(sys.executable).parent / "jac";
     if cand.exists() { return str(cand); }

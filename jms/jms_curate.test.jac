@@ -22,6 +22,7 @@ import from jms_projects { create_project, _find_project, jms_project_dir }
 
 def _isolate_ws -> None {
     os.environ["JAC_STUDIO_WORKSPACE"] = tempfile.mkdtemp(prefix="studio-jmscur-");
+    os.environ["JAC_STUDIO_DATA_ROOT"] = os.environ["JAC_STUDIO_WORKSPACE"];
 }
 
 """6 fabricated raw rows written to the project's dataset/raw.jsonl. Rows carry

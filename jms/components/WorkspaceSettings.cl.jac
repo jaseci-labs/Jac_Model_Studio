@@ -515,7 +515,7 @@ def:pub WorkspaceSettings(
                             </select>
                         </Field>
                         <Field label="FILES (comma-separated)">
-                            <TextInput value={filesStr} onSet={lambda (v: str) { filesStr = v; }} placeholder="01-sft-dpo" mono={True} />
+                            <TextInput value={filesStr} onSet={lambda (v: str) { filesStr = v; }} placeholder="path/to/dir" mono={True} />
                         </Field>
                         <div className="flex gap-2">
                             <button

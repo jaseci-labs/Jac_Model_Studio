@@ -82,9 +82,9 @@ assert '$CHAT' in ids, chats
 print('OK')
 "
 
-echo "=== unauthenticated create_gpu_instance should 401 ==="
-code=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$API/function/create_gpu_instance" \
-  -H "Content-Type: application/json" -d '{"offer_id": 1}')
+echo "=== unauthenticated start_remote_run (GPU spend) should 401 ==="
+code=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$API/function/start_remote_run" \
+  -H "Content-Type: application/json" -d '{"cfg": {}}')
 if [[ "$code" != "401" ]]; then
   echo "FAIL: expected 401, got $code" >&2
   exit 1

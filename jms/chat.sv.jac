@@ -28,7 +28,9 @@ def chat_stream(
     }
     path = str(models.model_path(m));
     # stream_chat guards load+generate in try/except and emits its own error frame.
-    gen: any = inference.stream_chat(messages, model_id, path, temperature, top_p, max_tokens);
+    gen: any = inference.stream_chat(
+        messages, model_id, path, temperature, top_p, max_tokens, models.model_adapter_path(m)
+    );
     for frame in gen {
         yield frame;
     }

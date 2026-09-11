@@ -19,6 +19,7 @@ import from jms_projects { JmsProject, JmsEvalRun, create_project, _find_project
 
 def _isolate_ws -> None {
     os.environ["JAC_STUDIO_WORKSPACE"] = tempfile.mkdtemp(prefix="studio-jmseval-");
+    os.environ["JAC_STUDIO_DATA_ROOT"] = os.environ["JAC_STUDIO_WORKSPACE"];
     try { os.environ.pop("ANTHROPIC_API_KEY"); } except Exception {}
 }
 

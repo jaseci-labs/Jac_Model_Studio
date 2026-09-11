@@ -113,11 +113,14 @@ test "opts render to whitelisted CLI flags only" {
 
 test "dataset defaults resolve from [cloudrun], cfg overrides win" {
     d = _dataset_rels({});
-    assert str(d["train_rel"]).endswith("dataset/mlx/train.jsonl");
-    assert str(d["valid_rel"]).endswith("dataset/mlx/valid.jsonl");
+    assert str(d["train_rel"]).endswith("dataset/sft/train.jsonl"), d;
+    assert str(d["valid_rel"]).endswith("dataset/sft/valid.jsonl"), d;
+    # toml defaults ("../...") are normalized to absolute, ".."-free paths so
+    # jobs.safe(allow_slash=True) accepts them.
+    assert str(d["train_rel"]).startswith("/") and ".." not in str(d["train_rel"]), d;
     o = _dataset_rels({"dataset": {"train_rel": "custom/train.jsonl"}});
     assert str(o["train_rel"]) == "custom/train.jsonl";
-    assert str(o["valid_rel"]).endswith("dataset/mlx/valid.jsonl");
+    assert str(o["valid_rel"]).endswith("dataset/sft/valid.jsonl");
 }
 
 test "start_remote_run validation gate rejects before any side effects" {

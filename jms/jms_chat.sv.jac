@@ -12,7 +12,7 @@ jaclang streaming runtime does NOT bind the caller's root inside the generator
 body (`[root -->]` sees the system root, not the user's) — every other SSE
 endpoint here (chat_stream) only ever touches the GLOBAL model registry, never
 per-user graph, so this is the first to hit it. Instead we scan the workspace's
-jms-projects/*/project.json for the pid (a 12-hex uuid — an effectively
+<data_root>/projects/*/project.json for the pid (a 12-hex uuid — an effectively
 unguessable capability token) and read the run's own mlx_config.json (written by
 jms_train for local-mlx runs only) for the base-model path + adapter dir. The
 endpoint is still auth-gated (401 without a token); the pid is the object
@@ -67,12 +67,12 @@ def _no_mlx_config_error(run_dir: Path, rid: str) -> str {
 }
 
 """Resolve (pid, rid) → {ok, base_path, adapter_path, model_id, error} from disk.
-Scans jms-projects/*/project.json for the pid, then reads runs/<rid>/mlx_config.json
+Scans <data_root>/projects/*/project.json for the pid, then reads runs/<rid>/mlx_config.json
 (local-mlx runs only) for the base-model abs path + the adapter dir. See the module
 docstring on why this is disk-based, not graph-based."""
 def _resolve_run(pid: str, rid: str) -> dict {
     if not pid or not rid { return {"ok": False, "error": "missing pid/rid"}; }
-    base = paths.workspace_root() / "jms-projects";
+    base = paths.projects_dir();
     if not base.is_dir() { return {"ok": False, "error": "unknown project"}; }
     for pj in base.glob("*/project.json") {
         proj: dict = {};

@@ -260,6 +260,11 @@ def _start_local(p: JmsProject, rid: str, base_model: str, opts: dict) -> dict {
     if not m or not models.model_available(m) {
         return {"ok": False, "rid": "", "error": f"local model not available: {base_model}"};
     }
+    # A registry entry with an `adapter` is base+LoRA; mlx_lm.lora would silently
+    # train on the bare base, so require a plain base model here.
+    if models.model_adapter_path(m) {
+        return {"ok": False, "rid": "", "error": f"{base_model} is an adapter entry — pick a base model to train on"};
+    }
     model_path = str(models.model_path(m));
 
     prep = _prepare_data(p, rid);
@@ -284,11 +289,7 @@ def _start_local(p: JmsProject, rid: str, base_model: str, opts: dict) -> dict {
         return {"ok": False, "rid": "", "error": f"GPU busy: {grab['busy_with']} is running"};
     }
 
-    venv_bin = str(paths.data_root() / ".venv" / "bin");
-    env: dict = {};
-    if (paths.data_root() / ".venv" / "bin").is_dir() {
-        env["PATH"] = f"{venv_bin}:{os.environ.get('PATH', '')}";
-    }
+    env: dict = {"PATH": paths.tool_path()};
     inner = f"mlx_lm.lora --config {shlex.quote(str(cfg_file))}";
     rl.write_text("");   # erase any stale __EXIT__ marker
     cmd = jobs.with_exit_marker(inner, rl);

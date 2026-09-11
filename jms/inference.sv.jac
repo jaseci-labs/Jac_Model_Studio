@@ -234,7 +234,16 @@ scripts/jms_gen_worker.jac documents. Returns (model, tokenizer)."""
 def _mlx_load(path: str, adapter_path: str) -> any {
     mod: any = importlib.import_module("mlx_lm");
     if adapter_path {
-        return mod.load(path, adapter_path=adapter_path);
+        loaded: any = mod.load(path, adapter_path=adapter_path);
+        # mlx_lm evals the base weights inside load() but loads the adapter
+        # weights LAZILY afterwards. The SSE generator's next() calls can run on
+        # different threadpool threads, and MLX streams are thread-local, so the
+        # first forward pass on another thread died with "There is no
+        # Stream(gpu, N) in current thread". Materialize everything here, on the
+        # loading thread.
+        mx: any = importlib.import_module("mlx.core");
+        mx.eval(loaded[0].parameters());
+        return loaded;
     }
     return mod.load(path);
 }

@@ -1,4 +1,15 @@
+# build/runtime state
 .jac/
+data/
 node_modules/
+__pycache__/
+*.pyc
+*.db
+*.db-shm
+*.db-wal
+*.log
+logs/
+.DS_Store
+# editors
 .vscode/
 .idea/

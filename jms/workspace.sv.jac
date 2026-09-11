@@ -1,15 +1,14 @@
 """studio - workspace configuration loader.
 
 Single source of truth for studio's data-config (model registry, dataset file
-maps, train/builder/eval key lists, CPT + RL layout). Everything that used to be
-a hard-coded `glob` in models/data/train/builders/evals/cpt/rl now flows through
-here, so the studio app adapts to a checkout by editing studio.workspace.toml,
-not code.
+maps, training-backend templates, cloud-run defaults). The app adapts to a
+checkout by editing studio.workspace.toml, not code — it is the ONLY place that
+names external artifacts (model dirs, datasets), and every such path may be
+missing without crashing anything.
 
 Resolution:
-  1. <workspace_root>/studio.workspace.toml   (JAC_STUDIO_WORKSPACE; travels
-     with the data checkout)
-  2. <studio_root>/studio.workspace.toml      (shipped fallback inside the app)
+  1. <workspace_root>/studio.workspace.toml   (JAC_STUDIO_WORKSPACE override)
+  2. <studio_root>/studio.workspace.toml      (shipped default, jms/)
   3. empty defaults                            (neither file present)
 
 TOML (not YAML) because `jac` ships as a frozen binary whose bundled Python has
@@ -95,15 +94,11 @@ def model_registry() -> list[dict] {
     return out;
 }
 
-def holdouts() -> dict {
-    return _dict_of(_sec("models").get("holdouts"));
-}
-
 def excluded_run_dirs() -> list[str] {
     return _str_list(_sec("models").get("excluded_run_dirs"));
 }
 
-# --- SFT/DPO dataset (data.sv.jac) ------------------------------------------
+# --- dataset browser (data.sv.jac) ------------------------------------------
 
 def preview_files() -> list[list[str]] {
     raw = _sec("data").get("preview_files");
@@ -117,10 +112,6 @@ def preview_files() -> list[list[str]] {
     return out;
 }
 
-def append_targets() -> dict {
-    return _dict_of(_sec("data").get("append_targets"));
-}
-
 def data_sft_stat_files() -> list[str] {
     return _str_list(_sec("data").get("sft_stat_files"));
 }
@@ -129,49 +120,7 @@ def data_split_files() -> dict {
     return _dict_of(_sec("data").get("split_files"));
 }
 
-# --- RL (rl.sv.jac / data.sv.jac) -------------------------------------------
-
-def rl_sources() -> list[str] {
-    return _str_list(_sec("rl").get("sources"));
-}
-
-# Values are per-source [[rel, label], ...]; kept as a raw dict (untyped values).
-def rl_preview_files() -> dict {
-    return _dict_of(_sec("rl").get("preview_files"));
-}
-
-def rung_order() -> list {
-    return _str_list(_sec("rl").get("rung_order"));
-}
-
-# --- CPT (cpt.sv.jac) -------------------------------------------------------
-
-def cpt_files() -> list[list[str]] {
-    raw = _sec("cpt").get("files");
-    out: list[list[str]] = [];
-    if not isinstance(raw, list) { return out; }
-    for pair in (raw as list) {
-        if isinstance(pair, list) {
-            out.append([str(x) for x in (pair as list)]);
-        }
-    }
-    return out;
-}
-
-def cpt_manifest_rel() -> str {
-    raw = _sec("cpt").get("manifest_rel");
-    return str(raw) if raw is not None else "";
-}
-
-def cpt_src_order() -> list[str] {
-    return _str_list(_sec("cpt").get("src_order"));
-}
-
-def cpt_kind_map() -> dict {
-    return _dict_of(_sec("cpt").get("kind_map"));
-}
-
-# --- train / builders / evals (train/builders/evals.sv.jac) -----------------
+# --- backend env-key whitelists (backends.sv.jac) --------------------------
 
 def sft_keys() -> list[str] {
     return _str_list(_sec("train").get("sft_keys"));
@@ -179,14 +128,6 @@ def sft_keys() -> list[str] {
 
 def dpo_keys() -> list[str] {
     return _str_list(_sec("train").get("dpo_keys"));
-}
-
-def builder_stages() -> list[str] {
-    return _str_list(_sec("builders").get("stages"));
-}
-
-def eval_kinds() -> list[str] {
-    return _str_list(_sec("evals").get("kinds"));
 }
 
 # --- training backends (backends.sv.jac) ------------------------------------
@@ -210,14 +151,6 @@ def training_backends() -> dict {
 def training_backend(name: str) -> dict {
     raw = _sec("backends").get(name);
     return dict(raw) if isinstance(raw, dict) else {};
-}
-
-"""Spheron remote path overrides from [spheron] in studio.workspace.toml.
-Used by spheron.sv.jac to build the cloudInit.runcmd working directory for a
-dispatched training job (a fresh Spheron instance starts empty, so these are
-where the dispatch cds into before launching)."""
-def spheron_remote_config() -> dict {
-    return _dict_of(_sec("spheron"));
 }
 
 """[cloudrun] section: supervised-run dataset defaults + supervisor policy
@@ -282,96 +215,44 @@ node Workspace {
 }
 
 # --- the core rail ----------------------------------------------------------
-# Every Experiments workspace shows the SAME six sections, in this order:
-#   CHAT · DATA · TRAIN · EVALS · CLOUD · PLAN
-# Only the *component* behind a section id varies per workspace (see
-# _CORE_RAIL_COMPONENTS); workspace 02 additionally keeps RESULTS + GENERATE at
-# the tail because those are RL-only features with no meaning elsewhere.
+# Every Experiments workspace shows the same generic sections, in this order:
+#   CHAT · DATA · CLOUD
+# (The per-experiment TRAIN/EVALS/RL/CPT/PLAN sections were removed with the
+# 01-04 experiments they drove; training + eval now live in the JMS surface.)
 #
 # This is the single source of truth for BOTH first-run seeding (_seed_one_workspace)
 # and the backfill migration (_migrate_core_rail), so the two can never drift.
 glob _CORE_RAIL: list[dict] = [
     {"id": "chat", "label": "CHAT", "component": "Chat"},
     {"id": "data", "label": "DATA", "component": "Data"},
-    {"id": "train", "label": "TRAIN", "component": "Train"},
-    {"id": "evals", "label": "EVALS", "component": "Evals"},
-    {"id": "cloud", "label": "CLOUD", "component": "Cloud"},
-    {"id": "plan", "label": "PLAN", "component": "Plan"}
-];
-
-# Per-workspace component overrides for core rail ids. Anything not listed uses
-# the generic component from _CORE_RAIL above — so a user-created workspace ("05")
-# still gets a sensible six-item rail.
-glob _CORE_RAIL_COMPONENTS: dict[str, any] = {
-    "02": {"data": "RlData"},
-    "03": {"data": "CptData", "train": "CptTrain"},
-    "04": {"data": "CptSftData", "plan": "CptSftPlan"}
-};
-
-# RL-only tail sections, workspace 02 only.
-glob _RL_TAIL: list[dict] = [
-    {"id": "results", "label": "RESULTS", "component": "Results"},
-    {"id": "generate", "label": "GENERATE", "component": "Generate"}
+    {"id": "cloud", "label": "CLOUD", "component": "Cloud"}
 ];
 
 # Canonical render position of every known section id. Used by the migration to
 # slot new sections in at the right place relative to what is already there.
-glob _CORE_RANK: dict[str, int] = {
-    "chat": 0, "data": 1, "train": 2, "evals": 3,
-    "cloud": 4, "plan": 5, "results": 6, "generate": 7
-};
+glob _CORE_RANK: dict[str, int] = {"chat": 0, "data": 1, "cloud": 2};
 
 """The full section spec (id/label/component, in render order) for one workspace."""
-def _rail_spec_for(wid: str) -> list[dict] {
-    over = _dict_of(_CORE_RAIL_COMPONENTS.get(wid));
-    out: list[dict] = [];
-    for item in _CORE_RAIL {
-        d = dict(item);
-        sid = str(d["id"]);
-        if sid in over { d["component"] = str(over[sid]); }
-        out.append(d);
-    }
-    if wid == "02" {
-        for item in _RL_TAIL { out.append(dict(item)); }
-    }
-    return out;
+def _rail_spec_for(_wid: str) -> list[dict] {
+    return [dict(item) for item in _CORE_RAIL];
 }
 
-# Fixed workspace set used to seed the graph on first run. Mirrors the old
-# filesystem-discovered layout (01 SFT/DPO, 02 RL/GRPO, 03 CPT) — each now carries
-# an arbitrary `files` list the user can repoint to anything they want. Sections
-# are NOT listed here: they come from _rail_spec_for(id) so seed and migration
-# stay in lockstep.
+"""The default chat model for new/repaired workspaces: the first registry entry."""
+def _default_model_id() -> str {
+    reg = model_registry();
+    return str(reg[0]["id"]) if len(reg) > 0 else "";
+}
+
+# Fixed workspace set used to seed the graph on first run. Sections are NOT
+# listed here: they come from _rail_spec_for(id) so seed and migration stay in
+# lockstep. default_model "" = first model in the registry.
 glob _SEED_WORKSPACES: list[dict] = [
     {
         "id": "01",
-        "label": "SFT/DPO",
+        "label": "MAIN",
         "accent": "ws01",
-        "default_model": "qwen-dpo",
-        "files": ["01-sft-dpo"]
-    },
-    {
-        "id": "02",
-        "label": "RL/GRPO",
-        "accent": "ws02",
-        "default_model": "qwen3coder-rl",
-        "files": ["02-rl-grpo"]
-    },
-    {
-        "id": "03",
-        "label": "CPT",
-        "accent": "ws03",
-        "default_model": "qwen-q4",
-        # was "03-new" — that directory does not exist; the attempt dir was
-        # renamed to 03-cpt-only (matches studio.workspace.toml's [cpt] paths).
-        "files": ["03-cpt-only"]
-    },
-    {
-        "id": "04",
-        "label": "CPT-SFT",
-        "accent": "ws04",
-        "default_model": "qwen-cpt-v1",
-        "files": ["04-cpt-sft"]
+        "default_model": "",
+        "files": []
     }
 ];
 
@@ -472,22 +353,46 @@ def _migrate_core_rail() -> None {
     return;
 }
 
-glob _WS03_FILES_MIGRATION: str = "ws03_files_v1";
+glob _LEGACY_PRUNE_MIGRATION: str = "legacy_prune_v1";
 
-"""One-shot repair of workspace 03's stale `files` entry. The attempt dir was
-renamed 03-new -> 03-cpt-only (studio.workspace.toml's [cpt] paths already point
-at the new name, and model-experiments/03-new does not exist). Fixing the seed
-alone would only help fresh installs, so patch already-seeded graphs too — but
-ONLY when `files` still holds the exact broken value, so a list the user has
-since repointed is never overwritten."""
-def _migrate_ws03_files() -> None {
-    if _migration_applied(_WS03_FILES_MIGRATION) { return; }
+# The seeded workspaces of the deleted 02-04 experiments, identified by their
+# EXACT seed `files` value so a workspace the user repointed is never touched.
+glob _LEGACY_SEED_FILES: dict[str, list[str]] = {
+    "02": ["02-rl-grpo"],
+    "03": ["03-cpt-only"],
+    "04": ["04-cpt-sft"]
+};
+
+"""One-shot cleanup after the 01-04 experiments were deleted:
+- drop sections whose component no longer exists (Train/Evals/RlData/Cpt*/Plan/
+  Results/Generate) — otherwise they render "UNKNOWN SECTION";
+- drop the untouched seeded 02/03/04 workspaces (exact seed `files` match);
+- workspace 01 still pointing at "01-sft-dpo" becomes the generic MAIN one;
+- repoint any default_model that is no longer in the registry;
+- never leave a workspace with zero sections (adds CHAT back)."""
+def _migrate_legacy_prune() -> None {
+    if _migration_applied(_LEGACY_PRUNE_MIGRATION) { return; }
+    live: list[str] = [str(t["component"]) for t in SECTION_TYPES];
+    reg_ids: list[str] = [str(m["id"]) for m in model_registry()];
     for ws in [root -->][?:Workspace] {
-        if ws.wid == "03" and list(ws.files) == ["03-new"] {
-            ws.files = ["03-cpt-only"];
+        legacy = _LEGACY_SEED_FILES.get(ws.wid);
+        if legacy is not None and list(ws.files) == list(legacy) {
+            _delete_workspace_node(ws);
+            continue;
         }
+        if ws.wid == "01" and list(ws.files) == ["01-sft-dpo"] {
+            ws.files = [];
+            if ws.label == "SFT/DPO" { ws.label = "MAIN"; }
+        }
+        for sec in [ws -->][?:WorkspaceSection] {
+            if sec.component not in live { del sec; }
+        }
+        if len([ws -->][?:WorkspaceSection]) == 0 {
+            ws ++> WorkspaceSection(sid="chat", label="CHAT", component="Chat", order=0);
+        }
+        if ws.default_model not in reg_ids { ws.default_model = _default_model_id(); }
     }
-    _mark_migration(_WS03_FILES_MIGRATION);
+    _mark_migration(_LEGACY_PRUNE_MIGRATION);
     return;
 }
 
@@ -500,7 +405,7 @@ def _seed_one_workspace(spec: dict, sort_index: int) -> None {
         wid=wid,
         label=str(spec["label"]),
         accent=str(spec["accent"]),
-        default_model=str(spec["default_model"]),
+        default_model=str(spec["default_model"]) or _default_model_id(),
         files=[str(f) for f in (spec["files"] as list)],
         sort_order=sort_index
     ))[0];
@@ -533,16 +438,19 @@ def _ensure_workspaces_seeded() -> None {
             }
         }
         _migrate_core_rail();
-        _migrate_ws03_files();
+        _migrate_legacy_prune();
+        if len([root -->][?:Workspace]) == 0 {
+            for (i, spec) in enumerate(_SEED_WORKSPACES) { _seed_one_workspace(spec, i); }
+        }
         return;
     }
     for (i, spec) in enumerate(_SEED_WORKSPACES) {
         _seed_one_workspace(spec, i);
     }
-    # Freshly seeded graphs are already correct — mark both migrations spent so
-    # they can never re-add a section (or rewrite a path) the user later changed.
+    # Freshly seeded graphs are already correct — mark the migrations spent so
+    # they can never re-add or prune a section the user later changed.
     _mark_migration(_CORE_RAIL_MIGRATION);
-    _mark_migration(_WS03_FILES_MIGRATION);
+    _mark_migration(_LEGACY_PRUNE_MIGRATION);
     return;
 }
 
@@ -595,17 +503,7 @@ def _delete_workspace_node(ws: Workspace) -> None {
 # Registry of mountable section components — single source for CRUD UI + SectionMount.
 glob SECTION_TYPES: list[dict] = [
     {"component": "Chat", "label": "Chat", "default_sid": "chat"},
-    {"component": "Data", "label": "SFT/DPO Data", "default_sid": "data"},
-    {"component": "RlData", "label": "RL Data", "default_sid": "data"},
-    {"component": "CptData", "label": "CPT Data", "default_sid": "data"},
-    {"component": "CptSftData", "label": "CPT-SFT Data", "default_sid": "data"},
-    {"component": "CptSftPlan", "label": "CPT-SFT Plan", "default_sid": "plan"},
-    {"component": "Train", "label": "Train", "default_sid": "train"},
-    {"component": "CptTrain", "label": "CPT Train", "default_sid": "train"},
-    {"component": "Evals", "label": "Evals", "default_sid": "evals"},
-    {"component": "Results", "label": "Results", "default_sid": "results"},
-    {"component": "Generate", "label": "Generate", "default_sid": "generate"},
-    {"component": "Plan", "label": "Plan", "default_sid": "plan"},
+    {"component": "Data", "label": "Dataset", "default_sid": "data"},
     {"component": "Cloud", "label": "Cloud GPU", "default_sid": "cloud"}
 ];
 
@@ -636,7 +534,7 @@ def create_workspace(
     _ensure_workspaces_seeded();
     wid = _next_workspace_id();
     acc = accent if accent else _next_accent();
-    dm = default_model if default_model else "qwen-dpo";
+    dm = default_model if default_model else _default_model_id();
     ws = (root ++> Workspace(
         wid=wid, label=label, accent=acc, default_model=dm,
         files=list(files), sort_order=len(_all_workspaces())

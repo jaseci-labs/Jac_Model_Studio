@@ -8,9 +8,9 @@ set -e
 cd "$(dirname "$0")"
 
 _STUDIO_DIR="$(pwd)"
-_WORKSPACE_DEFAULT="$(dirname "$_STUDIO_DIR")"
-export JAC_STUDIO_WORKSPACE="${JAC_STUDIO_WORKSPACE:-$_WORKSPACE_DEFAULT}"
-export JAC_STUDIO_DATA_ROOT="${JAC_STUDIO_DATA_ROOT:-$JAC_STUDIO_WORKSPACE}"
+# Paths: JAC_STUDIO_WORKSPACE (base for studio.workspace.toml paths, default
+# this dir) and JAC_STUDIO_DATA_ROOT (runtime writes, default ./data) are read
+# by paths.sv.jac; only pass them through when set. See README.md.
 
 # SQLite concurrency hardening — see scripts/pysite/sitecustomize.py for the
 # full root-cause writeup. Short version: jac-scale opens a NEW sqlite

@@ -294,7 +294,9 @@ error frame). Consumes inference.stream_chat."""
 def _mlx_generate(model_id: str, path: str, prompt: str) -> str {
     msgs: list[dict] = [{"role": "user", "content": prompt}];
     acc = "";
-    gen: any = inference.stream_chat(msgs, model_id, path, 0.3, 0.95, 1400);
+    m = models.model_by_id(model_id);
+    ad = models.model_adapter_path(m) if m else "";
+    gen: any = inference.stream_chat(msgs, model_id, path, 0.3, 0.95, 1400, ad);
     for frame in gen {
         kind = str(frame["kind"]);
         if kind == "token" { acc = str(frame["text"]); }

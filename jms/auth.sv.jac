@@ -94,16 +94,9 @@ def uid() -> str {
 
 """Per-user results tree: <data_root>/results/users/<uid>/.
 
-Everything a user's SFT/DPO training, eval, and builder jobs write lands here, so
+Everything a user's cloud runs and JMS training jobs write lands here, so
 the list/stop/delete endpoints are scoped to the caller. Callers mkdir it on first
 use (parents=True, exist_ok=True)."""
 def user_results_dir() -> Path {
     return models.results_dir() / "users" / uid();
-}
-
-"""Per-user path under the shared workspace checkout (used by CPT, whose corpus
-lives in the repo). <workspace_root>/<rel_prefix>/users/<uid>/<rest>."""
-def user_workspace_dir(rel_prefix: str, rest: str = "") -> Path {
-    base = paths.workspace_root() / rel_prefix / "users" / uid();
-    return base / rest if rest else base;
 }

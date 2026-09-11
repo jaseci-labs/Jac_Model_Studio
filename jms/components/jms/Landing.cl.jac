@@ -25,7 +25,7 @@ Load choreography (delays live in jms.css, derived from --dur-fast):
 
 The footer's "at a glance" readout is real data or nothing: three independent
 best-effort calls to endpoints that are already registered in main.jac
-(`list_projects`, `list_runs`, `list_evals`). Each writes its own state string
+(`list_projects`, `active_jobs`, `list_cloud_runs`). Each writes its own state string
 only on success, so a failed/slow call simply omits its segment — this page
 never renders a placeholder number that could be mistaken for a real one. The
 readout's `<span>` is rendered unconditionally (empty until the calls land) so
@@ -47,8 +47,8 @@ import from react { useEffect }
 import from ..ThemeSwitcher { ThemeSwitcher }
 import from ..AssistantPanel { AssistantPanel }
 sv import from ...jms_projects { list_projects }
-sv import from ...runs { list_runs }
-sv import from ...evals { list_evals }
+sv import from ...jobs { active_jobs }
+sv import from ...cloudruns { list_cloud_runs }
 
 def:pub Landing(onPick: any = None) -> JsxElement {
     has glance: str = "",
@@ -65,24 +65,15 @@ def:pub Landing(onPick: any = None) -> JsxElement {
             parts.append(str(n) + (" PROJECT" if n == 1 else " PROJECTS"));
         } except Exception { }
         try {
-            rr = await list_runs();
-            rl = list(rr["runs"]);
-            live = 0;
-            for r in rl {
-                if r["running"] { live = live + 1; }
-            }
+            aj = await active_jobs();
+            live = int(aj["running"]);
             running = live;
-            seg = str(len(rl)) + (" RUN" if len(rl) == 1 else " RUNS");
-            if live > 0 { seg = seg + " · " + str(live) + " LIVE"; }
-            parts.append(seg);
+            parts.append(str(live) + " JOB" + ("" if live == 1 else "S") + " LIVE");
         } except Exception { }
         try {
-            er = await list_evals();
-            el = list(er["evals"]);
-            if len(el) > 0 {
-                e0 = el[0];
-                parts.append("LAST EVAL " + str(e0.status).upper() + " " + str(e0.started)[:10]);
-            }
+            cr = await list_cloud_runs();
+            cl = list(cr["runs"]);
+            parts.append(str(len(cl)) + (" CLOUD RUN" if len(cl) == 1 else " CLOUD RUNS"));
         } except Exception { }
         glance = " · ".join(parts);
     }
@@ -118,8 +109,8 @@ def:pub Landing(onPick: any = None) -> JsxElement {
                 <span className="jms-label jms-hero-kicker">EXISTING LAB</span>
                 <span className="jms-display jms-hero-word">EXPERIMENTS</span>
                 <span className="jms-hero-accent-tick jms-tick-draw jms-seq-6" />
-                <span className="jms-hero-sub">The existing lab: chat, data, train, RL, CPT.</span>
-                <span className="jms-stat">sft/dpo · rl/grpo · cpt workspaces</span>
+                <span className="jms-hero-sub">The lab: chat with models, browse datasets, cloud GPU runs.</span>
+                <span className="jms-stat">chat · data · cloud workspaces</span>
             </button>
         </div>
 

@@ -1,8 +1,9 @@
 """studio - model registry + data-root resolution.
 
-Ports server/config.py. models/ is gitignored and resolves against
-paths.data_root() (JAC_STUDIO_DATA_ROOT / workspace). `list_models` is the
-client-facing endpoint; the rest are helpers used by chat/eval/train modules.
+Registry entries come from studio.workspace.toml ([[models.registry]]: id, label,
+path, optional adapter). Relative paths resolve against paths.workspace_root().
+`list_models` is the client-facing endpoint; the rest are helpers used by the
+chat/eval/train modules.
 """
 
 import os;
@@ -10,9 +11,6 @@ import inference;
 import paths;
 import workspace;
 import from pathlib { Path }
-
-# Model registry, eval holdouts, and excluded run dirs now live in
-# studio.workspace.toml (workspace_root > studio_root). See workspace.sv.jac.
 
 """One model as the client sees it: registry entry + on-disk availability."""
 obj ModelView {
@@ -37,21 +35,26 @@ def model_by_id(model_id: str) -> dict {
 }
 
 def model_path(m: dict) -> Path {
-    return data_root() / str(m["path"]);
+    return paths.resolve(str(m["path"]));
 }
 
+"""Absolute LoRA adapter dir for a registry entry, "" when the entry is a plain
+model (no `adapter` key)."""
+def model_adapter_path(m: dict) -> str {
+    a = str(m.get("adapter", "") or "");
+    return str(paths.resolve(a)) if a else "";
+}
+
+"""Base dir on disk AND (when set) the adapter dir on disk. A missing path is
+never an error — the entry just shows as unavailable."""
 def model_available(m: dict) -> bool {
-    return model_path(m).is_dir();
+    if not model_path(m).is_dir() { return False; }
+    ad = model_adapter_path(m);
+    return Path(ad).is_dir() if ad else True;
 }
 
 def results_dir() -> Path {
-    # run_probe.sh / run_dpo.sh cd to the repo root and write under
-    # model-experiments/01-sft-dpo/results/, so the studio must read the same tree.
-    return data_root() / "model-experiments/01-sft-dpo" / "results";
-}
-
-def jac_bin() -> Path {
-    return data_root() / ".venv" / "bin" / "jac";
+    return paths.results_dir();
 }
 
 # Memoized model-dir sizes. `list_models()` backs the chat model picker AND
@@ -146,7 +149,7 @@ def warm_model(model_id: str) -> dict {
     # {id, load_s, error} contract instead of letting it escape as a 500 — a
     # failed warm must degrade to an error message for THIS request only.
     try {
-        s = inference.load_sync(model_id, str(model_path(m)));
+        s = inference.load_sync(model_id, str(model_path(m)), model_adapter_path(m));
     } except Exception as e {
         return {"id": model_id, "load_s": 0.0, "error": str(e)};
     }

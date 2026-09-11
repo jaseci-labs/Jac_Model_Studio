@@ -1,21 +1,22 @@
 """studio - dataset stats / preview / ingest. Ports server/datasets.py.
 
-Read-only browser (stats/files/rows) + append. Builder pipeline (subprocess)
-lands with the jobs module. All code fields returned as raw strings.
+Read-only browser (stats/files/rows) over the dataset files listed in
+studio.workspace.toml [data] (resolved against paths.workspace_root(); a missing
+file just counts 0), plus add_examples, which appends to JMS-owned files under
+<data_root>/examples/<target>.jsonl — never into an external dataset. All code
+fields returned as raw strings.
 """
 
 import os;
 import json;
 import re;
-import models;
 import paths;
 import workspace;
 import from pathlib { Path }
 
-# Dataset + RL file maps now live in studio.workspace.toml (workspace.sv.jac):
-# preview_files / append_targets / split_files / sft_stat_files / rl_preview_files.
-# RL data still resolves against the workspace checkout (paths.workspace_root),
-# not the studio data_root when JAC_STUDIO_DATA_ROOT points elsewhere.
+# Browsable files come from studio.workspace.toml [data] (workspace.sv.jac):
+# preview_files / split_files / sft_stat_files.
+glob APPEND_TARGETS: list[str] = ["sft", "dpo"];
 
 obj FileRefView {
     has path: str = "", label: str = "", count: int = 0;
@@ -28,11 +29,26 @@ obj DataRowView {
 }
 
 def _abs(rel: str) -> Path {
-    return models.data_root() / rel;
+    return paths.resolve(rel);
+}
+
+"""JMS-owned append target for *target* (sft/dpo): <data_root>/examples/<t>.jsonl."""
+def _example_file(target: str) -> Path {
+    return paths.data_root() / "examples" / f"{target}.jsonl";
+}
+
+"""Browsable files: the toml preview_files + the JMS-owned example files (by
+absolute path, so they resolve regardless of workspace_root)."""
+def _preview_pairs() -> list[list[str]] {
+    out = workspace.preview_files();
+    for t in APPEND_TARGETS {
+        out.append([str(_example_file(t)), f"Saved examples · {t.upper()}"]);
+    }
+    return out;
 }
 
 def _allowed(rel: str) -> bool {
-    for pair in workspace.preview_files() {
+    for pair in _preview_pairs() {
         if pair[0] == rel {
             return True;
         }
@@ -195,7 +211,7 @@ def _build_row(idx: int, rec: any) -> DataRowView {
     );
 }
 
-"""Dataset statistics: counts per SFT file, DPO pairs, split sizes."""
+"""Dataset statistics: counts per SFT stat file + named split sizes (toml)."""
 def dataset_stats() -> dict {
     sft_rels = workspace.data_sft_stat_files();
     sft_files: list = [];
@@ -206,20 +222,17 @@ def dataset_stats() -> dict {
         grand += n;
     }
     split_rels = workspace.data_split_files();
-    splits: dict = {};
+    splits: list = [];
     for k in split_rels {
-        splits[k] = _line_count(str(split_rels[k]));
+        splits.append({"name": str(k), "count": _line_count(str(split_rels[k]))});
     }
-    return {
-        "sft_files": sft_files, "sft_total": grand,
-        "dpo_pairs": _line_count("model-experiments/01-sft-dpo/dataset/conversion/dpo.jsonl"), "splits": splits
-    };
+    return {"sft_files": sft_files, "sft_total": grand, "splits": splits};
 }
 
 """All preview-allowed files with line counts."""
 def dataset_files() -> list[FileRefView] {
     out: list[FileRefView] = [];
-    for pair in workspace.preview_files() {
+    for pair in _preview_pairs() {
         out.append(FileRefView(path=pair[0], label=pair[1], count=_line_count(pair[0])));
     }
     return out;
@@ -245,62 +258,7 @@ def dataset_rows(path: str, offset: int, limit: int) -> dict {
     return {"rows": result, "total": total};
 }
 
-def _rl_allowed(source: str, rel: str) -> bool {
-    pairs = (workspace.rl_preview_files().get(source, []) as list[list[str]]);
-    for pair in pairs {
-        if pair[0] == rel { return True; }
-    }
-    return False;
-}
-
-def _rl_read_lines(rel: str) -> list {
-    p = paths.resolve(rel, "workspace");
-    if not p.exists() { return []; }
-    out: list = [];
-    for line in p.read_text().split("\n") {
-        if line.strip() { out.append(line); }
-    }
-    return out;
-}
-
-"""The RL source axis (SFT/GRPO/conversion/synthetic/splits) from
-studio.workspace.toml — drives the RlData section's source picker so it stays in
-sync with the server (no client-side duplicate of the source list)."""
-def rl_sources() -> list[str] {
-    return workspace.rl_sources();
-}
-
-"""RL dataset sources (SFT/GRPO/conversion/synthetic/splits) with their files + counts."""
-def rl_dataset_files(source: str) -> list[FileRefView] {
-    out: list[FileRefView] = [];
-    pairs = (workspace.rl_preview_files().get(source, []) as list[list[str]]);
-    for pair in pairs {
-        out.append(FileRefView(path=pair[0], label=pair[1], count=_count_lines_cached(paths.resolve(pair[0], "workspace"))));
-    }
-    return out;
-}
-
-"""A page of parsed rows from an RL dataset file (cap 40), gated by source."""
-def rl_dataset_rows(source: str, path: str, offset: int, limit: int) -> dict {
-    if not _rl_allowed(source, path) {
-        return {"rows": [], "total": 0};
-    }
-    cap = max(1, min(limit, 40));
-    lines = _rl_read_lines(path);
-    total = len(lines);
-    result: list[DataRowView] = [];
-    i = offset;
-    while i < total and i < offset + cap {
-        try {
-            rec = json.loads(str(lines[i]));
-            result.append(_build_row(i, rec));
-        } except Exception {}
-        i += 1;
-    }
-    return {"rows": result, "total": total};
-}
-
-"""Append valid JSONL rows to *target* (key in workspace.append_targets() — sft/dpo). Each
+"""Append valid JSONL rows to *target* (sft/dpo → <data_root>/examples/<target>.jsonl). Each
 non-empty line is validated as JSON with the required schema (DPO needs
 prompt/chosen/rejected; SFT needs a messages list). Returns {added, errors, total}.
 
@@ -308,10 +266,10 @@ prompt/chosen/rejected; SFT needs a messages list). Returns {added, errors, tota
 # no whole-file read to inspect one byte. The closing _line_count streams the file
 # once (memoized). Unknown targets return an error dict instead of raising."""
 def add_examples(target: str, jsonl: str) -> dict {
-    if target not in workspace.append_targets() {
+    if target not in APPEND_TARGETS {
         return {"added": 0, "errors": [f"unknown target: {target}"], "total": 0};
     }
-    rel = str(workspace.append_targets()[target]);
+    rel = str(_example_file(target));
     is_dpo = target == "dpo";
     valid: list[str] = [];
     errors: list[str] = [];

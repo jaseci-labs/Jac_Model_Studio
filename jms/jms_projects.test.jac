@@ -7,8 +7,8 @@ subdir + an oversized/binary file), and delete_project removing the project from
 the list.
 
 These share one persisted `root` (see `jac guide jac-testing`), so each test
-creates its own projects and counts only what it created. The workspace_root is
-redirected to a temp dir so the jms-projects/ skeleton + project.json snapshots
+creates its own projects and counts only what it created. The data_root is
+redirected to a temp dir so the projects/ skeleton + project.json snapshots
 stay out of the repo. Annex file: pairs with jms_projects.sv.jac. Run with
 `jac test jms_projects.sv.jac`; `jac clean --data --force` first if a re-run flakes.
 """
@@ -16,9 +16,10 @@ stay out of the repo. Annex file: pairs with jms_projects.sv.jac. Run with
 import os;
 import tempfile;
 
-"""Contain the jms-projects/ skeleton + snapshots in a throwaway workspace."""
+"""Contain the projects/ skeleton + snapshots in a throwaway workspace."""
 def _isolate_ws -> None {
     os.environ["JAC_STUDIO_WORKSPACE"] = tempfile.mkdtemp(prefix="studio-jms-");
+    os.environ["JAC_STUDIO_DATA_ROOT"] = os.environ["JAC_STUDIO_WORKSPACE"];
 }
 
 """Build a small source tree: 3 code files + a docs file + an excluded

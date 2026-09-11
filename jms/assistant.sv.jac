@@ -24,8 +24,6 @@ import from workspace { ui_layout }
 import from jms_workspaces { jms_ui_layout }
 import from jms_projects { JmsProjectView, list_projects, get_project }
 import from jms_eval { list_jms_evals }
-import from runs { list_runs }
-import from evals { list_evals }
 import from cloudruns { list_cloud_runs }
 import from persistence { list_chats }
 
@@ -143,8 +141,8 @@ def assistant_providers() -> dict {
 #
 # `_collect_assistant_context()` fans out to every already-existing, cheap
 # dict/list-returning server function across the app (Experiments + JMS
-# workspaces, JMS projects incl. per-project stage_state/counts, JMS + classic
-# train runs, JMS + standalone evals, cloud deployments, recent chat titles,
+# workspaces, JMS projects incl. per-project stage_state/counts, JMS
+# train runs, JMS evals, cloud deployments, recent chat titles,
 # configured LLM providers) and serializes them into ONE labeled plain-text
 # digest. Best-effort: every source call is wrapped in its own try/except so
 # one failing source (empty graph, missing file, etc.) can't blank out the
@@ -349,46 +347,6 @@ def _sec_jms_evals(projects: list[JmsProjectView]) -> str {
     return _clip("\n".join(lines), _PER_FILE_CHARS * 4);
 }
 
-"""Classic (pre-JMS) SFT/DPO attempt runs from `runs.list_runs()`."""
-def _sec_classic_runs() -> str {
-    try {
-        data = list_runs();
-        lines: list[str] = ["=== CLASSIC RUNS (SFT/DPO) ==="];
-        items = data.get("runs", []);
-        if not items { lines.append("(none)"); }
-        for r in items {
-            lines.append(
-                f"- {r.get('name', '')} has_sft={r.get('has_sft', False)} "
-                f"has_dpo={r.get('has_dpo', False)} running={r.get('running', False)} "
-                f"stages={r.get('stages', {})}"
-            );
-        }
-        return _clip("\n".join(lines), _PER_FILE_CHARS * 3);
-    } except Exception as e {
-        return "=== CLASSIC RUNS (SFT/DPO) ===\n(unavailable: " + str(e) + ")";
-    }
-}
-
-"""Standalone EvalRun list from `evals.list_evals()` (the classic-runs eval
-surface, distinct from JMS per-project evals above)."""
-def _sec_standalone_evals() -> str {
-    try {
-        data = list_evals();
-        lines: list[str] = ["=== STANDALONE EVALS ==="];
-        items = data.get("evals", []);
-        if not items { lines.append("(none)"); }
-        for ev in items {
-            lines.append(
-                f"- {ev.id} kind={ev.kind} model={ev.model} status={ev.status} "
-                f"started={ev.started} finished={ev.finished}"
-            );
-        }
-        return _clip("\n".join(lines), _PER_FILE_CHARS * 2);
-    } except Exception as e {
-        return "=== STANDALONE EVALS ===\n(unavailable: " + str(e) + ")";
-    }
-}
-
 """Cloud (Spheron) supervised deployments from `cloudruns.list_cloud_runs()`."""
 def _sec_cloud_runs() -> str {
     try {
@@ -487,8 +445,6 @@ def _collect_assistant_context() -> str {
         _sec_jms_projects(projects, details),
         _sec_jms_train_runs(projects, details),
         _sec_jms_evals(projects),
-        _sec_classic_runs(),
-        _sec_standalone_evals(),
         _sec_cloud_runs(),
         _sec_chat_history(),
         _sec_llm_providers()
@@ -569,26 +525,19 @@ glob _ASSISTANT_PREAMBLE: str = (
     "concrete value per field — NEVER copy an option list like a|b|c verbatim:\n"
     "- navigate — move the UI. Fields: \"surface\" = exactly one of experiments, "
     "jms, hub; \"workspace\" = an id or label from live state (optional); "
-    "\"stage\" = one of chat, data, train, evals, cloud, results (optional).\n"
+    "\"stage\" = one of chat, data, cloud (optional).\n"
     "  Example: <<DO>>{\"action\":\"navigate\",\"surface\":\"experiments\","
-    "\"workspace\":\"03\",\"stage\":\"train\"}<</DO>>\n"
-    "- start_training — Fields: \"name\", \"mode\" = sft OR dpo, \"model_id\" "
-    "(optional).\n"
-    "  Example: <<DO>>{\"action\":\"start_training\",\"name\":\"my-run\",\"mode\":"
-    "\"sft\",\"model_id\":\"qwen-base\"}<</DO>>\n"
-    "- create_eval — Fields: \"kind\" (from live state), \"model_id\" (optional), "
-    "\"holdout\" = function OR graph (optional), \"limit\" (int, optional).\n"
-    "  Example: <<DO>>{\"action\":\"create_eval\",\"kind\":\"function\"}<</DO>>\n"
+    "\"workspace\":\"01\",\"stage\":\"data\"}<</DO>>\n"
     "- set_setting — Fields: \"wid\" (jms workspace id) plus any of "
     "\"default_model\", \"accent\", \"label\".\n"
     "  Example: <<DO>>{\"action\":\"set_setting\",\"wid\":\"1\",\"default_model\":"
-    "\"qwen-dpo\"}<</DO>>\n"
+    "\"qwen-q4\"}<</DO>>\n"
     "Do NOT put the action block inside a markdown code fence (no ``` around "
     "it) — emit the <<DO>>...<</DO>> line as plain text.\n"
     "Rules: use ids/labels that appear in the live state below (never invent "
     "them). Emit an action ONLY for a clear act request; for a pure question, "
     "answer in prose with no block. The app auto-runs navigate and asks the user "
-    "to confirm training/eval/settings, so you never need to ask permission "
+    "to confirm settings, so you never need to ask permission "
     "yourself — just emit the block. Use GitHub-flavored markdown in prose "
     "(headings, **bold**, `code`, fenced ```code```, - lists).\n\n"
     "=== LIVE APP STATE ===\n"
@@ -692,7 +641,9 @@ def _stream_local(
             return;
         }
         path = str(models.model_path(m));
-        gen: any = inference.stream_chat(grounded, model_id, path, temperature, top_p, max_tokens);
+        gen: any = inference.stream_chat(
+            grounded, model_id, path, temperature, top_p, max_tokens, models.model_adapter_path(m)
+        );
         for frame in gen {
             f: dict = dict(frame);
             if str(f.get("kind", "")) == "error" {

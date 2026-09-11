@@ -1,34 +1,53 @@
-# Jac ML Studio
+# Jac ML Studio (JMS)
 
-One-stop local ML workbench for the Jac fine-tuning project: chat with the
-trained models, launch + monitor training, run the data pipeline, and run
-evals — all in one frosted-glass light/dark UI. Written in **pure Jac** (full-stack: server
-+ React-in-Jac client from one codebase). Supersedes the old FastAPI + Next.js
-app (deleted) and the earlier web_app/ + dashboard_app/.
+Local ML workbench written in pure Jac (server `.sv.jac` + React-in-Jac client
+`.cl.jac`, one codebase). Two surfaces:
+
+- **JMS** — projects: sources → synthesize dataset → curate → train (local MLX or
+  a BYO remote GPU) → eval → chat with the result. Plus the in-app AI assistant.
+- **Experiments** — workspaces with CHAT (registry models), DATA (dataset
+  browser) and CLOUD (BYO GPU clusters + supervised remote runs).
+
+This directory is self-contained: it runs from `jms/` and only reaches outside
+through the paths in `studio.workspace.toml`.
 
 ## Run
 
-    jac setup desktop               # one-time: init the native webview target
-    ./jms/start.sh       # launches a native desktop window (API in-process, no browser)
+    jac setup desktop        # one-time: native webview target
+    ./start.sh               # native desktop window (dev mode, local single user)
 
-Models/dataset/results are read from `JAC_STUDIO_DATA_ROOT` (defaults to the
-parent of `jms/` — the `jac_ml_studio` workspace checkout). Override
-with `JAC_STUDIO_WORKSPACE` / `JAC_STUDIO_DATA_ROOT` when models live elsewhere.
+Browser instead of a native window: `jac start --dev main.jac` (UI :8000, API
+:8001). Production (multi-tenant, login gate): `JWT_SECRET=... ./start_prod.sh`,
+see `deploy/`.
 
-Workspace data-config (model registry, dataset file maps, train defaults) lives
-in `studio.workspace.toml` at the workspace root — see `workspace.sv.jac`.
+After editing a `.cl.jac` file restart the server — `--dev` compiles the client
+once at boot.
 
-## Desktop runtime dependencies (one-time, after clone or cache wipe)
+## Config and data
 
-The desktop target runs the server **in-process on an isolated, bundled Python**
-(`~/.cache/jac/rt/<hash>/site`). `jaclang`'s wheel declares **no** dependencies,
-so that bundle is missing the whole `jac-scale` server stack (`bcrypt`,
-`sqlalchemy`, `fastapi`, `pymongo`, `pyjwt`, `redis`, …) and the in-process boot
-dies on `import bcrypt`. `start.sh` points the native host's `JAC_DESKTOP_DEPS`
-env var at `.jac/desktop_deps/` (appended to `sys.path` at boot). That dir is
-.gitignored, so repopulate it after a fresh clone or a `jac clean`:
+| What | Where | Override |
+|------|-------|----------|
+| Model registry, dataset files, cloud-run defaults | `studio.workspace.toml` | `$JAC_STUDIO_WORKSPACE/studio.workspace.toml` |
+| Base dir for relative paths in the toml | `jms/` | `JAC_STUDIO_WORKSPACE` |
+| Runtime data JMS writes: `results/` (per-user runs, GPU lock), `audit/`, `projects/`, `examples/` | `jms/data/` (gitignored) | `JAC_STUDIO_DATA_ROOT` |
+| Graph + users DB, JWT secret | `jms/.jac/` (gitignored) | — |
 
-    pip install --target jms/.jac/desktop_deps \
+The shipped toml points at the sibling `../model-experiments/` checkout (base
+Qwen3-Coder q4 + the 08 SFT adapter, 08 SFT/DPO datasets). Registry entries take
+`path` (MLX model dir) and an optional `adapter` (LoRA dir). Any path may be
+missing: the model shows as unavailable and dataset files count 0.
+
+Worker/tool binaries (`jac`, `mlx_lm.lora`) are taken from next to the running
+interpreter, then `PATH`; a `../.venv/bin` is used only as a last-resort
+fallback if it exists.
+
+## Desktop runtime dependencies (one-time, after clone or `jac clean`)
+
+The desktop target runs the server in-process on a bundled Python that lacks the
+`jac-scale` server stack. `start.sh` points `JAC_DESKTOP_DEPS` at
+`.jac/desktop_deps/`; populate it with (versions pinned to what jac-scale needs):
+
+    pip install --target .jac/desktop_deps \
       "rich>=13.0.0" "python-dotenv>=1.2.1,<2.0.0" \
       "fastapi>=0.121.3,<0.122.0" "uvicorn[standard]>=0.38.0,<0.39.0" \
       "pyjwt>=2.10.1,<2.11.0" "fastapi-sso>=0.21.0,<1.0.0" \
@@ -37,38 +56,25 @@ env var at `.jac/desktop_deps/` (appended to `sys.path` at boot). That dir is
       "email-validator>=2.3.0,<3.0.0" \
       "pymongo>=4.15.4,<5.0.0" "redis>=7.1.0,<8.0.0"
 
-Versions are pinned to what `jac-scale` requires; don't let pip float them or
-the boot crashes on incompatible majors.
-
-Dev-mode (`./start.sh`) also needs `watchdog` importable by the `jac` CLI
-(HMR file watcher). It is listed under `[dependencies]` in `jac.toml`; `start.sh`
-force-installs it into `.jac/venv` if missing (plain `pip install` can no-op when
-watchdog is only present in the ephemeral `~/.cache/jac/rt/<hash>/site`).
-
 ## Layout
 
-Everything lives in this directory (`jms/`):
-
-- `paths.sv.jac` — canonical `studio_root` / `workspace_root` / `data_root` +
-  jacgen script paths (single source of truth for path resolution).
-- `workspace.sv.jac` — loads `studio.workspace.toml` (workspace root > studio
-  root). Single source of truth for data-config the app used to hard-code: model
-  registry, eval holdouts, dataset/RL/CPT file maps, train option keys, builder
-  stages, eval kinds, RL rung order. Edit the TOML to adapt the app to a checkout
-  — no code changes. (TOML, not YAML, because `jac` ships as a frozen binary
-  whose bundled Python has stdlib `tomllib` but no PyYAML.)
-- `*.sv.jac` — server endpoints. `models`/`inference` (resident MLX + token
-  stream), `chat` (SSE), `persistence` (OSP graph: chats/messages, replaces
-  SQLite), `data`/`builders` (dataset + pipeline), `evals` (OSP EvalRun graph),
-  `train`/`runs` (job control + metrics), `jobs` (detached subprocess engine,
-  port of procs.py), `metrics` (log/metric parsers, port of runlogs.py),
-  `prompts`.
-- `components/**/*.cl.jac` — the UI. Sections CHAT / TRAIN / DATA / EVALS / RL
-  behind the left icon rail; shared chart/form/log primitives; frosted-glass
-  light/dark theme with warm orange accent (`global.css`, `theme.css`).
-- `main.jac` — registers every endpoint + mounts the client app.
+- `main.jac` — registers every endpoint + mounts the client.
+- `paths.sv.jac` — the three roots (studio / workspace / data) + tool lookup.
+- `workspace.sv.jac` — toml loader + Experiments workspace graph.
+- `jms_*.sv.jac` — JMS product (projects, plan, gen, curate, train, eval, chat, llm).
+- `models` / `inference` / `chat` / `persistence` / `data` — model registry,
+  resident MLX + streaming, chat history graph, dataset browser.
+- `jobs` (detached subprocess engine + heavy GPU lock), `cloudruns` / `clusters` /
+  `backends` / `remote/` (BYO GPU runs), `auth`, `audit`, `crypto`, `assistant`.
+- `components/`, `hooks/`, `lib/` — UI. `scripts/` — workers + backup tooling.
+- `docs/{plans,specs,blog}` — design history.
 
 ## Test
 
-    cd jms && jac check main.jac   # type-check the whole app
-    ./jms/smoke.sh                 # while running
+    jac test <module>.test.jac     # one annex; run each *.test.jac (no server needed)
+    ./smoke.sh                     # while the browser-target server is up
+    JAC_API=http://localhost:8001 ./smoke_auth.sh
+
+Tests redirect `JAC_STUDIO_WORKSPACE` / `JAC_STUDIO_DATA_ROOT` to temp dirs. Don't
+`jac run` app modules from inside `jms/` while a server is up — it writes the
+live `.jac/data` graph.

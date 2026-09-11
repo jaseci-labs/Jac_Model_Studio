@@ -3,9 +3,9 @@
 The JMS product surface (frontend → JmsShell → JmsProject) is backed by a small
 graph: `root ++> JmsProject ++> JmsSource`. Projects hang off the caller's OWN
 root, so every read (`[root -->][?:JmsProject]`) is multi-tenant isolated for
-free — same guarantee persistence.sv.jac / evals.sv.jac rely on.
+free — same guarantee persistence.sv.jac relies on.
 
-A project owns an on-disk skeleton under <workspace_root>/jms-projects/<slug>/
+A project owns an on-disk skeleton under <data_root>/projects/<slug>/
 (dataset/ sources/ jobs/ runs/ evals/); the slug is the filesystem identity and
 is **immutable after creation** — `rename_project` changes the DISPLAY name only
 and never touches the directory (see its docstring for why). Sources are
@@ -195,9 +195,9 @@ node JmsEvalRun {
 }
 
 # --------------------------------------------------------------- fs helpers ----
-"""<workspace_root>/jms-projects/<slug> — the project's on-disk home."""
+"""<data_root>/projects/<slug> — the project's on-disk home."""
 def jms_project_dir(slug: str) -> Path {
-    return paths.workspace_root() / "jms-projects" / slug;
+    return paths.projects_dir() / slug;
 }
 
 """Non-blank JSONL line count, 0 on missing/unreadable file."""
@@ -699,7 +699,7 @@ def update_project(pid: str, fields: dict) -> JmsProjectView {
 
 Why no re-slug (the decision, spelled out): the slug is not a label, it is a
 *resolved filesystem identity* that other records already point at by absolute
-path. `JmsTrainRun.adapter_path` stores an absolute `.../jms-projects/<slug>/runs/
+path. `JmsTrainRun.adapter_path` stores an absolute `.../projects/<slug>/runs/
 <rid>/...`; `jobs/<jid>/job.json` + `run.log`, `evals/<eid>/summary.json` and
 `dataset/*.jsonl` are all addressed under the same prefix; and detached worker
 processes (jms_gen / jms_train / jms_eval, plus the remote supervisor) hold those

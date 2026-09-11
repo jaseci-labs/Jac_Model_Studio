@@ -10,35 +10,14 @@ import from persistence {
     ChatView, MsgView,
     create_chat, list_chats, rename_chat, delete_chat, get_messages, add_message, today_utc
 }
-import from data { FileRefView, DataRowView, dataset_stats, dataset_files, dataset_rows, add_examples, rl_sources, rl_dataset_files, rl_dataset_rows }
-import from builders { BuilderView, list_builders, run_builder, get_builder }
+import from data { FileRefView, DataRowView, dataset_stats, dataset_files, dataset_rows, add_examples }
 import from prompts { list_prompts }
 # Cross-app activity snapshot for the top-bar indicator (read-only).
 import from jobs { active_jobs }
-import from gallery { list_galleries, gallery_images }
-import from evals { EvalView, create_eval, list_evals, get_eval, stop_eval, delete_eval }
-# Training control + read-only run metrics — consumed by the TRAIN section's
-# `sv import` RPC stubs, so register them at the top level.
-import from train { start_training, stop_training, get_status, list_sessions }
-import from backends { list_backends }
 import from workspace {
     ui_layout, section_types,
     create_workspace, update_workspace, delete_workspace, reorder_workspaces,
     add_section, update_section, delete_section, reorder_sections
-}
-import from runs { list_runs, get_run, compare_runs }
-# Live RL ladder results — consumed by the RL section's `sv import` RPC stub.
-import from rl { get_rl_ladder, get_rl_corrected, rl_generate }
-# CPT corpus browser + training control (model-experiments/03-new attempt) — consumed by the CPT
-# workspace's DATA + TRAIN sections.
-import from cpt {
-    cpt_manifest, cpt_files, cpt_rows,
-    start_cpt_training, stop_cpt_training, get_cpt_status, get_all_cpt_status
-}
-# 04-cpt-sft dataset browser + three-arm plan status (model-experiments/04-cpt-sft)
-# — consumed by the CPT-SFT workspace's DATA + PLAN sections via `sv import` stubs.
-import from cptsft {
-    cptsft_stats, cptsft_files, cptsft_rows, cptsft_plan_status
 }
 # Streaming chat endpoint — consumed by a raw fetch reader on the client (not an
 # `sv import` RPC stub), so register it explicitly at the top level.

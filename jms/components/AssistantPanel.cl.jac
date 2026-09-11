@@ -58,8 +58,6 @@ import from ..hooks.useFocusTrap { useFocusTrap }
 sv import from ..persistence {
     list_chats, create_chat, get_messages, add_message, delete_chat
 }
-sv import from ..train { start_training }
-sv import from ..evals { create_eval }
 sv import from ..workspace { update_workspace, ui_layout }
 import from ..auth_session { bearerHeaders, handleUnauthorized }
 import from .chat.Thread { Thread }
@@ -162,14 +160,6 @@ def _actionLabel(a: dict) -> str {
         if "workspace" in a and a["workspace"] { parts.append(str(a["workspace"])); }
         if "stage" in a and a["stage"] { parts.append(str(a["stage"])); }
         return "Go to " + " · ".join(parts);
-    }
-    if act == "start_training" {
-        md = str(a["mode"]).upper() if "mode" in a else "";
-        nm = str(a["name"]) if "name" in a else "";
-        return "Start " + md + " training: " + nm;
-    }
-    if act == "create_eval" {
-        return "Create eval: " + (str(a["kind"]) if "kind" in a else "");
     }
     if act == "set_setting" {
         return "Update workspace " + (str(a["wid"]) if "wid" in a else "") + " settings";
@@ -449,7 +439,7 @@ def:pub AssistantPanel(pageContext: str = "") -> JsxElement {
         widgetOpen = False;
     }
 
-    """Execute a confirm-gated action (training / eval / settings) on the user's
+    """Execute a confirm-gated action (settings) on the user's
     Confirm click. Reuses the existing server endpoints; set_setting reads the
     current workspace first and merges so unspecified fields aren't clobbered."""
     async def runConfirmed -> None {
@@ -458,20 +448,7 @@ def:pub AssistantPanel(pageContext: str = "") -> JsxElement {
         act = str(a["action"]) if "action" in a else "";
         actionNote = "running…";
         try {
-            if act == "start_training" {
-                nm = str(a["name"]) if ("name" in a and a["name"]) else "assistant-run";
-                md = str(a["mode"]) if "mode" in a else "sft";
-                mid = str(a["model_id"]) if ("model_id" in a and a["model_id"]) else modelId;
-                await start_training(nm, md, mid, {}, "");
-                actionNote = "✓ started " + md.upper() + " training '" + nm + "'";
-            } elif act == "create_eval" {
-                kd = str(a["kind"]) if "kind" in a else "";
-                mid = str(a["model_id"]) if ("model_id" in a and a["model_id"]) else "";
-                hd = str(a["holdout"]) if ("holdout" in a and a["holdout"]) else "function";
-                lm = int(a["limit"]) if ("limit" in a and a["limit"]) else 0;
-                r: any = await create_eval(kd, mid, "", "", hd, lm, 0.0);
-                actionNote = ("✓ eval '" + kd + "' created") if r else "✗ eval rejected (bad kind/model)";
-            } elif act == "set_setting" {
+            if act == "set_setting" {
                 wid = str(a["wid"]) if "wid" in a else "";
                 ly: any = await ui_layout();
                 cur: dict | None = None;

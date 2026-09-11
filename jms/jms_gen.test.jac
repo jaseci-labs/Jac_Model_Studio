@@ -19,6 +19,7 @@ import from jms_llm { clear_anthropic_key }
 
 def _isolate_ws -> None {
     os.environ["JAC_STUDIO_WORKSPACE"] = tempfile.mkdtemp(prefix="studio-jmsgen-");
+    os.environ["JAC_STUDIO_DATA_ROOT"] = os.environ["JAC_STUDIO_WORKSPACE"];
 }
 
 """A one-file real source tree add_source can scan."""

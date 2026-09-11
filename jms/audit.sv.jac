@@ -1,7 +1,7 @@
 """studio - append-only audit trail for shared-host operations.
 
 Every money- or job-sensitive action writes one JSON line to
-<data_root>/audit/audit.jsonl: who (uid), when, what (action), detail (dict).
+<data_root>/audit/audit.jsonl (paths.audit_dir()): who (uid), when, what (action), detail (dict).
 Call only from inside authenticated endpoint bodies (uses auth.uid()).
 
 Retention / rotation is an ops concern — ship a logrotate rule or cron that
@@ -11,7 +11,7 @@ compresses old audit.jsonl files; the app never truncates.
 import json;
 import datetime;
 import auth;
-import models;
+import paths;
 import from pathlib { Path }
 
 def _now() -> str {
@@ -19,7 +19,7 @@ def _now() -> str {
 }
 
 def _audit_file() -> Path {
-    d = models.data_root() / "audit";
+    d = paths.audit_dir();
     d.mkdir(parents=True, exist_ok=True);
     return d / "audit.jsonl";
 }

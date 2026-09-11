@@ -1,35 +1,16 @@
-"""DATA section (workspace 01 SFT/DPO) — pipeline rail + add-examples (left) |
-dataset browser (right).
+"""DATA section — dataset browser + add-examples.
 
-Ports ui/components/sections/data/{data-section,pipeline-rail,add-examples,
-dataset-browser,row-detail,stats-tiles}. The 13 build stages run as detached jobs
-(builders.sv.jac); the browser is read-only over the preview-allowed files
-(data.sv.jac); appends go through add_examples. Rows render via the shared RowBrowser.
-The RL dataset browser lives in the 02 workspace's RlData section now.
-
-# studio: the tsx polls builders only while a stage is running (usePoll). Reproducing
-# that gate needs a fresh closure over state; instead we poll unconditionally every
-# 3s while mounted — a touch more network, but correct and far simpler.
+Read-only browser over the dataset files listed in studio.workspace.toml [data]
+(data.sv.jac); add_examples appends to JMS-owned files under
+<data_root>/examples/. Rows render via the shared RowBrowser. Stat tiles are
+driven by whatever named splits the toml declares — no hard-coded file keys.
 """
 
-import from react { useEffect }
 sv import from ...data { dataset_stats, dataset_files, dataset_rows, add_examples, FileRefView, DataRowView }
-sv import from ...builders { list_builders, run_builder, BuilderView }
 import from ..shared.StatTile { StatTile }
-import from ..shared.StatusGlyph { StatusGlyph }
 import from ..shared.LogView { LogView }
 import from ..shared.Field { Segmented }
 import from ..shared.RowBrowser { RowBrowser }
-
-glob GROUPS: list[dict] = [
-    {"label": "SEED", "stages": ["seed_conversion"]},
-    {"label": "IDIOM BATCHES", "stages": ["idiomatic_batch", "idiomatic_batch2", "idiomatic_batch3"]},
-    {"label": "SCALE", "stages": ["scale_conversion"]},
-    {"label": "DPO", "stages": ["dpo_conversion"]},
-    {"label": "MANIFEST+SPLITS", "stages": ["build_manifest", "build_splits", "build_dpo_splits"]},
-    {"label": "HOLDOUTS", "stages": ["holdout", "graph_holdout"]},
-    {"label": "AUDIT", "stages": ["dataset_stats", "verify_dataset"]}
-];
 
 def:pub Data -> JsxElement {
     has stats: any = None,
@@ -39,14 +20,10 @@ def:pub Data -> JsxElement {
         offset: int = 0,
         total: int = 0,
         expanded: int = -1,
-        builders: list = [],
-        selectedStage: str = "",
         addTarget: str = "sft",
         addText: str = "",
         addResult: any = None,
         addBusy: bool = False,
-        doneCount: int = 0,
-        runningStage: str = "",
         loadErr: str = "";
 
     # `p`/`off` are passed explicitly — reading the state right after setting it
@@ -74,42 +51,6 @@ def:pub Data -> JsxElement {
         expanded = -1 if expanded == idx else idx;
     }
 
-    async def loadBuilders() -> None {
-        try {
-            bs = await list_builders();
-            builders = bs;
-            dc = 0;
-            rs = "";
-            for b in bs {
-                st = str(b.status);
-                if st == "done" or st == "finished" {
-                    dc += 1;
-                }
-                if st == "running" {
-                    rs = str(b.stage);
-                }
-            }
-            doneCount = dc;
-            runningStage = rs;
-        } except Exception as e {
-            loadErr = "pipeline poll failed · " + str(e);
-        }
-    }
-
-    def selectStage(s: str) -> None {
-        selectedStage = s;
-    }
-
-    async def runStage(s: str) -> None {
-        selectedStage = s;
-        try {
-            await run_builder(stage=s);
-        } except Exception as e {
-            loadErr = "stage " + s + " failed to start · " + str(e);
-        }
-        await loadBuilders();
-    }
-
     async def submitExamples() -> None {
         addBusy = True;
         addResult = None;
@@ -134,7 +75,6 @@ def:pub Data -> JsxElement {
             stats = await dataset_stats();
             fs = await dataset_files();
             files = fs;
-            await loadBuilders();
             if len(fs) > 0 {
                 await openFile(str(fs[0].path));
             }
@@ -145,14 +85,6 @@ def:pub Data -> JsxElement {
             loadErr = "dataset load failed · " + str(e);
         }
     }
-
-    # ponytail: interval lives in its own effect with an effect-LOCAL id. The old
-    # `can with exit` cleanup closed over `pollId` from the first render (still
-    # None), so clearInterval never ran and every remount leaked a 3s poller.
-    useEffect(lambda {
-        iv: any = setInterval(lambda { loadBuilders(); }, 3000);
-        return lambda { clearInterval(float(str(iv))); };
-    }, []);
 
     async def prevPage -> None {
         if offset > 0 {
@@ -172,24 +104,6 @@ def:pub Data -> JsxElement {
         }
     }
 
-    def _statusOf(stage: str) -> str {
-        for b in builders {
-            if str(b.stage) == stage {
-                return str(b.status);
-            }
-        }
-        return "idle";
-    }
-
-    def _logOf(stage: str) -> str {
-        for b in builders {
-            if str(b.stage) == stage {
-                return str(b.log_tail);
-            }
-        }
-        return "";
-    }
-
     def _tiles() -> JsxElement {
         if not stats {
             if loadErr {
@@ -197,72 +111,12 @@ def:pub Data -> JsxElement {
             }
             return <span className="micro-label">loading…</span>;
         }
-        sp: any = stats["splits"];
+        sp: list = list(stats["splits"]);
         return <div className="grid grid-cols-3 gap-3 lg:grid-cols-6">
             <StatTile label="SFT.TOTAL" value={str(stats["sft_total"])} sub="examples" dim={False} />
-            <StatTile label="DPO.PAIRS" value={str(stats["dpo_pairs"])} sub="pairs" dim={False} />
-            <StatTile label="MLX.SFT" value={str(sp["mlx_train"]) + "/" + str(sp["mlx_valid"])} sub="train/valid" dim={False} />
-            <StatTile label="MLX.DPO" value={str(sp["dpo_train"]) + "/" + str(sp["dpo_valid"])} sub="train/valid" dim={False} />
-            <StatTile label="HOLDOUT" value={str(sp["holdout"])} sub="function" dim={False} />
-            <StatTile label="HOLDOUT.GRAPH" value={str(sp["graph_holdout"])} sub="graph" dim={False} />
-        </div>;
-    }
-
-    def _rail() -> JsxElement {
-        nstages = len(builders) if len(builders) > 0 else 13;
-        pct = (doneCount * 100.0) / nstages if nstages > 0 else 0.0;
-        return <div className="relative exp-panel p-3 pt-4">
-            <span className="micro-label absolute -top-2 left-3 bg-background px-2">PIPELINE</span>
-            <div className="mb-3 flex flex-col gap-1.5">
-                <div className="flex items-center justify-between">
-                    <span className="stat-line text-muted-foreground">{str(doneCount)}/{str(nstages)} DONE</span>
-                    {runningStage and <span className="micro-label pulse text-foreground/80">⦿ {runningStage}</span>}
-                </div>
-                <div className="h-1 w-full rounded-full bg-border">
-                    <div className="h-1 rounded-full transition-all" style={{"width": str(pct) + "%", "background": "var(--ws-accent)"}}></div>
-                </div>
-            </div>
-            <div className="relative flex flex-col gap-0.5 pl-3">
-                <div className="absolute bottom-1 left-0 top-1 w-px bg-secondary"></div>
-                {for group in GROUPS {
-                    <div key={str(group["label"])} className="mt-2 first:mt-0">
-                        <div className="mb-1 flex items-center gap-2">
-                            <span className="micro-label shrink-0 text-muted-foreground/80">{str(group["label"])}</span>
-                            <div className="dashed-rule flex-1"></div>
-                        </div>
-                        {for stage in list(group["stages"]) {
-                            <div key={str(stage)}>
-                                <div
-                                    role="button"
-                                    tabIndex={0}
-                                    aria-label={"select stage " + str(stage)}
-                                    onClick={lambda (e: MouseEvent) { selectStage(str(stage)); }}
-                                    onKeyDown={lambda (e: KeyboardEvent) {
-                                        if e.key == "Enter" or e.key == " " {
-                                            e.preventDefault();
-                                            selectStage(str(stage));
-                                        }
-                                    }}
-                                    className={"exp-hoverable flex cursor-pointer items-center gap-2 rounded-lg border px-2 py-1 " + (
-                                        "border-border bg-accent/15" if selectedStage == str(stage) else "border-transparent hover:text-foreground"
-                                    )}
-                                >
-                                    <StatusGlyph status={_statusOf(str(stage))} showLabel={False} />
-                                    <span className="flex-1 truncate font-mono text-xs text-muted-foreground">{str(stage)}</span>
-                                    <button
-                                        disabled={_statusOf(str(stage)) == "running"}
-                                        onClick={lambda (e: MouseEvent) { e.stopPropagation(); runStage(str(stage)); }}
-                                        className="micro-label rounded border border-input px-1.5 py-0.5 text-muted-foreground transition-colors hover:border-ring hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
-                                    >
-                                        RUN
-                                    </button>
-                                </div>
-                                {(str(stage) == "seed_conversion") and <div className="stat-line ml-8 mt-0.5 mb-1 border-l-2 border-input pl-2">TRUNCATES sft.jsonl→32 · dpo.jsonl→2 · run idiomatic batches after, then downstream stages</div>}
-                            </div>
-                        }}
-                    </div>
-                }}
-            </div>
+            {for sx in sp {
+                <StatTile key={str(sx["name"])} label={str(sx["name"]).upper()} value={str(sx["count"])} sub="rows" dim={False} />
+            }}
         </div>;
     }
 
@@ -298,31 +152,21 @@ def:pub Data -> JsxElement {
 
     return <div className="flex h-full min-w-0 flex-1 flex-col">
         <div className="section-header flex items-center justify-between border-b border-border px-4 py-2.5">
-            <span className="micro-label">DATA · SFT/DPO DATASET</span>
-            {runningStage and <span key="running" className="micro-label pulse text-foreground/80">⦿ {runningStage}</span>}
+            <span className="micro-label">DATA · DATASETS</span>
         </div>
         {loadErr and <div key="dataerr" className="border-b border-border px-4 py-1.5">
             <span className="stat-line" style={{"color": "var(--danger)"}}>{loadErr}</span>
         </div>}
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
             {_tiles()}
-            <div className="grid gap-4" style={{"gridTemplateColumns": "280px 1fr"}}>
-                <div className="flex flex-col gap-4">
-                    {_rail()}
-                    {selectedStage and <div className="relative exp-panel p-3 pt-4">
-                        <span className="micro-label absolute -top-2 left-3 bg-background px-2">{selectedStage}</span>
-                        <LogView text={_logOf(selectedStage)} maxH="14rem" />
-                    </div>}
-                </div>
-                <div className="flex flex-col gap-4">
-                    <RowBrowser
-                        files={files} path={path} rows={rows} offset={offset}
-                        total={total} expanded={expanded}
-                        onOpen={openFile} onToggle={toggleRow}
-                        onPrev={prevPage} onNext={nextPage}
-                    />
-                    {_addExamples()}
-                </div>
+            <div className="flex flex-col gap-4">
+                <RowBrowser
+                    files={files} path={path} rows={rows} offset={offset}
+                    total={total} expanded={expanded}
+                    onOpen={openFile} onToggle={toggleRow}
+                    onPrev={prevPage} onNext={nextPage}
+                />
+                {_addExamples()}
             </div>
         </div>
     </div>;
