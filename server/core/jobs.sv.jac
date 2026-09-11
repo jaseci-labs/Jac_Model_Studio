@@ -218,6 +218,11 @@ def _heavy_guard_file() -> Path {
 # together they guarantee a crashed process can never deadlock the heavy slot.
 glob _GUARD_STALE_SEC: float = 15.0;
 
+# How long a detached heavy claim whose job file does not exist yet still counts
+# as live (acquire → spawn → write_job takes well under a second; a claim whose
+# spawn crashed without heavy_release self-heals after this).
+glob _HEAVY_CLAIM_GRACE_SEC: float = 60.0;
+
 """True iff an existing guard file was abandoned — its recorded pid is dead, or it
 is older than _GUARD_STALE_SEC. A vanished guard is NOT stale (the create will
 just be retried)."""
@@ -288,6 +293,14 @@ via the recorded pid+stamp."""
 def _heavy_live(lock: dict) -> bool {
     jf = str(lock.get("job_file", ""));
     if jf {
+        # A detached claim is taken BEFORE the job is spawned and its job file
+        # written. Inside that window a missing job file means "starting", not
+        # "dead" — reading it as stale let a second caller steal the GPU slot.
+        if not Path(jf).exists() {
+            t = 0.0;
+            try { t = float(str(lock.get("t") or 0)); } except Exception { t = 0.0; }
+            return (time.time() - t) < _HEAVY_CLAIM_GRACE_SEC;
+        }
         job = live_status(Path(jf), Path(str(lock.get("runlog", ""))));
         return job is not None and str(job.get("status", "")) == "running";
     }
@@ -329,7 +342,8 @@ def heavy_acquire(holder: str, job_file: Path | None = None, runlog: Path | None
                 "runlog": str(runlog) if runlog is not None else "",
                 "pid": pid if job_file is None else 0,
                 "stamp": proc_stamp(pid) if job_file is None else "",
-                "started": time.strftime("%Y-%m-%d %H:%M:%S")
+                "started": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "t": time.time()
             });
             return {"ok": True};
         } finally {

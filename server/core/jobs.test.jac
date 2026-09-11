@@ -69,3 +69,27 @@ test "safe rejects bare dot tokens that name the current/parent dir" {
     assert safe("x/y.jsonl", allow_slash=True);
     assert not safe("x/../y", allow_slash=True);
 }
+
+test "a detached claim is held while its job file is still being spawned" {
+    # heavy_acquire(holder, job_file, runlog) is called BEFORE the job is spawned
+    # and its job file written; in that window _heavy_live read the missing job
+    # file as "not running" and a second caller stole the slot (two GPU jobs).
+    import from pathlib { Path }
+    import tempfile;
+    lf = _heavy_lock_file();
+    try { lf.unlink(); } except Exception {}
+    d = Path(tempfile.mkdtemp(prefix="studio-heavy-"));
+    g1 = heavy_acquire("test:detached", d / ".job.json", d / "run.log");
+    assert g1["ok"], g1;
+    g2 = heavy_acquire("test:thief");
+    assert not g2["ok"], g2;
+    assert g2["busy_with"] == "test:detached", g2;
+    # a claim whose job file never appeared is stale once the grace expires
+    cur = read_job(lf);
+    assert cur is not None;
+    cur["t"] = 1.0;
+    write_job(lf, cur);
+    g3 = heavy_acquire("test:after-grace");
+    assert g3["ok"], g3;
+    try { lf.unlink(); } except Exception {}
+}
