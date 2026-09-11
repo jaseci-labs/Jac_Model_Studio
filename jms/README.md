@@ -13,12 +13,15 @@ through the paths in `studio.workspace.toml`.
 
 ## Run
 
-    jac setup desktop        # one-time: native webview target
-    ./start.sh               # native desktop window (dev mode, local single user)
+    ./start.sh               # dev mode, local single user: API :8001, UI :8000 (auto-opens; JMS_NO_OPEN=1 to skip)
 
-Browser instead of a native window: `jac start --dev main.jac` (UI :8000, API
-:8001). Production (multi-tenant, login gate): `JWT_SECRET=... ./start_prod.sh`,
-see `deploy/`.
+Needs the `jac` on PATH to carry jac-scale + jac-client + mlx-lm (the uv-installed
+`jaclang` tool does). Production (multi-tenant, login gate):
+`JWT_SECRET=... ./start_prod.sh`, see `deploy/`.
+
+Native desktop window (`--client desktop`) is off: the installed jac-desktop
+0.2.0 host serves static files only and never starts the API, so the window
+loads but every call 404s.
 
 After editing a `.cl.jac` file restart the server — `--dev` compiles the client
 once at boot.
@@ -40,21 +43,6 @@ missing: the model shows as unavailable and dataset files count 0.
 Worker/tool binaries (`jac`, `mlx_lm.lora`) are taken from next to the running
 interpreter, then `PATH`; a `../.venv/bin` is used only as a last-resort
 fallback if it exists.
-
-## Desktop runtime dependencies (one-time, after clone or `jac clean`)
-
-The desktop target runs the server in-process on a bundled Python that lacks the
-`jac-scale` server stack. `start.sh` points `JAC_DESKTOP_DEPS` at
-`.jac/desktop_deps/`; populate it with (versions pinned to what jac-scale needs):
-
-    pip install --target .jac/desktop_deps \
-      "rich>=13.0.0" "python-dotenv>=1.2.1,<2.0.0" \
-      "fastapi>=0.121.3,<0.122.0" "uvicorn[standard]>=0.38.0,<0.39.0" \
-      "pyjwt>=2.10.1,<2.11.0" "fastapi-sso>=0.21.0,<1.0.0" \
-      "python-multipart>=0.0.21,<1.0.0" "bcrypt>=4.0.0,<5.0.0" \
-      "aiohttp>=3.9.0,<4.0.0" "sqlalchemy>=2.0.0,<3.0.0" \
-      "email-validator>=2.3.0,<3.0.0" \
-      "pymongo>=4.15.4,<5.0.0" "redis>=7.1.0,<8.0.0"
 
 ## Layout
 
