@@ -2,28 +2,17 @@
 # Replace studio.example.com with your domain; point DNS A/AAAA at this host.
 #
 # Caddy auto-provisions TLS via Let's Encrypt.
-# The Jac process should bind loopback only (start_prod.sh defaults API :8001, UI :8000).
+#
+# ONE upstream: start_prod.sh runs `jac start` WITHOUT --dev, and in that mode
+# jaclang serves the UI *and* the API (/function/*, /walker/*, /user/*, /cl/*,
+# /assets/*, /health, ...) on the -p port (:8000); -a is only used by --dev
+# (jaclang cli/commands/impl/execution.impl.jac: actual_api_port = port).
+# Splitting paths onto :8001 sent every API call to a closed port (502), and the
+# bare `handle /` matched only "/" itself, so /assets/* and /cl/* got nothing.
+#
+# jac-scale binds 0.0.0.0 unless [plugins.scale.server] host is set, so also
+# firewall :8000 from the outside (only Caddy should reach it).
 
 studio.example.com {
-	# Vite UI (static + HMR disabled in prod build)
-	handle / {
-		reverse_proxy 127.0.0.1:8000
-	}
-
-	# Jac Scale API (/function/*, /user/*, /health, /ws/*, …)
-	handle /function/* {
-		reverse_proxy 127.0.0.1:8001
-	}
-	handle /user/* {
-		reverse_proxy 127.0.0.1:8001
-	}
-	handle /health {
-		reverse_proxy 127.0.0.1:8001
-	}
-	handle /ready {
-		reverse_proxy 127.0.0.1:8001
-	}
-	handle /ws/* {
-		reverse_proxy 127.0.0.1:8001
-	}
+	reverse_proxy 127.0.0.1:8000
 }
