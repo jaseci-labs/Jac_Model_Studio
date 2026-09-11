@@ -74,3 +74,23 @@ test "resolved key falls back to ANTHROPIC_API_KEY env when no user key" {
     st2 = llm_status();
     assert st2["source"] == "none" and st2["configured"] == False, st2;
 }
+
+test "status survives a stored key that no longer decrypts (master key changed)" {
+    # A key stored under one master key (start.sh's cached JWT_SECRET) read
+    # under another (bare `jac start`, rotated JAC_SECRET_KEY) made decrypt()
+    # raise inside llm_status -> 500, bricking the key modal.
+    _master_on();
+    os.environ.pop("ANTHROPIC_API_KEY", None);
+    clear_anthropic_key();
+    set_anthropic_key("sk-ant-rotated-1234");
+    os.environ["JAC_SECRET_KEY"] = "a-different-master-key";
+    try {
+        st = llm_status();
+        assert st["source"] == "user", st;
+        assert "1234" not in str(st["masked"]), st;
+        assert resolved_anthropic_key() == "", "an undecryptable key must not resolve";
+    } finally {
+        _master_on();
+        clear_anthropic_key();
+    }
+}

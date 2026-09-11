@@ -62,8 +62,18 @@ exists — called inside the plan request that spends on it. Never surface this
 from an endpoint."""
 def resolved_anthropic_key() -> str {
     s = _settings();
-    if s is not None and s.anthropic_key { return str(crypto.decrypt(s.anthropic_key)); }
+    if s is not None and s.anthropic_key { return _decrypt_or_blank(s.anthropic_key); }
     return os.environ.get("ANTHROPIC_API_KEY", "");
+}
+
+"""Decrypt a stored key, "" when it no longer decrypts (master key changed or
+unset). Callers then report "no key" instead of raising a 500."""
+def _decrypt_or_blank(token: str) -> str {
+    try {
+        return str(crypto.decrypt(token));
+    } except Exception {
+        return "";
+    }
 }
 
 """Where the resolved key comes from: user | env | none."""
@@ -79,7 +89,8 @@ only to reveal the final 4 chars for the status badge — never the whole key.""
 def _masked_tail() -> str {
     s = _settings();
     if s is None or not s.anthropic_key { return ""; }
-    k = str(crypto.decrypt(s.anthropic_key));
+    k = _decrypt_or_blank(s.anthropic_key);
+    if not k { return ""; }
     if len(k) <= 4 { return "…"; }
     return "…" + k[len(k) - 4:];
 }
