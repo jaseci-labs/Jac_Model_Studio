@@ -85,9 +85,13 @@ def parse_train_log(path: Path) -> dict {
     return {"train": train, "val": val, "lr": lr, "tps": tps, "last_iter": last_it};
 }
 
-"""Read a JSONL file as [{x: step, y: <ykey>}]. Skips non-object / incomplete rows."""
+"""Read a JSONL file as [{x: step, y: <ykey>}], ascending by step. Skips
+non-object / incomplete rows. A step that appears more than once keeps its LAST
+row: a remote run relaunched after a supervisor --resume re-logs its steps into
+the same (appended) metrics.jsonl."""
 def read_series(path: Path, ykey: str) -> list[dict] {
     out: list[dict] = [];
+    by_step: dict[int, float] = {};
     if not path.exists() { return out; }
     fh: any = open(path);
     try {
@@ -102,10 +106,13 @@ def read_series(path: Path, ykey: str) -> list[dict] {
             # NaN/Infinity (train_sft writes a diverged loss as bare NaN) would 500
             # the response: Starlette serializes with allow_nan=False.
             if not math.isfinite(y) { continue; }
-            out.append(_pt(int(str(r["step"])), y));
+            by_step[int(str(r["step"]))] = y;
         }
     } finally {
         fh.close();
+    }
+    for s in sorted(by_step.keys()) {
+        out.append(_pt(s, by_step[s]));
     }
     return out;
 }

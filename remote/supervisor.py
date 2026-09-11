@@ -494,7 +494,12 @@ class Supervisor:
         launch_cmd = self.spec.get("launch_cmd", "")
         if not launch_cmd:
             raise RunFailed("runspec has no launch_cmd")
-        inner = "%s > train.log 2>&1; echo __EXIT__ $? >> run.log" % launch_cmd
+        # APPEND (>>), never truncate: a relaunch after --resume reuses this dir
+        # and the local mirror tracks train.log by byte offset — truncating put
+        # the local offset past the remote size, so nothing new was ever mirrored
+        # (and the stall watchdog fired). Repeated metrics steps from the rerun
+        # are de-duplicated (last wins) by server/core/metrics.read_series.
+        inner = "%s >> train.log 2>&1; echo __EXIT__ $? >> run.log" % launch_cmd
         # NB: '&' must bind to the *simple* nohup command (not a 'cd && nohup'
         # list) -- otherwise the un-redirected background subshell holds the
         # ssh stdout/stderr pipes open and this call blocks for the whole run.

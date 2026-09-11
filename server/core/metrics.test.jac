@@ -162,3 +162,15 @@ test "read_series / last_row never return NaN or Infinity" {
     json.dumps(last, allow_nan=False);
     assert last["eval_loss"] == 1.5 and last["loss"] is None, last;
 }
+
+test "read_series keeps the last row per step (a resumed run re-logs steps)" {
+    p = _tmpfile(
+        "{\"step\": 1, \"loss\": 3.0}\n{\"step\": 2, \"loss\": 2.5}\n"
+        "{\"step\": 1, \"loss\": 2.9}\n{\"step\": 2, \"loss\": 2.4}\n"
+        "{\"step\": 3, \"loss\": 2.0}\n",
+        ".jsonl"
+    );
+    s = read_series(p, "loss");
+    assert [int(str(d["x"])) for d in s] == [1, 2, 3], s;
+    assert float(str(s[0]["y"])) == 2.9 and float(str(s[1]["y"])) == 2.4, s;
+}
