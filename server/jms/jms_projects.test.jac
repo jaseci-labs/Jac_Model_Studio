@@ -361,3 +361,21 @@ test "create/duplicate never reuse a slug whose directory already exists on disk
     # the foreign directory is untouched
     assert (other / "dataset" / "train.jsonl").read_text() == "{\"secret\": 1}\n";
 }
+
+import from server.core { jobs }
+
+test "per-user job cap counts running JMS jobs in the caller's projects" {
+    # _count_running_jobs only scanned results/users/<uid>, so JMS train/eval/gen
+    # jobs (under projects/<slug>/) never counted toward JAC_MAX_CONCURRENT_JOBS.
+    # A "running" file whose pid is dead must not count (it would wedge the cap).
+    _isolate_ws();
+    v = create_project("Cap Count", "t");
+    d = jms_project_dir(v.slug);
+    for i in range(3) {
+        jobs.write_job(d / "jobs" / f"j{i}" / "job.json", {"status": "running", "pid": os.getpid()});
+    }
+    jobs.write_job(d / "runs" / "r1" / ".job-train.json", {"status": "running", "pid": 999999});
+    jobs.write_job(d / "evals" / "e1" / "job.json", {"status": "done", "pid": os.getpid()});
+    n = jobs._count_running_jobs();
+    assert n == 3, n;
+}

@@ -19,6 +19,7 @@ import time;
 import from server.core { auth }
 import from server.core { audit }
 import from server.core { metrics }
+import from server.core { paths }
 import server.models.models as models;  # not `import from server.models { models }`: jac check resolves that to the package
 import from pathlib { Path }
 import from signal { SIGTERM }
@@ -101,18 +102,40 @@ def _max_concurrent_jobs() -> int {
     }
 }
 
-"""Count job.json / .job-*.json files with status=running under caller's tree."""
+"""Count job.json / .job-*.json files with status=running under every tree the
+caller's detached jobs write to (see _user_job_roots). A "running" file whose
+recorded pid is dead is not counted — a crashed job must not wedge the cap."""
 def _count_running_jobs() -> int {
-    base = auth.user_results_dir();
-    if not base.exists() { return 0; }
     n = 0;
-    for jf in base.rglob("*.json") {
-        if "job" not in jf.name { continue; }
-        job = read_job(jf);
-        if job is None { continue; }
-        if str(job.get("status", "")) == "running" { n += 1; }
+    for base in _user_job_roots() {
+        if not base.exists() { continue; }
+        for jf in base.rglob("*.json") {
+            if "job" not in jf.name { continue; }
+            job = read_job(jf);
+            if job is None { continue; }
+            if str(job.get("status", "")) != "running" { continue; }
+            pid = 0;
+            try { pid = int(str(job.get("pid") or 0)); } except Exception { pid = 0; }
+            if pid > 0 and not alive(pid) { continue; }
+            n += 1;
+        }
     }
     return n;
+}
+
+"""The caller's job-file trees: the per-user results dir (cloud runs) plus each
+of the caller's JMS project dirs (projects/<slug>/ — train/eval/gen jobs). The
+projects come from the caller's OWN root, so another tenant's jobs never count.
+Matched by type name: jms_projects imports this module, so it can't be imported
+back here."""
+def _user_job_roots() -> list[Path] {
+    out: list[Path] = [auth.user_results_dir()];
+    for nd in [root -->] {
+        if type(nd).__name__ != "JmsProject" { continue; }
+        slug = str(getattr(nd, "slug", "") or "");
+        if slug and safe(slug) { out.append(paths.projects_dir() / slug); }
+    }
+    return out;
 }
 
 def read_job(job_file: Path) -> dict | None {
