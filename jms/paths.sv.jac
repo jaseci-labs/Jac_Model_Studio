@@ -6,7 +6,7 @@ Three roots, all defaulting to the jms/ directory so the app is self-contained:
 - workspace_root() — base for the RELATIVE paths in studio.workspace.toml (model
                      dirs, dataset files). `JAC_STUDIO_WORKSPACE` overrides;
                      default = studio_root(). The toml is the ONLY place that
-                     names external artifacts (e.g. ../model-experiments/...).
+                     names external artifacts (e.g. ../../model-experiments/...).
 - data_root()      — everything JMS WRITES at runtime: results/, audit/,
                      projects/, examples/. `JAC_STUDIO_DATA_ROOT` overrides;
                      default = <studio_root>/data (gitignored).

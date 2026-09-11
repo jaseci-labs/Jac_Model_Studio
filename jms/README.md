@@ -35,7 +35,7 @@ once at boot.
 | Runtime data JMS writes: `results/` (per-user runs, GPU lock), `audit/`, `projects/`, `examples/` | `jms/data/` (gitignored) | `JAC_STUDIO_DATA_ROOT` |
 | Graph + users DB, JWT secret | `jms/.jac/` (gitignored) | — |
 
-The shipped toml points at the sibling `../model-experiments/` checkout (base
+The shipped toml points at a `model-experiments` checkout next to this repo (base
 Qwen3-Coder q4 + the 08 SFT adapter, 08 SFT/DPO datasets). Registry entries take
 `path` (MLX model dir) and an optional `adapter` (LoRA dir). Any path may be
 missing: the model shows as unavailable and dataset files count 0.

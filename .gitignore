@@ -1,6 +1,4 @@
 # repo-wide; jms/ has its own .gitignore
-# separate repo (jaseci-labs/Jac_Model_Experiments), cloned here for local paths
-model-experiments/
 .env
 .venv/
 .jac/
