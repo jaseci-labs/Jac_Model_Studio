@@ -341,3 +341,23 @@ test "export_summary caps long lists instead of truncating silently" {
     assert "evals" in joined and "capped" in joined, parsed["notes"];
     assert int(j["bytes"]) <= _EXPORT_MAX_BYTES, j["bytes"];
 }
+
+test "create/duplicate never reuse a slug whose directory already exists on disk" {
+    # Slugs were de-duplicated only against the CALLER's graph, but project dirs
+    # live in ONE shared <data_root>/projects/ — so a second user naming a
+    # project "Shared Name" got the first user's directory (their dataset,
+    # runs, adapters) and could purge it. An on-disk dir must count as taken.
+    _isolate_ws();
+    other = jms_project_dir("shared-name");
+    (other / "dataset").mkdir(parents=True, exist_ok=True);
+    (other / "dataset" / "train.jsonl").write_text("{\"secret\": 1}\n");
+    v = create_project("Shared Name", "x");
+    assert v.slug != "shared-name", v.slug;
+    d = get_project(v.pid);
+    assert int(str(d["row_stats"]["curated"])) == 0, d["row_stats"];
+    dup = duplicate_project(v.pid, "Shared Name");
+    assert str(dup["slug"]) != "shared-name", dup;
+    assert str(dup["slug"]) != v.slug, dup;
+    # the foreign directory is untouched
+    assert (other / "dataset" / "train.jsonl").read_text() == "{\"secret\": 1}\n";
+}

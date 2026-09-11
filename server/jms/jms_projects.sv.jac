@@ -301,7 +301,11 @@ def _slugify(name: str) -> str {
     return out;
 }
 
+"""A slug is taken if the caller already uses it OR its directory exists on disk:
+the graph is per-user but <data_root>/projects/ is shared by every tenant, so a
+graph-only check handed user B user A's directory (dataset, runs, purge)."""
 def _slug_taken(slug: str) -> bool {
+    if jms_project_dir(slug).exists() { return True; }
     for p in [root -->][?:JmsProject] {
         if p.slug == slug { return True; }
     }
