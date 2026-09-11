@@ -198,3 +198,30 @@ test "a saved cluster resolves into the runspec's ssh_override" {
         _drop_fake_cluster(d);
     }
 }
+
+test "start_remote_run (HTTP) ignores a client-supplied dataset path" {
+    # cfg.dataset used to be honored from the HTTP endpoint and jobs.safe
+    # (allow_slash) accepts absolute paths, so any caller could upload an
+    # arbitrary server file (another user's ssh key, the user DB, ...) to their
+    # own box as data/train.jsonl. Only the trusted in-process caller
+    # (jms_train -> _start_remote_run) may pick dataset files.
+    kid = "0123456789abcdef0123456789abcdef";
+    d = _fake_cluster(kid, "cr-cluster-exfil", "203.0.113.11", 22, "root");
+    prev_ws = os.environ.get("JAC_STUDIO_WORKSPACE", "");
+    os.environ["JAC_STUDIO_WORKSPACE"] = tempfile.mkdtemp(prefix="jms-cr-ws-");
+    try {
+        r = start_remote_run({
+            "name": "exfil-run", "mode": "sft", "base_model": "org/m",
+            "cluster_id": "cr-cluster-exfil",
+            "dataset": {"train_rel": "/nonexistent-exfil/train.jsonl",
+                        "valid_rel": "/nonexistent-exfil/valid.jsonl"}
+        });
+        assert not bool(r["ok"]), r;
+        assert "nonexistent-exfil" not in str(r["error"]), r;
+        assert "train dataset missing" in str(r["error"]), r;
+    } finally {
+        if prev_ws { os.environ["JAC_STUDIO_WORKSPACE"] = prev_ws; }
+        else { os.environ.pop("JAC_STUDIO_WORKSPACE", None); }
+        _drop_fake_cluster(d);
+    }
+}

@@ -361,8 +361,23 @@ def _view(r: CloudRun, tail_n: int = 40) -> dict {
 `cluster_id` is resolved through clusters.cluster_ssh_override() into the
 runspec's `ssh_override` (a cfg-supplied `ssh_override` is overridden by it).
 Nothing is provisioned: deployment_id stays "" and hourly_rate 0.0.
-Returns {ok, run, error}."""
+Returns {ok, run, error}.
+
+HTTP boundary: a client-supplied `dataset` is DROPPED here. jobs.safe accepts
+absolute paths, so honoring it let any caller upload an arbitrary server file
+(other users' ssh keys, the user DB) to their own box. The dataset override is
+reserved for the trusted in-process caller (jms_train → _start_remote_run)."""
 def start_remote_run(cfg: dict) -> dict {
+    clean: dict = {};
+    for k in cfg {
+        if str(k) != "dataset" { clean[str(k)] = cfg[k]; }
+    }
+    return _start_remote_run(clean);
+}
+
+"""start_remote_run minus the HTTP-boundary scrub: cfg.dataset is honored. Only
+for server-side callers that built the dataset paths themselves (jms_train)."""
+def _start_remote_run(cfg: dict) -> dict {
     name = str(cfg.get("name", ""));
     mode = str(cfg.get("mode", "sft"));
     if not jobs.safe(name) { return _err("invalid name"); }

@@ -356,7 +356,9 @@ def _start_spheron(p: JmsProject, rid: str, base_model: str, opts: dict) -> dict
         if k in opts { cfg[k] = opts[k]; }
     }
 
-    res = cloudruns.start_remote_run(cfg);
+    # _start_remote_run: the trusted entry that honors cfg.dataset (the public
+    # start_remote_run drops it — see its docstring).
+    res = cloudruns._start_remote_run(cfg);
     if not bool(res["ok"]) {
         return {"ok": False, "rid": "", "error": str(res["error"])};
     }
