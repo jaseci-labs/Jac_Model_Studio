@@ -29,26 +29,26 @@ path = "../Jac_Model_Experiments/models/qwen-q4"
 id = "qwen-08-spectrum-sft"
 label = "Qwen3-Coder · 08 SFT (spectrum)"
 path = "../Jac_Model_Experiments/models/qwen-q4"
-adapter = "../Jac_Model_Experiments/08-nitin-new2-ds/spectrum_probe/adapters/sft-on-nitin-spectrum"
+adapter = "../Jac_Model_Experiments/experiments/08-nitin-new2-ds/adapter"
 
-# Archived best adapters (Jac_Model_Experiments/archive/README.md)
+# Archived best adapters (Jac_Model_Experiments/experiments/README.md)
 [[models.registry]]
 id = "qwen-04-spectrum-sft"
 label = "Qwen3-Coder · 04 SFT (spectrum, 74.7%)"
 path = "../Jac_Model_Experiments/models/qwen-q4"
-adapter = "../Jac_Model_Experiments/archive/04-cpt-sft"
+adapter = "../Jac_Model_Experiments/experiments/04-cpt-sft/adapter"
 
 [[models.registry]]
 id = "qwen-06-spectrum-sft"
 label = "Qwen3-Coder · 06 SFT (spectrum, 74.4%)"
 path = "../Jac_Model_Experiments/models/qwen-q4"
-adapter = "../Jac_Model_Experiments/archive/06-nitin-ds-sft"
+adapter = "../Jac_Model_Experiments/experiments/06-nitin-ds-sft/adapter"
 
 [[models.registry]]
 id = "qwen-07-spectrum-dpo"
 label = "Qwen3-Coder · 07 DPO-best (spectrum, 73.0%)"
 path = "../Jac_Model_Experiments/models/qwen-q4"
-adapter = "../Jac_Model_Experiments/archive/07-nitin-ds-new-sft"
+adapter = "../Jac_Model_Experiments/experiments/07-nitin-ds-new-sft/adapter"
 
 # ---------------------------------------------------------------------------
 # Dataset browser (data.sv.jac, experiments DATA section)
@@ -57,23 +57,23 @@ adapter = "../Jac_Model_Experiments/archive/07-nitin-ds-new-sft"
 [data]
 # browsable files as [path, human label]
 preview_files = [
-  ["../Jac_Model_Experiments/08-nitin-new2-ds/dataset/sft/train.jsonl", "08 SFT train"],
-  ["../Jac_Model_Experiments/08-nitin-new2-ds/dataset/sft/valid.jsonl", "08 SFT valid"],
-  ["../Jac_Model_Experiments/08-nitin-new2-ds/dataset/dpo/train.jsonl", "08 DPO train"],
-  ["../Jac_Model_Experiments/08-nitin-new2-ds/dataset/dpo/valid.jsonl", "08 DPO valid"]
+  ["../Jac_Model_Experiments/experiments/08-nitin-new2-ds/dataset/sft/train.jsonl", "08 SFT train"],
+  ["../Jac_Model_Experiments/experiments/08-nitin-new2-ds/dataset/sft/valid.jsonl", "08 SFT valid"],
+  ["../Jac_Model_Experiments/experiments/08-nitin-new2-ds/dataset/dpo/train.jsonl", "08 DPO train"],
+  ["../Jac_Model_Experiments/experiments/08-nitin-new2-ds/dataset/dpo/valid.jsonl", "08 DPO valid"]
 ]
 # counted into the SFT.TOTAL tile
 sft_stat_files = [
-  "../Jac_Model_Experiments/08-nitin-new2-ds/dataset/sft/train.jsonl",
-  "../Jac_Model_Experiments/08-nitin-new2-ds/dataset/sft/valid.jsonl"
+  "../Jac_Model_Experiments/experiments/08-nitin-new2-ds/dataset/sft/train.jsonl",
+  "../Jac_Model_Experiments/experiments/08-nitin-new2-ds/dataset/sft/valid.jsonl"
 ]
 
 # one stat tile per named split (name -> path)
 [data.split_files]
-sft_train = "../Jac_Model_Experiments/08-nitin-new2-ds/dataset/sft/train.jsonl"
-sft_valid = "../Jac_Model_Experiments/08-nitin-new2-ds/dataset/sft/valid.jsonl"
-dpo_train = "../Jac_Model_Experiments/08-nitin-new2-ds/dataset/dpo/train.jsonl"
-dpo_valid = "../Jac_Model_Experiments/08-nitin-new2-ds/dataset/dpo/valid.jsonl"
+sft_train = "../Jac_Model_Experiments/experiments/08-nitin-new2-ds/dataset/sft/train.jsonl"
+sft_valid = "../Jac_Model_Experiments/experiments/08-nitin-new2-ds/dataset/sft/valid.jsonl"
+dpo_train = "../Jac_Model_Experiments/experiments/08-nitin-new2-ds/dataset/dpo/train.jsonl"
+dpo_valid = "../Jac_Model_Experiments/experiments/08-nitin-new2-ds/dataset/dpo/valid.jsonl"
 
 # ---------------------------------------------------------------------------
 # Training backends (backends.sv.jac) — declarative job specs → shell commands.
@@ -104,8 +104,8 @@ log_parser = "mlx"
 # ---------------------------------------------------------------------------
 
 [cloudrun]
-train_rel = "../Jac_Model_Experiments/08-nitin-new2-ds/dataset/sft/train.jsonl"
-valid_rel = "../Jac_Model_Experiments/08-nitin-new2-ds/dataset/sft/valid.jsonl"
+train_rel = "../Jac_Model_Experiments/experiments/08-nitin-new2-ds/dataset/sft/train.jsonl"
+valid_rel = "../Jac_Model_Experiments/experiments/08-nitin-new2-ds/dataset/sft/valid.jsonl"
 remote_dir = "studio-run"
 auto_terminate = "on_success"
 max_wall_clock_min = 720
