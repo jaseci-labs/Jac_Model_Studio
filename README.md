@@ -51,22 +51,36 @@ fallback if it exists.
 
 ## Layout
 
-- `main.jac` — registers every endpoint + mounts the client.
-- `paths.sv.jac` — the three roots (studio / workspace / data) + tool lookup.
-- `workspace.sv.jac` — toml loader + Experiments workspace graph.
-- `jms_*.sv.jac` — JMS product (projects, plan, gen, curate, train, eval, chat, llm).
-- `models` / `inference` / `chat` / `persistence` / `data` — model registry,
-  resident MLX + streaming, chat history graph, dataset browser.
-- `jobs` (detached subprocess engine + heavy GPU lock), `cloudruns` / `clusters` /
-  `backends` / `remote/` (BYO GPU runs), `auth`, `audit`, `crypto`, `assistant`.
-- `components/`, `hooks/`, `lib/` — UI. `scripts/` — workers + backup tooling.
-- `docs/design/` — glass design system + agentic assistant specs; `docs/blog/` — JMS write-up.
+    main.jac            registers every endpoint (server imports) + mounts the client
+    server/             one package per concern; each dir has an empty __init__.jac
+      core/             paths (3 roots + tool lookup), auth, audit, crypto, jobs
+                        (detached engine + heavy GPU lock), persistence (chat graph),
+                        workspace (toml loader + Experiments graph), metrics, data
+      models/           models (registry), inference (resident MLX), chat, assistant,
+                        prompts (+ prompts.json)
+      jms/              jms_* — JMS product (projects, plan, gen, curate, train, eval, chat, llm)
+      cloud/            cloudruns, clusters, backends (BYO GPU runs; uploads remote/)
+    client/             frontend.cl.jac, auth_session.cl.jac, components/, hooks/, lib/,
+                        styles/ (theme.css, global.css, jms.css)
+    assets/             favicon — must stay at the root (jac-scale serve_root_asset)
+    remote/             uploaded to GPU boxes
+    scripts/            workers (jms_gen_worker, jms_eval_worker), smoke tests, backup/restore, pysite/
+    deploy/  docs/      systemd/Caddy units; design specs + JMS write-up
+
+Server modules import each other by package path from the repo root
+(`import from server.core { paths }`, `import from server.jms.jms_projects { ... }`).
+`.cl.jac` files `sv import` with dots up to the repo root
+(`sv import from ...server.core.jobs { ... }` from `client/components/`).
+Persisted `node` types carry `@archetype_alias("<old_module>.<Node>")` so graph rows
+written before the move still load.
 
 ## Test
 
-    jac test <module>.test.jac     # one annex; run each *.test.jac (no server needed)
-    ./smoke.sh                     # while the browser-target server is up
-    JAC_API=http://localhost:8001 ./smoke_auth.sh
+    jac test server/core/jobs.test.jac   # one annex, FROM THE REPO ROOT (no server needed)
+    scripts/smoke.sh                     # while the browser-target server is up
+    JAC_API=http://localhost:8001 scripts/smoke_auth.sh
+
+`jac test` must run from the repo root so `server.*` imports resolve.
 
 Tests redirect `JAC_STUDIO_WORKSPACE` / `JAC_STUDIO_DATA_ROOT` to temp dirs. Don't
 `jac run` app modules from the repo root while a server is up — it writes the

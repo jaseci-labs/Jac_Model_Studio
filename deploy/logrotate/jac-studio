@@ -7,10 +7,10 @@
 #
 # Paths below assume the default data root, /opt/jac_ml_studio/data
 # (<jms>/data). If you set JAC_STUDIO_DATA_ROOT, edit the two glob prefixes to match. The server appends
-# to audit.jsonl with a fresh open() per record (audit.sv.jac), so a plain
+# to audit.jsonl with a fresh open() per record (server/core/audit.sv.jac), so a plain
 # rename-and-recreate rotation loses no lines — no restart or signal needed.
 
-# Append-only audit trail (audit.sv.jac writes <data_root>/audit/audit.jsonl).
+# Append-only audit trail (server/core/audit.sv.jac writes <data_root>/audit/audit.jsonl).
 /opt/jac_ml_studio/data/audit/audit.jsonl {
     weekly
     rotate 26

@@ -12,7 +12,7 @@ cd "$(dirname "$0")"
 _STUDIO_DIR="$(pwd)"
 # Paths: JAC_STUDIO_WORKSPACE (base for studio.workspace.toml paths, default
 # this dir) and JAC_STUDIO_DATA_ROOT (runtime writes, default ./data) are read
-# by paths.sv.jac; only pass them through when set. See README.md.
+# by server/core/paths.sv.jac; only pass them through when set. See README.md.
 
 # SQLite concurrency hardening — see scripts/pysite/sitecustomize.py for the
 # full root-cause writeup. Short version: jac-scale opens a NEW sqlite
@@ -43,7 +43,7 @@ export PYTHONPATH="$_STUDIO_DIR/scripts/pysite${PYTHONPATH:+:$PYTHONPATH}"
 # maxfiles`), so the watcher alone exhausts it and the first local model load
 # dies with `[Errno 24] Too many open files` — after which EVERY endpoint 500s
 # until a restart. Raising it here covers the watcher itself; the in-process
-# fallback in inference.sv.jac (_raise_fd_limit) cannot retroactively fix opens
+# fallback in server/models/inference.sv.jac (_raise_fd_limit) cannot retroactively fix opens
 # that already failed during boot. macOS caps any request at kern.maxfilesperproc
 # (184320 here); 65536 is ample and leaves ~48k headroom over the watcher.
 # `-S` matters: bare `ulimit -n N` in bash sets the HARD limit too, permanently
@@ -55,7 +55,7 @@ fi
 echo "[start.sh] open-file limit: soft=$(ulimit -Sn) hard=$(ulimit -Hn)"
 
 # Local single-user mode: the client auto-provisions one implicit local user
-# and skips the login screen (see frontend.cl.jac / auth.local_mode). Production
+# and skips the login screen (see client/frontend.cl.jac / auth.local_mode). Production
 # (start_prod.sh) deliberately leaves this unset so the real login gate shows.
 export JAC_LOCAL_USER="${JAC_LOCAL_USER:-1}"
 
@@ -64,7 +64,7 @@ export JAC_LOCAL_USER="${JAC_LOCAL_USER:-1}"
 # git-committed 'supersecretkey_for_testing_only!'. Generate a random per-machine
 # value once and CACHE it under .jac/ (gitignored) so it is stable across
 # restarts: JWT_SECRET is also the secret-at-rest master key when JAC_SECRET_KEY
-# is unset (crypto.sv.jac), so a fresh value each boot would log the user out
+# is unset (server/core/crypto.sv.jac), so a fresh value each boot would log the user out
 # every restart AND make already-encrypted provider API keys undecryptable.
 # Prod does the opposite on purpose: start_prod.sh REQUIRES an externally
 # provided JWT_SECRET and never generates one.
