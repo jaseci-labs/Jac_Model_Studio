@@ -8,6 +8,7 @@ Annex file: pairs with metrics.sv.jac and sees its private `def`s directly.
 Run with `jac test server/core/metrics.test.jac`.
 """
 
+import json;
 import tempfile;
 import from pathlib { Path }
 
@@ -142,4 +143,22 @@ test "idiom_summary picks the row carrying avg_sim" {
     assert row["idiomatic"] == 4, row;
     # Nothing on disk for the graph kind → empty dict.
     assert idiom_summary(d, "sft", "graph") == {}, "expected empty for missing graph metrics";
+}
+
+test "read_series / last_row never return NaN or Infinity" {
+    # train_sft.py writes a NaN loss as bare `NaN`; json.loads accepts it, and
+    # Starlette serializes responses with allow_nan=False, so a single NaN row
+    # 500'd the cloud-run status/list endpoints.
+    p = _tmpfile(
+        "{\"step\": 1, \"loss\": 2.0}\n"
+        "{\"step\": 2, \"loss\": NaN}\n"
+        "{\"step\": 3, \"loss\": Infinity, \"eval_loss\": 1.5}\n",
+        ".jsonl"
+    );
+    s = read_series(p, "loss");
+    assert len(s) == 1 and s[0]["x"] == 1, s;
+    json.dumps(s, allow_nan=False);
+    last = last_row(p);
+    json.dumps(last, allow_nan=False);
+    assert last["eval_loss"] == 1.5 and last["loss"] is None, last;
 }

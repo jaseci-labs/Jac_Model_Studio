@@ -11,6 +11,7 @@ Checker notes (jaclang 0.16.1): re.Match / json.loads results stay in `any` loca
 """
 
 import json;
+import math;
 import re;
 import from io { BytesIO, TextIOWrapper }
 import from pathlib { Path }
@@ -97,7 +98,11 @@ def read_series(path: Path, ykey: str) -> list[dict] {
                 r = json.loads(stripped);
             } except Exception { continue; }
             if "step" not in r or ykey not in r { continue; }
-            out.append(_pt(int(str(r["step"])), float(str(r[ykey]))));
+            y = float(str(r[ykey]));
+            # NaN/Infinity (train_sft writes a diverged loss as bare NaN) would 500
+            # the response: Starlette serializes with allow_nan=False.
+            if not math.isfinite(y) { continue; }
+            out.append(_pt(int(str(r["step"])), y));
         }
     } finally {
         fh.close();
@@ -120,6 +125,11 @@ def last_row(path: Path) -> dict {
         }
     } finally {
         fh.close();
+    }
+    # Top-level non-finite floats → None (JSON null): see read_series.
+    for k in list(last.keys()) {
+        v = last[k];
+        if isinstance(v, float) and not math.isfinite(v) { last[k] = None; }
     }
     return last;
 }
