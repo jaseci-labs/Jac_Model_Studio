@@ -183,7 +183,10 @@ def _build_runspec(cfg: dict, run_id: str, deployment_id: str, hourly_rate: floa
         "mode": mode,
         "deployment_id": deployment_id,
         "hourly_rate": hourly_rate,
-        "remote_dir": f"{remote_base}-{name}",
+        # Unique per RUN (not per name): a reused name on the same box would
+        # otherwise inherit .provisioned (skipping the new dataset upload) and
+        # the old run.log __EXIT__ (ending the new run instantly).
+        "remote_dir": f"{remote_base}-{name}-{run_id[:8]}",
         "uploads": [
             {"local": str(paths.resolve(str(ds["train_rel"]))), "remote": "data/train.jsonl"},
             {"local": str(paths.resolve(str(ds["valid_rel"]))), "remote": "data/valid.jsonl"},

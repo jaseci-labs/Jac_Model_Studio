@@ -33,8 +33,8 @@ test "runspec construction: uploads/pull/policy/remote_dir from cfg" {
     assert str(spec["deployment_id"]) == "dep-1";
     assert float(str(spec["hourly_rate"])) == 0.35;
     assert str(spec["launch_cmd"]) == "bash fake_train.sh";
-    # remote_dir is per-run unique: <base>-<name>
-    assert str(spec["remote_dir"]) == "studio-run-t-run";
+    # remote_dir is per-run unique: <base>-<name>-<run_id[:8]>
+    assert str(spec["remote_dir"]) == "studio-run-t-run-rid-1", spec["remote_dir"];
     assert str(spec["ssh_override"]) == "ssh test@fakehost";
 
     remotes: list[str] = [];
@@ -224,4 +224,16 @@ test "start_remote_run (HTTP) ignores a client-supplied dataset path" {
         else { os.environ.pop("JAC_STUDIO_WORKSPACE", None); }
         _drop_fake_cluster(d);
     }
+}
+
+test "remote_dir is unique per run, not per name" {
+    # remote_dir was <base>-<name>, so re-running a name on the same cluster
+    # reused the old dir: .provisioned skipped the NEW dataset upload and the
+    # old run.log's __EXIT__ ended the new run instantly with the old adapter.
+    cfg: dict = {"name": "same-name", "mode": "sft"};
+    a = _build_runspec(cfg, "11111111-aaaa", "", 0.0, "cmd");
+    b = _build_runspec(cfg, "22222222-bbbb", "", 0.0, "cmd");
+    assert str(a["remote_dir"]) != str(b["remote_dir"]), (a["remote_dir"], b["remote_dir"]);
+    assert str(a["remote_dir"]).startswith("studio-run-same-name"), a["remote_dir"];
+    assert _build_runspec(cfg, "11111111-aaaa", "", 0.0, "cmd")["remote_dir"] == a["remote_dir"];
 }
