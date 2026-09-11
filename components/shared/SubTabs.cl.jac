@@ -2,7 +2,7 @@
 
 The active tab was signalled by colour + underline ONLY, so a screen reader read
 four identical buttons. `aria-current` carries that state non-visually; the `·`
-separators are decorative and hidden. Prop shape unchanged (Cloud/Train pass
+separators are decorative and hidden. Prop shape unchanged (Cloud passes
 tabs/active/onTab)."""
 
 def:pub SubTabs(tabs: list[str], active: str, onTab: Callable[([str], None)]) -> JsxElement {

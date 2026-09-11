@@ -7,7 +7,7 @@
 #   file:  $JAC_STUDIO_WORKSPACE/studio.workspace.toml, else ./studio.workspace.toml
 #   paths: relative paths resolve against $JAC_STUDIO_WORKSPACE (default: repo root);
 #          absolute paths are used as-is.
-# Defaults below assume the experiments repo checked out next to this repo (../model-experiments).
+# Defaults below assume the experiments repo checked out next to this repo (../Jac_Model_Experiments).
 
 # ---------------------------------------------------------------------------
 # Model registry (models.sv.jac) — the chat / train / plan model pickers.
@@ -23,32 +23,32 @@ excluded_run_dirs = ["comparison", "_builder", "_evals"]
 [[models.registry]]
 id = "qwen-q4"
 label = "Qwen3-Coder · BASE (q4)"
-path = "../model-experiments/models/qwen-q4"
+path = "../Jac_Model_Experiments/models/qwen-q4"
 
 [[models.registry]]
 id = "qwen-08-spectrum-sft"
 label = "Qwen3-Coder · 08 SFT (spectrum)"
-path = "../model-experiments/models/qwen-q4"
-adapter = "../model-experiments/08-nitin-new2-ds/spectrum_probe/adapters/sft-on-nitin-spectrum"
+path = "../Jac_Model_Experiments/models/qwen-q4"
+adapter = "../Jac_Model_Experiments/08-nitin-new2-ds/spectrum_probe/adapters/sft-on-nitin-spectrum"
 
-# Archived best adapters (model-experiments/archive/README.md)
+# Archived best adapters (Jac_Model_Experiments/archive/README.md)
 [[models.registry]]
 id = "qwen-04-spectrum-sft"
 label = "Qwen3-Coder · 04 SFT (spectrum, 74.7%)"
-path = "../model-experiments/models/qwen-q4"
-adapter = "../model-experiments/archive/04-cpt-sft"
+path = "../Jac_Model_Experiments/models/qwen-q4"
+adapter = "../Jac_Model_Experiments/archive/04-cpt-sft"
 
 [[models.registry]]
 id = "qwen-06-spectrum-sft"
 label = "Qwen3-Coder · 06 SFT (spectrum, 74.4%)"
-path = "../model-experiments/models/qwen-q4"
-adapter = "../model-experiments/archive/06-nitin-ds-sft"
+path = "../Jac_Model_Experiments/models/qwen-q4"
+adapter = "../Jac_Model_Experiments/archive/06-nitin-ds-sft"
 
 [[models.registry]]
 id = "qwen-07-spectrum-dpo"
 label = "Qwen3-Coder · 07 DPO-best (spectrum, 73.0%)"
-path = "../model-experiments/models/qwen-q4"
-adapter = "../model-experiments/archive/07-nitin-ds-new-sft"
+path = "../Jac_Model_Experiments/models/qwen-q4"
+adapter = "../Jac_Model_Experiments/archive/07-nitin-ds-new-sft"
 
 # ---------------------------------------------------------------------------
 # Dataset browser (data.sv.jac, experiments DATA section)
@@ -57,23 +57,23 @@ adapter = "../model-experiments/archive/07-nitin-ds-new-sft"
 [data]
 # browsable files as [path, human label]
 preview_files = [
-  ["../model-experiments/08-nitin-new2-ds/dataset/sft/train.jsonl", "08 SFT train"],
-  ["../model-experiments/08-nitin-new2-ds/dataset/sft/valid.jsonl", "08 SFT valid"],
-  ["../model-experiments/08-nitin-new2-ds/dataset/dpo/train.jsonl", "08 DPO train"],
-  ["../model-experiments/08-nitin-new2-ds/dataset/dpo/valid.jsonl", "08 DPO valid"]
+  ["../Jac_Model_Experiments/08-nitin-new2-ds/dataset/sft/train.jsonl", "08 SFT train"],
+  ["../Jac_Model_Experiments/08-nitin-new2-ds/dataset/sft/valid.jsonl", "08 SFT valid"],
+  ["../Jac_Model_Experiments/08-nitin-new2-ds/dataset/dpo/train.jsonl", "08 DPO train"],
+  ["../Jac_Model_Experiments/08-nitin-new2-ds/dataset/dpo/valid.jsonl", "08 DPO valid"]
 ]
 # counted into the SFT.TOTAL tile
 sft_stat_files = [
-  "../model-experiments/08-nitin-new2-ds/dataset/sft/train.jsonl",
-  "../model-experiments/08-nitin-new2-ds/dataset/sft/valid.jsonl"
+  "../Jac_Model_Experiments/08-nitin-new2-ds/dataset/sft/train.jsonl",
+  "../Jac_Model_Experiments/08-nitin-new2-ds/dataset/sft/valid.jsonl"
 ]
 
 # one stat tile per named split (name -> path)
 [data.split_files]
-sft_train = "../model-experiments/08-nitin-new2-ds/dataset/sft/train.jsonl"
-sft_valid = "../model-experiments/08-nitin-new2-ds/dataset/sft/valid.jsonl"
-dpo_train = "../model-experiments/08-nitin-new2-ds/dataset/dpo/train.jsonl"
-dpo_valid = "../model-experiments/08-nitin-new2-ds/dataset/dpo/valid.jsonl"
+sft_train = "../Jac_Model_Experiments/08-nitin-new2-ds/dataset/sft/train.jsonl"
+sft_valid = "../Jac_Model_Experiments/08-nitin-new2-ds/dataset/sft/valid.jsonl"
+dpo_train = "../Jac_Model_Experiments/08-nitin-new2-ds/dataset/dpo/train.jsonl"
+dpo_valid = "../Jac_Model_Experiments/08-nitin-new2-ds/dataset/dpo/valid.jsonl"
 
 # ---------------------------------------------------------------------------
 # Training backends (backends.sv.jac) — declarative job specs → shell commands.
@@ -104,8 +104,8 @@ log_parser = "mlx"
 # ---------------------------------------------------------------------------
 
 [cloudrun]
-train_rel = "../model-experiments/08-nitin-new2-ds/dataset/sft/train.jsonl"
-valid_rel = "../model-experiments/08-nitin-new2-ds/dataset/sft/valid.jsonl"
+train_rel = "../Jac_Model_Experiments/08-nitin-new2-ds/dataset/sft/train.jsonl"
+valid_rel = "../Jac_Model_Experiments/08-nitin-new2-ds/dataset/sft/valid.jsonl"
 remote_dir = "studio-run"
 auto_terminate = "on_success"
 max_wall_clock_min = 720

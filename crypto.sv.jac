@@ -1,7 +1,7 @@
 """studio - symmetric encryption for secrets at rest (env-keyed).
 
 Threat model: protect stored third-party credentials (currently the per-user
-Spheron API key on `SpheronCred.api_key`) from anyone who can read the OSP graph
+Anthropic / OpenAI API keys — jms_llm.sv.jac / assistant.sv.jac) from anyone who can read the OSP graph
 database or a `backup_graph.sh` tarball. It is NOT a defense against an attacker
 who already has the running process's environment (they hold the master key).
 

@@ -1,13 +1,12 @@
 """Shared dataset row browser: file chips + row table + expand-detail + pager.
 
-Props-component extracted from Data.cl.jac so the 01 (core), 02 (RL) and 03 (CPT)
-DATA sections all render identical browsers over `DataRowView` rows. The parent
+Props-component rendered by Data.cl.jac over `DataRowView` rows. The parent
 owns the fetch state (files/path/rows/offset/total/expanded) and the handlers;
 this component renders and calls back.
 
 The ONE piece of local state is the search box (`has q`). It is deliberately not
-a prop: the parent's pager is SERVER-paged (useRowPager fetches
-`fetch_rows(path, offset)`, one page at a time), so a query here can only ever
+a prop: the parent's pager is SERVER-paged (Data.cl.jac fetches one page at a
+time), so a query here can only ever
 match the rows already fetched. The UI says exactly that — "this page only",
 with the loaded/total counts — instead of implying a dataset-wide search. The
 server-side fix (a `q` argument on data.sv.jac's row endpoints) is in the report.

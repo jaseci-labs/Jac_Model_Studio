@@ -1,4 +1,4 @@
-"""Left section sidebar — the active workspace's sections (CHAT/DATA/TRAIN/…).
+"""Left section sidebar — the active workspace's sections (CHAT/DATA/CLOUD/…).
 
 The workspace switcher now lives in the top <WorkspaceBar/>; this rail carries only
 the section tiles for whichever workspace is active, one per row. Sections are read
@@ -58,7 +58,7 @@ def _glyph(s: str) -> JsxElement {
             <path d="M4.5 11.5h7a2.5 2.5 0 000-5 3 3 0 00-5.8-1A2.2 2.2 0 004.5 11.5z" />
         </svg>;
     }
-    # results (also the old rl fallback): sparkline + point
+    # fallback (results / any unknown id): sparkline + point
     return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.25">
         <path d="M2 13h12" opacity="0.45" />
         <path d="M2 11l3-3 3 2 5-6" strokeLinejoin="miter" />

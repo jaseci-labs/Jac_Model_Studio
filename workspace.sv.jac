@@ -73,15 +73,6 @@ def _str_list(raw: any) -> list[str] {
     return [str(x) for x in (raw as list)];
 }
 
-"""Which file the loader resolved (workspace > studio > ""). Handy for a future
-/function/workspace_info debug endpoint."""
-def resolved_path() -> str {
-    for p in _candidate_paths() {
-        if p.is_file() { return str(p); }
-    }
-    return "";
-}
-
 # --- model registry (models.sv.jac) -----------------------------------------
 
 def model_registry() -> list[dict] {
@@ -135,17 +126,6 @@ def dpo_keys() -> list[str] {
 def training_backend_default() -> str {
     raw = _sec("backends").get("default");
     return str(raw) if raw is not None else "mlx_local";
-}
-
-"""Top-level [backends] section minus the `default` scalar."""
-def training_backends() -> dict {
-    sec = _sec("backends");
-    out: dict = {};
-    for k in sec {
-        if k == "default" { continue; }
-        if isinstance(sec[k], dict) { out[str(k)] = dict(sec[k]); }
-    }
-    return out;
 }
 
 def training_backend(name: str) -> dict {

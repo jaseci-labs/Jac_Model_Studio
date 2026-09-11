@@ -1,7 +1,7 @@
 """studio - unit tests for data.sv.jac row parsing + fence helpers.
 
 Covers the pure record→DataRowView classifier (`_build_row`) that powers the DATA
-and RL DATA browsers, plus the markdown-fence / func-name extractors it relies on.
+browser (incl. RL-task records), plus the markdown-fence / func-name extractors it relies on.
 No filesystem or workspace registry is touched, so these run anywhere.
 
 Annex file: pairs with data.sv.jac. Run with `jac test data.sv.jac`.

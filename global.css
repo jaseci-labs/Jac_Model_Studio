@@ -163,12 +163,12 @@ body {
 }
 /* the vocabulary hole: components were applying the CHIP modifier .exp-chip-active
    to buttons because no active-button state existed. */
-.exp-btn-active, .jms-btn-active {
+.exp-btn-active {
   color: var(--accent); border-color: var(--accent);
   background: var(--accent-tint); box-shadow: var(--accent-ring);
 }
-.exp-btn-ghost, .jms-btn-ghost { background: transparent; backdrop-filter: none; border-color: transparent; box-shadow: none; }
-.exp-btn-ghost:hover, .jms-btn-ghost:hover { color: var(--text); border-color: transparent; }
+.exp-btn-ghost { background: transparent; backdrop-filter: none; border-color: transparent; box-shadow: none; }
+.exp-btn-ghost:hover { color: var(--text); border-color: transparent; }
 .exp-btn-danger, .jms-btn-danger { color: var(--danger); border-color: var(--border-alt); }
 .exp-btn-danger:hover, .jms-btn-danger:hover { color: var(--danger); border-color: var(--danger); }
 @supports not (backdrop-filter: blur(1px)) { .exp-btn, .jms-btn { background: var(--surface-strong); } }
@@ -186,7 +186,7 @@ body {
   transition: color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
 }
 .exp-chip:hover, .jms-chip:hover { color: var(--text); border-color: var(--accent); }
-.exp-chip-active, .jms-chip-active {
+.exp-chip-active {
   color: var(--accent); border-color: var(--accent);
   background: var(--accent-tint); box-shadow: var(--accent-ring);
 }
@@ -211,7 +211,7 @@ body {
    NOT the fix: .exp-topbar sets backdrop-filter, which makes it a stacking context
    (so a z-index on the button alone can never escape it), and raising the whole
    62px bar above z-50 would bury the drawer's own 49px header row — ✕ included —
-   and every other z-50 overlay's top edge (AssistantPanel, ApiKeyModal, Gallery). */
+   and every other z-50 overlay's top edge (AssistantPanel, ApiKeyModal). */
 :root { --topbar-h: 62px; }
 .exp-topbar, .jms-topbar {
   display: flex;
@@ -322,16 +322,4 @@ body {
   .exp-hoverable:hover,.jms-card:hover,.jms-hero-panel:hover,
   .exp-btn:hover,.jms-btn:hover{transform:none}
   *,*::before,*::after{transition-duration:1ms!important;scroll-behavior:auto!important}
-}
-
-/* Floating panel label. Was written inline 51x as
-   `micro-label absolute -top-2 left-3 bg-background px-2` — an OPAQUE --bg chip
-   sitting on a translucent glass panel, so it never matched the surface under it
-   and read as a flat patch. .jms-section-label already solved this; this is the
-   same fix, available to both surfaces. */
-.panel-tab {
-  position: absolute; top: -8px; left: 12px; padding: 0 8px;
-  background: var(--surface-strong);
-  backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
-  border-radius: 999px;
 }

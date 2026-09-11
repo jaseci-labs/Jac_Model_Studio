@@ -158,14 +158,3 @@ def delete_jms_workspace(wid: str) -> dict {
     }
     return jms_ui_layout();
 }
-
-"""Persist a new top-bar tile order. Unknown ids are ignored. Returns the
-refreshed layout dict."""
-def reorder_jms_workspaces(ids: list) -> dict {
-    _seed_jms_workspaces();
-    for (i, wid) in enumerate(ids) {
-        w = _find_jms_workspace(str(wid));
-        if w { w.sort_order = i; }
-    }
-    return jms_ui_layout();
-}

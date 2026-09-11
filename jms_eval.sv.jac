@@ -418,9 +418,7 @@ def stop_eval_run(pid: str, eid: str) -> dict {
     return eval_status(pid, eid);
 }
 
-"""All of a project's evals, newest first, live-resolved (no log tails). Named
-`list_jms_evals` (not `list_evals`) to avoid colliding with evals.sv.jac's
-top-level `list_evals` at endpoint registration."""
+"""All of a project's evals, newest first, live-resolved (no log tails)."""
 def list_jms_evals(pid: str) -> list[dict] {
     p = _find_project(pid);
     if p is None { return []; }

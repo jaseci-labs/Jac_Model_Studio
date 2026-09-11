@@ -64,7 +64,7 @@ import from jms_projects {
 # JmsShell's WorkspaceBar + the future JmsWorkspaceSettings drawer.
 import from jms_workspaces {
     jms_ui_layout, create_jms_workspace, update_jms_workspace,
-    delete_jms_workspace, reorder_jms_workspaces
+    delete_jms_workspace
 }
 # JMS LLM provider config: per-user Anthropic key storage (encrypted) + the
 # provider/model catalog + price table. Consumed by the ApiKeyModal + PLAN picker.
@@ -84,7 +84,7 @@ import from assistant {
 # JMS GENERATE stage, PLAN step: LLM-authored dataset plans (claude via byllm /
 # mlx via the resident model), edit + approve. Consumed by GenerateStage.
 import from jms_plan {
-    draft_plan, get_plans, update_plan, approve_plan, latest_approved
+    draft_plan, update_plan, approve_plan, latest_approved
 }
 # JMS GENERATE stage, SYNTHESIZE step: detached dataset-generation worker jobs
 # (cost estimate, fire/stop, live status + log tail). Consumed by GenerateStage's

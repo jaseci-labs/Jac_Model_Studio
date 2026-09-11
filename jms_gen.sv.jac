@@ -1,8 +1,8 @@
 """studio - JMS GENERATE stage, SYNTHESIZE step: detached dataset-generation jobs.
 
 The generation ENGINE: `start_gen` spawns `scripts/jms_gen_worker.jac` as a
-detached `jac run` subprocess (jobs.spawn_detached + with_exit_marker — the
-builders.sv.jac pattern) that synthesizes sft-chat training rows grounded in
+detached `jac run` subprocess (jobs.spawn_detached + with_exit_marker) that
+synthesizes sft-chat training rows grounded in
 chunks of the project's real source files, appending to
 <project>/dataset/raw.jsonl. The worker is a standalone program with NO
 auth/graph context: everything it needs arrives via env vars + two snapshots
@@ -119,10 +119,6 @@ def _run_log(p: JmsProject, jid: str) -> Path {
     return _jobs_dir(p, jid) / "run.log";
 }
 
-def _progress_file(p: JmsProject, jid: str) -> Path {
-    return _jobs_dir(p, jid) / "progress.json";
-}
-
 """progress.json under an already-resolved job dir — the hoisted form so a caller
 looping over many jobs resolves jms_project_dir()/workspace_root() once, not once
 per file per row."""
@@ -134,10 +130,6 @@ def _read_progress_at(jd: Path) -> dict {
     } except Exception {
         return {};
     }
-}
-
-def _read_progress(p: JmsProject, jid: str) -> dict {
-    return _read_progress_at(_jobs_dir(p, jid));
 }
 
 # ----------------------------------------------------------------- finders ----
@@ -195,7 +187,7 @@ def _resolve(p: JmsProject, j: JmsGenJob) -> dict {
 
 """_resolve against an already-resolved job dir. Identical logic; split out so
 list_gen_jobs resolves jms_project_dir(p.slug) ONCE for the whole listing instead
-of three times per row (_job_file / _run_log / _progress_file each re-walked
+of three times per row (_job_file / _run_log / progress.json each re-walked
 workspace_root())."""
 def _resolve_at(jd: Path, j: JmsGenJob) -> dict {
     jf = jd / "job.json";

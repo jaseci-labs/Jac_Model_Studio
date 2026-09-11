@@ -65,7 +65,7 @@ export JAC_LOCAL_USER="${JAC_LOCAL_USER:-1}"
 # value once and CACHE it under .jac/ (gitignored) so it is stable across
 # restarts: JWT_SECRET is also the secret-at-rest master key when JAC_SECRET_KEY
 # is unset (crypto.sv.jac), so a fresh value each boot would log the user out
-# every restart AND make already-encrypted Spheron credentials undecryptable.
+# every restart AND make already-encrypted provider API keys undecryptable.
 # Prod does the opposite on purpose: start_prod.sh REQUIRES an externally
 # provided JWT_SECRET and never generates one.
 _JWT_FILE="$_STUDIO_DIR/.jac/jwt_secret"

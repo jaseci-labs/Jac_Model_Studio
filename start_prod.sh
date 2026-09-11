@@ -7,7 +7,6 @@
 # Optional env:
 #   JAC_STUDIO_WORKSPACE  — base for studio.workspace.toml paths (default: this dir)
 #   JAC_STUDIO_DATA_ROOT  — runtime data: results/ audit/ projects/ (default: ./data)
-#   SPHERON_MAX_CONCURRENT / SPHERON_DAILY_BUDGET_USD / SPHERON_MAX_HOURLY
 #   JAC_MAX_CONCURRENT_JOBS / JAC_TRASH_DAYS
 set -euo pipefail
 cd "$(dirname "$0")"

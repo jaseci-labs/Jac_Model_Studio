@@ -1,7 +1,7 @@
 """studio - unit tests for the heavy-job GPU lock in jobs.sv.jac.
 
 Covers the single-slot mutual exclusion that guarantees only one heavy local job
-(training / CPT / builder / eval / RL generate) runs at a time on the shared GPU:
+(JMS train / eval / generate) runs at a time on the shared GPU:
 a clean acquire, the busy path (correct busy_with), release-then-reacquire, and
 self-healing of a stale lock left by a crashed in-process holder.
 

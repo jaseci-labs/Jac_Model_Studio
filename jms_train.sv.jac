@@ -3,8 +3,7 @@
 The ONLY module that touches a training backend for a JMS project. Two backends:
 
   local-mlx  A local mlx_lm.lora LoRA run under <project>/runs/<rid>/, driven by
-             the detached-process jobs engine (jobs.sv.jac) exactly like
-             cpt.sv.jac / train.sv.jac. Takes the GLOBAL heavy GPU lock
+             the detached-process jobs engine (jobs.sv.jac). Takes the GLOBAL heavy GPU lock
              (jobs.heavy_acquire) — this box has one GPU + 48 GB, so at most one
              heavy local job runs at a time. The base model must be an available
              LOCAL model (models registry → abs path). mlx_lm.lora is invoked with

@@ -38,7 +38,7 @@ import jms_llm;
 import from byllm.lib { Model }
 import from jms_projects {
     JmsProject, JmsSource, JmsGenPlan,
-    _find_project, _sources_of, _gen_plans_of, _plan_dict, _plans_newest_first,
+    _find_project, _sources_of, _gen_plans_of, _plan_dict,
     _included, _EX_DIRS
 }
 
@@ -389,13 +389,6 @@ def draft_plan(pid: str, provider: str, model: str) -> dict {
         plan_json=json.dumps(plan), created=_now()
     ))[0];
     return {"ok": True, "plan": _plan_dict(g), "error": ""};
-}
-
-"""All of a project's plans as parsed dicts, newest (highest version) first."""
-def get_plans(pid: str) -> list[dict] {
-    p = _find_project(pid);
-    if p is None { return []; }
-    return _plans_newest_first(p);
 }
 
 """Replace a DRAFT plan's body from an edited plan_json string (normalized to the

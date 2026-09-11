@@ -147,7 +147,7 @@ def:pub JmsWorkspaceSettings(
 
     # An armed DELETE ("SURE?") disarms itself on Escape, on a pointer-down
     # outside the button, or after 4s — see hooks/useConfirmReset. This drawer is
-    # the 4th site of the two-click pattern (JmsProjects / Evals /
+    # one site of the two-click pattern (JmsProjects / CurateStage / Cloud /
     # WorkspaceSettings are the others) and was the one left sticky-armed: a
     # workspace could sit armed indefinitely and a later stray click at the same
     # screen position deleted it. Sits ABOVE the early return below — it wraps a

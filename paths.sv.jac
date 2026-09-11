@@ -6,7 +6,7 @@ Three roots, all defaulting to the repo root so the app is self-contained:
 - workspace_root() — base for the RELATIVE paths in studio.workspace.toml (model
                      dirs, dataset files). `JAC_STUDIO_WORKSPACE` overrides;
                      default = studio_root(). The toml is the ONLY place that
-                     names external artifacts (e.g. ../model-experiments/...).
+                     names external artifacts (e.g. ../Jac_Model_Experiments/...).
 - data_root()      — everything JMS WRITES at runtime: results/, audit/,
                      projects/, examples/. `JAC_STUDIO_DATA_ROOT` overrides;
                      default = <studio_root>/data (gitignored).
@@ -14,7 +14,6 @@ Three roots, all defaulting to the repo root so the app is self-contained:
 
 import os;
 import sys;
-import shutil;
 import from pathlib { Path }
 
 def studio_root() -> Path {
@@ -61,17 +60,6 @@ def resolve(rel: str, scope: str = "workspace") -> Path {
 used when it exists."""
 def _legacy_venv_bin() -> Path {
     return studio_root() / ".venv" / "bin";
-}
-
-"""The `jac` executable for spawning workers: next to the running interpreter,
-else on PATH, else the repo-root `.venv` if present. "" if none found."""
-def jac_bin() -> str {
-    cand = Path(sys.executable).parent / "jac";
-    if cand.exists() { return str(cand); }
-    w = shutil.which("jac");
-    if w { return str(w); }
-    lv = _legacy_venv_bin() / "jac";
-    return str(lv) if lv.exists() else "";
 }
 
 """PATH for detached tool subprocesses (mlx_lm.lora etc.): the running

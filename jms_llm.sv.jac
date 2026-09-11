@@ -2,8 +2,8 @@
 
 The JMS dataset-PLAN step delegates to either a hosted Claude model (byllm →
 Anthropic) or a resident local MLX model. This module owns the *provider*
-concern: the caller's per-user Anthropic key (encrypted at rest exactly like
-`SpheronCred`, on their OWN root so it is multi-tenant isolated), the resolved
+concern: the caller's per-user Anthropic key (encrypted at rest via crypto.sv.jac,
+on their OWN root so it is multi-tenant isolated), the resolved
 key used by the plan worker, the provider/model catalog the client picks from,
 and a tiny $/Mtok price table for the plan-cost estimate.
 
@@ -11,7 +11,7 @@ Never echo the key: no endpoint returns it. `llm_status` shows only a masked
 tail (last 4) when the key is user-set. `resolved_anthropic_key` is internal —
 it decrypts the user key, else falls back to the ANTHROPIC_API_KEY env var — and
 is the single point the plaintext key exists, inside the request that spends on
-it (same discipline as spheron.sv.jac `_api_key`).
+it.
 """
 
 import os;

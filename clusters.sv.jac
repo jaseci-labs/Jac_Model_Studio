@@ -21,17 +21,15 @@ Key material policy
     material, never a full ssh command.
 
 Multi-tenancy: `SshKey` and `Cluster` hang off the CALLER's own root
-(`[root -->][?:Type]`), same shape as spheron.sv.jac's `SpheronCred` /
-`SpheronDeployment`, so one tenant can never see or use another's cluster.
+(`[root -->][?:Type]`), so one tenant can never see or use another's cluster.
 
-Return convention (matches spheron.sv.jac exactly): every client-facing `def`
+Return convention: every client-facing `def`
 returns a dict that always contains `ok: bool` and `error: str`. `ok=True`
 means the operation succeeded; a failed *connection probe* is NOT a failed
 operation (see `add_cluster`) — that is reported via `test_ok`/`test_message`.
 
 Checker notes (jaclang 0.16.1): `root ++> X(...)` evaluates to a LIST — bind
-the node first and connect on its own statement (same trick spheron.sv.jac:495
-uses). `re` match groups are untyped, so every group read is wrapped in str().
+the node first and connect on its own statement. `re` match groups are untyped, so every group read is wrapped in str().
 """
 
 import os;
@@ -606,8 +604,7 @@ def remove_cluster(cluster_id: str) -> dict {
 """Resolved ssh command for a saved cluster, for remote/supervisor.py.
 
 CONTRACT (this is the surface cloudruns.sv.jac / jms_train.sv.jac consume —
-call it directly, the way spheron.resolved_api_key() is called today; it is
-deliberately NOT registered in main.jac, so it is never HTTP-reachable):
+call it directly; it is deliberately NOT registered in main.jac, so it is never HTTP-reachable):
 
     returns exactly  f"ssh -i {shlex.quote(str(privpath))} -p {port} {user}@{host}"
 

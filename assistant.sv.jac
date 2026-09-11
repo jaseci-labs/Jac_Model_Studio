@@ -159,10 +159,7 @@ def assistant_providers() -> dict {
 #
 # NEVER includes secrets: `llm_status()` already masks provider keys — only
 # its safe fields (id/label/requires_key/models/configured/source) are used
-# here, never a key. `spheron.list_spheron_dispatches()` is intentionally
-# NOT called: it refreshes each dispatch via a live Spheron API request
-# (`spheron_instance` -> `_request`), which needs credentials and can be
-# slow/error without them — not the cheap dict call this task wants.
+# here, never a key.
 # ================================================================================
 
 glob _MAX_GROUND_CHARS: int = 30000;
@@ -347,7 +344,7 @@ def _sec_jms_evals(projects: list[JmsProjectView]) -> str {
     return _clip("\n".join(lines), _PER_FILE_CHARS * 4);
 }
 
-"""Cloud (Spheron) supervised deployments from `cloudruns.list_cloud_runs()`."""
+"""Cloud (BYO-cluster) supervised runs from `cloudruns.list_cloud_runs()`."""
 def _sec_cloud_runs() -> str {
     try {
         data = list_cloud_runs();

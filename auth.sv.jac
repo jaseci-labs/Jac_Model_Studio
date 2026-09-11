@@ -6,8 +6,7 @@ OWN isolated root, so `jid(root)` is the stable per-user identity. Graph-backed 
 framework — `[root -->][?:Chat]` only ever returns the caller's chats. See
 `jac guide jac-sv-auth` + `jac-sv-multi-user`.
 
-This module namespaces the NON-graph artifacts (training / eval / builder / cpt job
-files + logs) under a per-user directory, so one tenant cannot list, read, stop, or
+This module namespaces the NON-graph artifacts (cloud-run job files + logs) under a per-user directory, so one tenant cannot list, read, stop, or
 delete another tenant's detached jobs by guessing a name or id. Defense-in-depth on
 top of the graph isolation.
 

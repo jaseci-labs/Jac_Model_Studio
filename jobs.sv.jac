@@ -3,7 +3,8 @@
 Job JSON files are the source of truth and survive server restarts; the `__EXIT__`
 marker appended to the run log is authoritative over pid liveness (children get
 reparented after a restart, so waitpid fails silently and zombies still answer
-kill-0). Internal helpers consumed by train/evals/builders .sv.jac — plain `def`.
+kill-0). Internal helpers consumed by jms_train/jms_eval/jms_gen/cloudruns .sv.jac —
+plain `def`.
 
 Checker notes (jaclang 0.16.1): import native symbols directly (signal.SIGTERM,
 subprocess.Popen) to dodge Unknown submodule access; dict/JSON values are `any`, so
@@ -24,7 +25,7 @@ import from signal { SIGTERM }
 import from subprocess { Popen, STDOUT, PIPE }
 import from threading { Lock }
 
-# Single heavy-job (training / CPT / builder / eval / RL generate) slot: this
+# Single heavy-job (JMS train / eval / generate) slot: this
 # box has ONE physical GPU + 48 GB, so only one heavy local job may run at a
 # time. The lock file is GLOBAL across users (models.results_dir() is the shared
 # root, not the per-user auth.user_results_dir()) because it guards one GPU.
@@ -280,8 +281,8 @@ def _guard_release(guard: Path) -> None {
 }
 
 """True iff the recorded lock holder is still doing work: detached holders are
-resolved via live_status on their job file; in-process holders (no job file,
-e.g. rl_generate inside the server) via the recorded pid+stamp."""
+resolved via live_status on their job file; in-process holders (no job file)
+via the recorded pid+stamp."""
 def _heavy_live(lock: dict) -> bool {
     jf = str(lock.get("job_file", ""));
     if jf {
@@ -291,8 +292,8 @@ def _heavy_live(lock: dict) -> bool {
     return alive_stamped(int(str(lock.get("pid") or 0)), str(lock.get("stamp", "")));
 }
 
-"""Claim the single heavy-job slot (training/CPT/eval/builder/RL generate all
-compete for the same GPU + 48 GB). Returns {"ok": True} or {"ok": False,
+"""Claim the single heavy-job slot (JMS train/eval/generate all compete for the
+same GPU + 48 GB). Returns {"ok": True} or {"ok": False,
 "busy_with": holder}. Self-healing: a recorded holder that is no longer running
 is stale and is replaced. Detached holders pass their job_file/runlog (so the
 lock heals from the job file after a server restart); in-process holders pass

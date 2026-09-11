@@ -3,7 +3,7 @@
 WHY THIS FILE EXISTS
 --------------------
 Under two concurrent client sessions (one calling `local_session`/`warm_model`
-while another's UI polls `list_builders`/`system_ram`/`active_jobs`/`today_utc`
+while another's UI polls `system_ram`/`active_jobs`/`today_utc`
 on a 1-2s timer) the server used to return "Internal Server Error" with
 `sqlite3.OperationalError: database is locked` as the root cause, on endpoints
 that never touch SQLite themselves. Reproduced here with 12 concurrent curl

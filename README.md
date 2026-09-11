@@ -14,7 +14,7 @@ adapters, SFT playbook) live in their own repo,
 [jaseci-labs/Jac_Model_Experiments](https://github.com/jaseci-labs/Jac_Model_Experiments);
 the shipped toml expects it checked out next to this repo:
 
-    git clone https://github.com/jaseci-labs/Jac_Model_Experiments.git ../model-experiments
+    git clone https://github.com/jaseci-labs/Jac_Model_Experiments.git ../Jac_Model_Experiments
 
 ## Run
 
@@ -40,7 +40,7 @@ once at boot.
 | Runtime data JMS writes: `results/` (per-user runs, GPU lock), `audit/`, `projects/`, `examples/` | `data/` (gitignored) | `JAC_STUDIO_DATA_ROOT` |
 | Graph + users DB, JWT secret | `.jac/` (gitignored) | — |
 
-The shipped toml points at a `model-experiments` checkout next to this repo (base
+The shipped toml points at a `Jac_Model_Experiments` checkout next to this repo (base
 Qwen3-Coder q4 + the 08 SFT adapter, 08 SFT/DPO datasets). Registry entries take
 `path` (MLX model dir) and an optional `adapter` (LoRA dir). Any path may be
 missing: the model shows as unavailable and dataset files count 0.
@@ -60,7 +60,7 @@ fallback if it exists.
 - `jobs` (detached subprocess engine + heavy GPU lock), `cloudruns` / `clusters` /
   `backends` / `remote/` (BYO GPU runs), `auth`, `audit`, `crypto`, `assistant`.
 - `components/`, `hooks/`, `lib/` — UI. `scripts/` — workers + backup tooling.
-- `docs/{plans,specs,blog}` — design history.
+- `docs/design/` — glass design system + agentic assistant specs; `docs/blog/` — JMS write-up.
 
 ## Test
 

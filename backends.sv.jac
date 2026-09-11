@@ -5,11 +5,11 @@ Declarative job specs are rendered into detached-process launch plans
 
 Job spec shape (dict):
   backend: str   optional — defaults to [backends].default
-  method:  str   required — sft | dpo | cpt | …
+  method:  str   required — sft | dpo
   vars:    dict  template placeholders (run_name, model_id, config_file, …)
   opts:    dict  env-var overrides (filtered by the method's env_keys)
 
-Consumers (train.sv.jac, cpt.sv.jac) build a spec and call render(); they keep
+The consumer (cloudruns.sv.jac) builds a spec and calls render(); it keeps
 ownership of job files, log paths, and resume logic — this module only knows how
 to turn a spec into a shell command.
 """
@@ -20,15 +20,6 @@ import paths;
 import workspace;
 import from pathlib { Path }
 
-# Backends whose studio.workspace.toml templates name placeholders NO caller ever
-# supplies ({base_model}/{output_dir}/{config_yaml} — train.sv.jac only passes
-# run_name + model_id), so rendering them yields a shell command with literal
-# "{base_model}" in it. Hidden from list_backends so the UI can't offer them.
-# ponytail: a hardcoded name list, not a `stub = true` flag in
-# studio.workspace.toml — the toml is outside this change's blast radius, and
-# these are the only two stubs ("not wired yet" is already in their description).
-glob _STUB_BACKENDS: list[str] = ["hf_trl", "axolotl"];
-
 """Resolve a cwd scope string to an absolute Path."""
 def _cwd_for(scope: str) -> Path {
     if scope == "data" { return paths.data_root(); }
@@ -38,7 +29,7 @@ def _cwd_for(scope: str) -> Path {
 
 """Substitute {placeholders} in *template* from *tpl_vars*. A placeholder with no
 matching key is left VERBATIM in the output — callers must supply every var their
-backend's template names (see _STUB_BACKENDS for the ones that can't be)."""
+backend's template names."""
 def _apply_template(template: str, tpl_vars: dict) -> str {
     out = template;
     for k in tpl_vars {
@@ -59,7 +50,7 @@ def _env_keys(method: str, method_cfg: dict) -> list[str] {
     return [];
 }
 
-"""Method table for one backend (sft/dpo/cpt keys only — skip label/description)."""
+"""Method table for one backend (method keys only — skip label/description)."""
 def _methods(backend_cfg: dict) -> dict {
     out: dict = {};
     for k in backend_cfg {
@@ -128,44 +119,4 @@ def render(spec: dict) -> dict {
         "method": method,
         "ignored_opts": ignored
     };
-}
-
-"""Log parser id for a backend method (defaults to mlx)."""
-def log_parser_for(backend_name: str, method: str) -> str {
-    backend_cfg = workspace.training_backend(backend_name);
-    methods = _methods(backend_cfg);
-    if method not in methods { return "mlx"; }
-    raw = methods[method].get("log_parser");
-    return str(raw) if raw is not None else "mlx";
-}
-
-"""List configured backends + their methods (for UI / debug). Unwired stub
-backends (_STUB_BACKENDS) are omitted — their templates can't be rendered into a
-runnable command, so offering them in the picker only spawns a broken job."""
-def list_backends() -> dict {
-    raw = workspace.training_backends();
-    default = workspace.training_backend_default();
-    out: list = [];
-    for name in sorted(raw.keys()) {
-        if str(name) in _STUB_BACKENDS { continue; }
-        cfg = dict(raw[name]) if isinstance(raw[name], dict) else {};
-        methods = _methods(cfg);
-        method_details: dict = {};
-        for mname in methods {
-            mc = methods[mname];
-            method_details[mname] = {
-                "env_keys": _env_keys(mname, mc),
-                "log_parser": log_parser_for(name, mname)
-            };
-        }
-        out.append({
-            "id": name,
-            "label": str(cfg.get("label", name)),
-            "description": str(cfg.get("description", "")),
-            "methods": sorted(methods.keys()),
-            "method_details": method_details,
-            "default": name == default
-        });
-    }
-    return {"default": default, "backends": out};
 }

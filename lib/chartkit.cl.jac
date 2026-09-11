@@ -1,23 +1,12 @@
 """chartkit — the one place chart chrome comes from.
 Recharts accepts "var(--x)" strings for stroke/fill (they resolve in the CSS
 cascade), so every color here is a theme token and charts re-skin with the
-ThemeSwitcher for free. Replaces the MONO/_tick/HUES/COLORS/STROKES globs that
-were copy-pasted across MonoChart, MultiLineChart, Train, and Results.
+ThemeSwitcher for free. Consumed by MonoChart.
 """
 
 glob MONO: str = "var(--font-mono)";
 
-# Module-internal: globs don't survive the JS module boundary — consumers use
-# chartColors()/chartColor(i)/gridStroke()/axisStroke().
-glob CHART_COLORS: list[str] = [
-    "var(--chart-1)", "var(--chart-2)", "var(--chart-3)",
-    "var(--chart-4)", "var(--chart-5)", "var(--chart-6)"
-];
-
-def:pub chartColors() -> list[str] {
-    return CHART_COLORS;
-}
-
+# Globs don't survive the JS module boundary — consumers call these accessors.
 # NOTE: `--border` is the GLASS highlight — rgba(255,255,255,0.55) in light mode,
 # i.e. a white line on a cream panel (invisible). `--input` (= --border-alt) is
 # the hairline rule token: dark-on-light in light mode, light-on-dark in dark.
@@ -52,9 +41,4 @@ def:pub tipItemStyle() -> dict {
 
 def:pub tipCursor() -> dict {
     return {"stroke": "var(--input)", "strokeDasharray": "3 3"};
-}
-
-"""Nth chart color (wraps)."""
-def:pub chartColor(i: int) -> str {
-    return CHART_COLORS[i % len(CHART_COLORS)];
 }

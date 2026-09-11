@@ -280,23 +280,6 @@
   .jms-hero-enter { transform: none; }
 }
 
-/* ------------------------------------------------------------ JMS shell --- */
-.jms-shell-empty {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: clamp(12px, 2vh, 22px);
-  padding: clamp(16px, 3vw, 48px);
-  text-align: center;
-  overflow: hidden;
-}
-.jms-shell-word {
-  font-size: clamp(34px, min(6vw, 12vh), 96px);
-}
-
 /* ====================================================== JMS project mgmt ===
    All token-consuming + theme-agnostic (no hardcoded palette): the project
    list grid, project-detail stage rail, and the sources-stage form controls.

@@ -51,10 +51,10 @@ call time, so every request that started inside that window went out with no
 `Authorization` header and came back 401. That is the whole cold-start bug: on
 first paint `frontend.cl.jac`'s `[authTick, loggedIn]` effect fires
 `touchSession()` (→ here) in the same commit that mounts <Landing/>, whose
-`loadGlance()` is already walking `list_projects` → `list_runs` → `list_evals`.
+`loadGlance()` is already walking `list_projects` → `active_jobs` → `list_cloud_runs`.
 React runs child effects before parent effects, so loadGlance starts first and
 its later awaits land squarely inside the hole — hence the red
-`POST /function/list_evals 401` on every fresh load, self-healing on the next
+`POST /function/<endpoint> 401` on every fresh load, self-healing on the next
 call because by then the token is back.
 
 The pre-clear bought nothing: `local_session()` is `def:pub` (auth.sv.jac) and

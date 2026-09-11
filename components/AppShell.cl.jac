@@ -224,7 +224,7 @@ def:pub AppShell(onHub: any = None) -> JsxElement {
     # round-trip (which unmounts AppShell) used to leak another permanent 3s
     # timer — and a zombie probe() failing calls handleUnauthorized() →
     # signalExpired() → jacLogout(), i.e. an unmounted shell could log the user
-    # out. Effect-local id + cleanup, same shape as Cloud/Train.
+    # out. Effect-local id + cleanup, same shape as Cloud.
     useEffect(lambda {
         iv: any = setInterval(lambda { probe(); }, 3000);
         return lambda { clearInterval(float(str(iv))); };

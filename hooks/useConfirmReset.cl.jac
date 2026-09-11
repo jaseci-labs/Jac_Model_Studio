@@ -2,7 +2,8 @@
 
 The two-click pattern (first click arms the button and flips its label to
 "SURE?", second click actually deletes) lives in JmsProjects (project DELETE),
-Evals (eval-history DEL) and WorkspaceSettings (workspace DELETE + section ✕).
+JmsWorkspaceSettings, CurateStage, Cloud and WorkspaceSettings (workspace
+DELETE + section ✕).
 Armed state used to be sticky: nothing but a second click cleared it, so a
 button could sit armed indefinitely and a stray click on the same screen
 position minutes later silently deleted a project / eval / workspace. Nothing in

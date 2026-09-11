@@ -13,8 +13,8 @@ Field cannot reach carry their own accessible name: `TextInput` always emits an
 # ponytail: Field does NOT wrap its children in the <label> (implicit
 # association) and does NOT clone children to inject a generated id. Both were
 # tried and rejected: a <label> forwards clicks to its first labelable
-# descendant, and ~8 call sites put <button> groups inside a Field
-# (Train BACKEND, Evals MODEL/KIND, Cloud OFFER/SSH KEY/AUTO-TERMINATE), so
+# descendant, and call sites put <button> groups inside a Field (Cloud's
+# segmented pickers), so
 # wrapping would make a click on the caption text press the first button.
 # Ceiling: a raw <input> passed as a Field child (Login EMAIL/PASSWORD) is still
 # only named by its placeholder unless the call site passes `htmlFor` + `id`.
