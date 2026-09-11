@@ -252,6 +252,10 @@ def decide_row(pid: str, row_id: str, action: str, messages: list = []) -> dict 
     if not found { return {"error": "unknown row: " + row_id}; }
     entry: dict = {"_id": row_id, "action": action, "ts": _now()};
     if action == "edit" {
+        # Type-check BEFORE coercing: dict("ab") raises, which surfaced as a 500.
+        for m in messages {
+            if not isinstance(m, dict) { return {"error": "invalid messages — edit must be a valid sft-chat transcript"}; }
+        }
         msgs: list = [dict(m) for m in messages];
         if not validate_row({"messages": msgs}) { return {"error": "invalid messages — edit must be a valid sft-chat transcript"}; }
         entry["messages"] = msgs;

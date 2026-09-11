@@ -237,3 +237,15 @@ test "materialize refuses a no-op build and never clobbers an existing split" {
     s = curate_stats(v.pid);
     assert int(str(s["train_rows"])) + int(str(s["holdout_rows"])) == 6, s;
 }
+
+test "decide_row edit with non-object messages is refused, not a 500" {
+    # `dict(m)` ran BEFORE validation, so messages=["ab", "cd"] raised
+    # ValueError out of the endpoint instead of returning {"error": ...}.
+    _isolate_ws();
+    v = create_project("Cur Bad Edit", "t");
+    _seed(v.pid);
+    r = decide_row(v.pid, "r0", "edit", ["ab", "cd"]);
+    assert "error" in r, r;
+    r2 = decide_row(v.pid, "r0", "edit", [1, 2]);
+    assert "error" in r2, r2;
+}
