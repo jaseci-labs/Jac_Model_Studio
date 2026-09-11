@@ -42,8 +42,10 @@ procedure is documented in `env.example`.
 
 ## Backup & restore
 
-- Backups: `scripts/backup_graph.sh` tars `.jac/data` → `$JAC_BACKUP_DIR`
-  (keeps last 14). Fired daily by `studio-backup.timer`. **Point
+- Backups: `scripts/backup_graph.sh` snapshots `.jac/data` (SQLite via the
+  online backup API, so a live server can't tear it) plus the runtime data root
+  (`$JAC_STUDIO_DATA_ROOT`, default `data/`: projects, results/adapters, audit)
+  into one tarball in `$JAC_BACKUP_DIR` (keeps last 14 — size it for adapters). Fired daily by `studio-backup.timer`. **Point
   `JAC_BACKUP_DIR` at off-host storage** — a backup on the same disk is not
   disaster recovery.
 - Restore: stop the server, then `scripts/restore_graph.sh [tarball]` (newest if
