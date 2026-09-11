@@ -27,7 +27,9 @@ local session and skip the login screen. `def:pub` so a logged-out client can
 read it; prod (start_prod.sh) leaves the env unset, so this returns False and
 the real login gate is shown."""
 def:pub local_mode() -> bool {
-    return bool(os.environ.get("JAC_LOCAL_USER", ""));
+    # Explicit truthy values only: bool("0") is True, so JAC_LOCAL_USER=0 used to
+    # ENABLE the passwordless local_session() it was meant to disable.
+    return os.environ.get("JAC_LOCAL_USER", "").strip().lower() in ["1", "true", "yes", "on"];
 }
 
 # Fixed credentials for the implicit local desktop user. Only ever used against
