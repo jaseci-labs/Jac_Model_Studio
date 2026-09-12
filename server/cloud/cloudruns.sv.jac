@@ -3,7 +3,7 @@
 Wires remote/supervisor.py (the detached per-run orchestrator) into the app:
 start_remote_run resolves a SAVED cluster (clusters.sv.jac) into an ssh command,
 writes <run_dir>/runspec.json with that command as `ssh_override`, and spawns the
-supervisor detached via jobs.spawn_detached with `--no-spheron-api`. Nothing is
+supervisor detached via jobs.spawn_detached. Nothing is
 provisioned or billed here — the box is the user's own persistent hardware, so
 there is no marketplace offer, no deployment id and no vendor REST API in the
 loop. From then on the supervisor owns the run end-to-end (wait_vm → provision →
@@ -262,7 +262,7 @@ def _is_detached(st: dict, pid: int) -> bool {
 
 """Env for the spawned supervisor: just the transport-shim seam
 (JMS_*_BIN / FAKE_REMOTE_ROOT) when set server-side. No vendor API credentials —
-every run is --no-spheron-api and reaches its box through runspec.ssh_override."""
+every run reaches its box through runspec.ssh_override."""
 def _supervisor_env() -> dict {
     env: dict = {};
     for k in ["JMS_SSH_BIN", "JMS_RSYNC_BIN", "JMS_SCP_BIN", "FAKE_REMOTE_ROOT"] {
@@ -274,18 +274,14 @@ def _supervisor_env() -> dict {
 
 """Spawn remote/supervisor.py detached against *run_dir*. flag: '' | '--resume'
 | '--pull-only'. stdout+stderr → <run_dir>/supervisor.log (the __EXIT__ jobs
-marker goes to run-<mode>.log, written by the supervisor itself).
-
-`--no-spheron-api` is ALWAYS passed (it is an independent store_true, so it
-composes with --resume/--pull-only): every run now reaches its box through
-runspec.ssh_override, so the supervisor must never call a vendor REST API to
-resolve a transport or to terminate — it just marks vm_terminated itself."""
+marker goes to run-<mode>.log, written by the supervisor itself). The supervisor
+has no vendor API: it reaches the box through runspec.ssh_override and marks
+vm_terminated itself."""
 def _spawn_supervisor(run_dir: Path, flag: str = "") -> int {
     py = os.environ.get("JMS_PYTHON", "python3");
     sup = paths.studio_root() / "remote" / "supervisor.py";
     cmd = f"{shlex.quote(py)} {shlex.quote(str(sup))} --run-dir {shlex.quote(str(run_dir))}";
     if flag { cmd = f"{cmd} {flag}"; }
-    cmd = f"{cmd} --no-spheron-api";
     return jobs.spawn_detached(
         cmd,
         runlog=run_dir / "supervisor.log",
