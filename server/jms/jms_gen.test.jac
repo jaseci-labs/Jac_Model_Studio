@@ -143,6 +143,13 @@ test "start_gen refuses mlx with an unknown/off-disk model" {
     assert "local model" in str(r["error"]), r;
 }
 
+test "_regen_ids ignores the stringified [] an omitted regen_of arrives as" {
+    # jac-scale fills an omitted list default in as "[]" → ['[', ']'] on the wire.
+    assert _regen_ids(["[", "]"]) == [], _regen_ids(["[", "]"]);
+    assert _regen_ids([]) == [];
+    assert _regen_ids(["a1b2c3d4", " 9f0e1d2c ", ""]) == ["a1b2c3d4", "9f0e1d2c"];
+}
+
 test "list_gen_jobs and gen_status are empty-safe" {
     _isolate_ws();
     v = create_project("Gen Empty", "test");

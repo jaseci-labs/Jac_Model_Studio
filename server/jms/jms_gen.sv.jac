@@ -219,6 +219,14 @@ def _resolve_at(jd: Path, j: JmsGenJob) -> dict {
     };
 }
 
+"""Row ids to regenerate, from start_gen's `regen_of`. Row ids are alphanumeric
+(uuid4 hex). When the caller omits `regen_of`, jac-scale fills the default in as
+the STRING "[]", which then arrives as ['[', ']'] — non-empty, so it flipped the
+worker into regen mode and every normal FIRE produced 0 rows. Keep real ids only."""
+def _regen_ids(regen_of: list) -> list[str] {
+    return [str(r).strip() for r in regen_of if str(r).strip().isalnum()];
+}
+
 # --------------------------------------------------------------- endpoints ----
 """Fire a generation job. Refuses when: no approved plan, no scanned source,
 another gen job already running on this project, claude without a resolvable
@@ -256,7 +264,7 @@ def start_gen(
             }
         }
     }
-    regen = [str(r) for r in regen_of if str(r)];
+    regen = _regen_ids(regen_of);
     if not regen {
         if target_rows < 1 { return {"ok": False, "jid": "", "error": "target_rows must be at least 1"}; }
         if target_rows > MAX_ROWS_CAP {

@@ -354,7 +354,9 @@ def:pub GenerateStage(project: any = None, onRefresh: any = None, active: bool =
         genErr = "";
         res: any = None;
         try {
-            res = await start_gen(_pid(), genProvider, genModel, _toInt(targetStr), _toInt(maxStr), _toInt(batchStr));
+            # Pass regen_of explicitly: an omitted list default reaches the server as
+            # the string "[]" and used to flip the worker into regen mode (0 rows).
+            res = await start_gen(_pid(), genProvider, genModel, _toInt(targetStr), _toInt(maxStr), _toInt(batchStr), []);
         } except Exception {
             genErr = "start failed";
             fireBusy = False;
