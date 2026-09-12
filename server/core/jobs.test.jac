@@ -94,6 +94,46 @@ test "a detached claim is held while its job file is still being spawned" {
     try { lf.unlink(); } except Exception {}
 }
 
+"""Pretend a chat model is resident (no real load: plain stub objects)."""
+def _stub_resident -> None {
+    inference._S["model"] = "stub-model";
+    inference._S["tokenizer"] = "stub-tok";
+    inference._S["current_id"] = "stub-id";
+}
+
+test "claiming the heavy slot evicts a resident chat model" {
+    lf = _heavy_lock_file();
+    try { lf.unlink(); } except Exception {}
+    _stub_resident();
+    g = heavy_acquire("test:evict");
+    assert g["ok"], g;
+    assert inference._S["model"] is None, inference._S;
+    assert inference._S["tokenizer"] is None, inference._S;
+    assert inference.current_id() == "", inference.current_id();
+    heavy_release("test:evict");
+    try { lf.unlink(); } except Exception {}
+}
+
+test "a claim does not block on a busy model lock; the eviction is deferred" {
+    lf = _heavy_lock_file();
+    try { lf.unlink(); } except Exception {}
+    _stub_resident();
+    inference._S["lock"].acquire();   # a chat stream is mid-generation
+    try {
+        g = heavy_acquire("test:evict-busy");
+        assert g["ok"], g;
+        assert bool(inference._S.get("evict_pending", False)), inference._S;
+    } finally {
+        inference._S["lock"].release();
+    }
+    inference._S["evict_pending"] = False;
+    inference._S["model"] = None;
+    inference._S["tokenizer"] = None;
+    inference._S["current_id"] = "";
+    heavy_release("test:evict-busy");
+    try { lf.unlink(); } except Exception {}
+}
+
 test "heavy_busy names a live holder and is blank when the slot is free" {
     lf = _heavy_lock_file();
     try { lf.unlink(); } except Exception {}
