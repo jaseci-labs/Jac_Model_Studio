@@ -83,8 +83,12 @@ def:pub EvalStage(project: any = None, onRefresh: any = None, active: bool = Tru
     # Completed, chattable/evaluable runs: local-mlx only. The server re-validates
     # the adapter is on disk, so the client filter stays coarse (backend + status).
     def _completedRuns -> list {
+        return _completedFrom(runs);
+    }
+
+    def _completedFrom(rs: list) -> list {
         out: list = [];
-        for r in runs {
+        for r in rs {
             if _g(r, "backend", "") == "local-mlx" and _g(r, "status", "") == "completed" {
                 out.append(r);
             }
@@ -110,7 +114,11 @@ def:pub EvalStage(project: any = None, onRefresh: any = None, active: bool = Tru
         try {
             rl = await list_train_runs(_pid());
             runs = list(rl);
-            cr = _completedRuns();
+            # From the fetched list, not `runs`: a state write is async, so reading
+            # `runs` here still saw the old (empty) list, the run pickers were never
+            # seeded, and with a single run SCORE/SEND stayed disabled for good (the
+            # select shows the one option, so picking it fires no change).
+            cr = _completedFrom(list(rl));
             if evalRunRid == "" and len(cr) > 0 { evalRunRid = _g(cr[0], "rid", ""); }
             if chatRunRid == "" and len(cr) > 0 { chatRunRid = _g(cr[0], "rid", ""); }
         } except Exception {}
