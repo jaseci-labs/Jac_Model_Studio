@@ -325,6 +325,27 @@ def load_sync(model_id: str, path: str, adapter_path: str = "") -> float {
 
 def current_id() -> str { return _S["current_id"] as str; }
 
+"""Drop the resident model, if any, so a detached MLX job (gen / train / eval
+worker) that loads its OWN copy doesn't sit next to this one — two 16GB copies
+plus training on a 48GB box is the swap wedge. Waits at most *timeout_s* for the
+model lock (an in-flight stream holds it) and then gives up rather than stalling
+the job start. Returns the evicted residency key, "" when nothing was resident or
+the lock was busy."""
+def evict(timeout_s: float = 5.0) -> str {
+    if not _S["current_id"] { return ""; }
+    if not _S["lock"].acquire(timeout=timeout_s) { return ""; }
+    try {
+        old = str(_S["current_id"]);
+        if old {
+            _unload_locked();
+            _S["load_seconds"] = 0.0;
+        }
+        return old;
+    } finally {
+        _S["lock"].release();
+    }
+}
+
 """Peak RSS → GB. ru_maxrss is bytes on macOS, kilobytes on Linux."""
 def _rss_to_gb(rss: float) -> float {
     bytes_val = rss if sys.platform == "darwin" else rss * 1024.0;

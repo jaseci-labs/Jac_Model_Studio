@@ -43,6 +43,7 @@ import from server.core { jobs }
 import from server.core { metrics }
 import server.models.models as models;  # not `import from server.models { models }`: jac check resolves that to the package
 import from server.core { paths }
+import from server.models { inference }
 import from server.cloud { cloudruns }
 import from pathlib { Path }
 import from uuid { uuid4 }
@@ -287,6 +288,8 @@ def _start_local(p: JmsProject, rid: str, base_model: str, opts: dict) -> dict {
     if not grab["ok"] {
         return {"ok": False, "rid": "", "error": f"GPU busy: {grab['busy_with']} is running"};
     }
+    # mlx_lm.lora loads its own copy; don't keep a chat model resident beside it.
+    inference.evict();
 
     env: dict = {"PATH": paths.tool_path()};
     inner = f"mlx_lm.lora --config {shlex.quote(str(cfg_file))}";
