@@ -745,7 +745,11 @@ def delete_project(pid: str, purge_files: bool = False) -> bool {
     for r in _train_runs_of(p) { del r; }
     for e in _eval_runs_of(p) { del e; }
     del p;
-    if purge_files {
+    # Only a real True (or an explicit "true"/"1"/"yes") purges. jac-scale fills an
+    # OMITTED default in as the string "False" — truthy — and the UI's DELETE omits
+    # it, so `if purge_files` rmtree'd the whole project dir, trained adapters too.
+    purge = purge_files is True or str(purge_files).strip().lower() in ["1", "true", "yes"];
+    if purge {
         shutil.rmtree(str(jms_project_dir(slug)), ignore_errors=True);
     }
     return True;

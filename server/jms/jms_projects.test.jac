@@ -143,6 +143,18 @@ test "delete_project removes it from the list" {
     assert delete_project(b.pid) == False, "second delete is a no-op";
 }
 
+test "delete_project keeps the project dir unless purge is a real True" {
+    _isolate_ws();
+    # The client omits purge_files; jac-scale fills the omitted default in as the
+    # STRING "False" (truthy), which used to rmtree the dir, adapters and all.
+    a = create_project("Wire Default", "x");
+    assert delete_project(a.pid, "False") == True;
+    assert jms_project_dir(a.slug).is_dir(), "string 'False' must not purge";
+    b = create_project("Real Purge", "y");
+    assert delete_project(b.pid, True) == True;
+    assert not jms_project_dir(b.slug).exists(), "purge_files=True removes the dir";
+}
+
 test "get_project on an unknown pid is empty" {
     _isolate_ws();
     assert get_project("no-such-pid") == {};
