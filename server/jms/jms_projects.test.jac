@@ -16,10 +16,20 @@ stay out of the repo. Annex file: pairs with jms_projects.sv.jac. Run with
 import os;
 import tempfile;
 
-"""Contain the projects/ skeleton + snapshots in a throwaway workspace."""
+"""Contain the projects/ skeleton + snapshots in a throwaway workspace. Local
+single-user mode, so add_source takes temp trees anywhere (the multi-user source
+allowlist has its own tests below)."""
 def _isolate_ws -> None {
     os.environ["JAC_STUDIO_WORKSPACE"] = tempfile.mkdtemp(prefix="studio-jms-");
     os.environ["JAC_STUDIO_DATA_ROOT"] = os.environ["JAC_STUDIO_WORKSPACE"];
+    os.environ["JAC_LOCAL_USER"] = "1";
+    os.environ.pop("JAC_STUDIO_SOURCE_ROOTS", None);
+}
+
+"""Switch to multi-user (prod) mode with no source-roots override."""
+def _multi_user -> None {
+    os.environ.pop("JAC_LOCAL_USER", None);
+    os.environ.pop("JAC_STUDIO_SOURCE_ROOTS", None);
 }
 
 """Build a small source tree: 3 code files + a docs file + an excluded
@@ -97,6 +107,58 @@ test "add_source rejects bad kind / relative / missing paths" {
     assert "error" in add_source(p.pid, "video", "/tmp"), "bad kind rejected";
     assert "error" in add_source(p.pid, "code", "relative/path"), "relative rejected";
     assert "error" in add_source(p.pid, "code", "/no/such/dir/xyz"), "missing rejected";
+}
+
+test "local mode accepts a source dir anywhere" {
+    _isolate_ws();
+    p = create_project("Local Any", "test");
+    res = add_source(p.pid, "code", _make_tree());
+    assert "error" not in res, res;
+}
+
+test "multi-user mode confines sources to the caller's project dirs" {
+    _isolate_ws();
+    _multi_user();
+    try {
+        p = create_project("Confined", "test");
+        assert "error" in add_source(p.pid, "code", _make_tree()), "outside dir rejected";
+        inside = jms_project_dir(p.slug) / "sources" / "repo";
+        inside.mkdir(parents=True, exist_ok=True);
+        _write(str(inside / "a.py"), "x = 1\n");
+        res = add_source(p.pid, "code", str(inside));
+        assert "error" not in res, res;
+        # A symlink inside the project dir must not reach outside it.
+        link = jms_project_dir(p.slug) / "sources" / "escape";
+        os.symlink(_make_tree(), str(link));
+        assert "error" in add_source(p.pid, "code", str(link)), "symlink escape rejected";
+        # A sibling that merely shares the dir-name prefix is not inside it.
+        sib = str(jms_project_dir(p.slug)) + "-evil";
+        os.makedirs(sib, exist_ok=True);
+        assert "error" in add_source(p.pid, "code", sib), "prefix sibling rejected";
+    } finally {
+        os.environ["JAC_LOCAL_USER"] = "1";
+    }
+}
+
+test "multi-user mode uses JAC_STUDIO_SOURCE_ROOTS instead of the default" {
+    _isolate_ws();
+    _multi_user();
+    try {
+        allowed = tempfile.mkdtemp(prefix="jms-roots-");
+        repo = os.path.join(allowed, "repo");
+        os.makedirs(repo, exist_ok=True);
+        _write(os.path.join(repo, "a.py"), "x = 1\n");
+        os.environ["JAC_STUDIO_SOURCE_ROOTS"] = os.pathsep.join(["/no/such/root", allowed]);
+        p = create_project("Env Roots", "test");
+        res = add_source(p.pid, "code", repo);
+        assert "error" not in res, res;
+        # With the env set, the project dir is no longer implied.
+        own = str(jms_project_dir(p.slug) / "sources");
+        assert "error" in add_source(p.pid, "code", own), "project dir not implied";
+    } finally {
+        os.environ.pop("JAC_STUDIO_SOURCE_ROOTS", None);
+        os.environ["JAC_LOCAL_USER"] = "1";
+    }
 }
 
 test "user include glob overrides the kind defaults" {

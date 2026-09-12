@@ -33,6 +33,7 @@ import os;
 import shutil;
 import fnmatch;
 import datetime;
+import from server.core { auth }
 import from server.core { jobs }
 import from server.core { paths }
 import from pathlib { Path }
@@ -751,17 +752,51 @@ def delete_project(pid: str, purge_files: bool = False) -> bool {
     return True;
 }
 
+"""Multi-user mode only: the directories a source may live under, realpath'd.
+JAC_STUDIO_SOURCE_ROOTS (os.pathsep-separated) when set, else the caller's own
+project dirs under data_root."""
+def _source_roots -> list[str] {
+    out: list[str] = [];
+    env = os.environ.get("JAC_STUDIO_SOURCE_ROOTS", "");
+    if env {
+        for r in env.split(os.pathsep) {
+            if r.strip() { out.append(os.path.realpath(r.strip())); }
+        }
+        return out;
+    }
+    for p in [root -->][?:JmsProject] {
+        out.append(os.path.realpath(str(jms_project_dir(p.slug))));
+    }
+    return out;
+}
+
+"""True when *path* may be used as a source. Local single-user mode
+(auth.local_mode) is unrestricted. Multi-user mode needs the realpath (so a
+symlink cannot escape) to be one of _source_roots() or inside one."""
+def _source_allowed(path: str) -> bool {
+    if auth.local_mode() { return True; }
+    real = os.path.realpath(path);
+    for r in _source_roots() {
+        if real == r or real.startswith(r.rstrip(os.sep) + os.sep) { return True; }
+    }
+    return False;
+}
+
 """Attach a source dir to a project and scan it inline. Validates: absolute path,
-existing directory, kind ∈ {code, docs}. Returns the scanned source dict, or
-{"error": ...} on a validation failure."""
+existing directory, kind ∈ {code, docs}, and (multi-user mode) that the dir is
+inside an allowed source root (_source_allowed). Returns the scanned source dict,
+or {"error": ...} on a validation failure."""
 def add_source(pid: str, kind: str, path: str, `include: list[str] = [], `exclude: list[str] = []) -> dict {
     p = _find_project(pid);
     if p is None { return {"error": "unknown project"}; }
     if kind not in ["code", "docs"] { return {"error": "kind must be code or docs"}; }
     if not os.path.isabs(path) { return {"error": "path must be absolute"}; }
     if not os.path.isdir(path) { return {"error": "not a directory"}; }
+    if not _source_allowed(path) { return {"error": "path is outside the allowed source roots"}; }
+    # Multi-user: store the resolved path so a later symlink swap can't redirect it.
+    spath = path if auth.local_mode() else os.path.realpath(path);
     s = (p ++> JmsSource(
-        sid=uuid4().hex[:12], kind=kind, path=path,
+        sid=uuid4().hex[:12], kind=kind, path=spath,
         include=list(`include), exclude=list(`exclude)
     ))[0];
     res = _apply_scan(s);
@@ -787,6 +822,7 @@ def scan_source(pid: str, sid: str) -> dict {
     if p is None { return {"error": "unknown project"}; }
     s = _find_source(p, sid);
     if s is None { return {"error": "unknown source"}; }
+    if not _source_allowed(s.path) { return {"error": "path is outside the allowed source roots"}; }
     res = _apply_scan(s);
     write_project_snapshot(p.pid);
     return res;

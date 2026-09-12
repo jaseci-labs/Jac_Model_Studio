@@ -20,6 +20,7 @@ import from server.jms.jms_llm { clear_anthropic_key }
 def _isolate_ws -> None {
     os.environ["JAC_STUDIO_WORKSPACE"] = tempfile.mkdtemp(prefix="studio-jmsgen-");
     os.environ["JAC_STUDIO_DATA_ROOT"] = os.environ["JAC_STUDIO_WORKSPACE"];
+    os.environ["JAC_LOCAL_USER"] = "1";   # add_source takes temp trees anywhere
 }
 
 """A one-file real source tree add_source can scan."""
