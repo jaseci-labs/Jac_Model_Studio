@@ -22,7 +22,7 @@ would otherwise leave post-await checks with a ReferenceError)."""
 import from "@jac/runtime" { jacIsLoggedIn }
 import from react { useEffect }
 sv import from ..server.core.auth { local_mode }
-import from .auth_session { authEventName, refreshLocalSession, touchSession }
+import from .auth_session { authEventName, refreshLocalSession, signOut, touchSession }
 import from .components.AppShell { AppShell }
 import from .components.Login { Login }
 import from .components.jms.Landing { Landing }
@@ -32,6 +32,7 @@ def:pub app -> JsxElement {
     has authTick: int = 0,
         checking: bool = True,
         loggedIn: bool = False,
+        localMode: bool = False,
         surface: str = "";
 
     """Read the current surface from the URL hash (#jms / #experiments / else "")."""
@@ -53,6 +54,16 @@ def:pub app -> JsxElement {
             w: any = window;
             w.history.pushState({"surface": s}, "", ("#" + s) if s else "#");
         } except Exception { }
+    }
+
+    """Sign out (prod only — never offered in local mode, where there is no
+    login screen to return to). Clears the token/cache/user keys, then drops
+    back to the hub surface and re-renders into <Login/>."""
+    def logout() {
+        signOut();
+        loggedIn = False;
+        goSurface("");
+        authTick = authTick + 1;
     }
 
     """On mount: read local_mode() once. Local desktop mints an in-process
@@ -95,6 +106,7 @@ def:pub app -> JsxElement {
                 break;
             }
         }
+        localMode = lm;
         loggedIn = ok or jacIsLoggedIn();
         checking = False;
     }
@@ -159,6 +171,7 @@ def:pub app -> JsxElement {
         }
         return <Landing
             onPick={lambda(s: str) { goSurface(s); }}
+            onLogout={None if localMode else logout}
         />;
     }
     # Production gate for logged-out visitors (or expired session).

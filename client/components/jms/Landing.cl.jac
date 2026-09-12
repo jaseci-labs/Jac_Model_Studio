@@ -50,7 +50,7 @@ sv import from ....server.jms.jms_projects { list_projects }
 sv import from ....server.core.jobs { active_jobs }
 sv import from ....server.cloud.cloudruns { list_cloud_runs }
 
-def:pub Landing(onPick: any = None) -> JsxElement {
+def:pub Landing(onPick: any = None, onLogout: Callable[([], None)] | None = None) -> JsxElement {
     has glance: str = "",
         running: int = 0;
 
@@ -78,6 +78,12 @@ def:pub Landing(onPick: any = None) -> JsxElement {
         glance = " · ".join(parts);
     }
 
+    """Pill-nav SIGN OUT. Rendered only when the gate passes `onLogout` (prod);
+    local mode passes None, so the button never exists there."""
+    def handleLogout(_e: MouseEvent) {
+        if onLogout is not None { onLogout(); }
+    }
+
     useEffect(lambda {
         loadGlance();
         return lambda {};
@@ -87,6 +93,11 @@ def:pub Landing(onPick: any = None) -> JsxElement {
         <div className="jms-pillnav reveal stagger-1">
             <span className="jms-label">JAC · MODEL STUDIO</span>
             <ThemeSwitcher />
+            {if onLogout is not None {
+                <button key="signout" type="button" className="jms-btn"
+                    aria-label="Sign out" title="sign out"
+                    onClick={handleLogout}>⏻ SIGN OUT</button>
+            }}
         </div>
 
         <div className="jms-hero-grid" style={{"paddingTop": "84px"}}>

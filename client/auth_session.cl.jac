@@ -10,7 +10,7 @@ symbols; without that, importers (frontend / Chat / AppShell) fail at runtime
 with `does not provide an export named '…'` and the UI never paints.
 """
 
-import from "@jac/runtime" { jacIsLoggedIn, jacLogout, __setLocalStorage }
+import from "@jac/runtime" { jacIsLoggedIn, jacLogout, __setLocalStorage, __removeLocalStorage }
 sv import from ..server.core.auth { local_mode, local_session, session_alive }
 
 glob:pub AUTH_EVENT: str = "jac-auth-expired";
@@ -100,6 +100,18 @@ def:pub signalExpired() {
         w: any = window;
         w.dispatchEvent(new(CustomEvent, AUTH_EVENT));  # jac:ignore[E1053]
     } except Exception {}
+}
+
+"""User-initiated sign-out (prod only; the hub hides the control in local mode).
+jac-scale has no /user/logout or token revocation, so ending the session is
+client-side: `jacLogout()` drops `jac_token` + the runtime RPC cache, and the
+user-scoped localStorage keys go too so the next account starts clean. Device
+prefs (`jacml.mode`, `jms.projects.sort`) are left alone. The caller flips the
+gate back to <Login/>."""
+def:pub signOut() {
+    jacLogout();
+    __removeLocalStorage("jacml.workspace");
+    __removeLocalStorage("jms.projects.q");
 }
 
 """Attempt recovery after a 401. Returns True when the session was restored."""
