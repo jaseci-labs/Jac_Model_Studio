@@ -9,6 +9,8 @@ popover adds a vs-model so the next send streams both side-by-side.
 Popovers are a relative trigger + an absolute panel; a fixed transparent overlay
 behind the panel closes it on an outside click (no Radix dependency here)."""
 
+import from react { useEffect }
+
 def _label(models: list, mid: str) -> str {
     for m in models {
         if str(m.id) == mid { return str(m.label); }
@@ -34,6 +36,22 @@ def:pub ModelPill(
 ) -> JsxElement {
     has pickerOpen: bool = False,
         cmpOpen: bool = False;
+
+    # Escape closes whichever popover is open. Without it a keyboard user had no
+    # way out: the transparent backdrop only answers clicks, and it sits over the
+    # whole page. Listener lives only while a popover is open (effect-local).
+    useEffect(lambda {
+        if not pickerOpen and not cmpOpen { return lambda { }; }
+        doc: any = document;
+        onKey = lambda(e: any) {
+            if str(e.key) == "Escape" {
+                pickerOpen = False;
+                cmpOpen = False;
+            }
+        };
+        doc.addEventListener("keydown", onKey);
+        return lambda { doc.removeEventListener("keydown", onKey); };
+    }, [pickerOpen, cmpOpen]);
 
     return <div className="section-header flex items-center justify-between border-b border-border px-4 py-2.5">
         <div className="flex items-center gap-2">
