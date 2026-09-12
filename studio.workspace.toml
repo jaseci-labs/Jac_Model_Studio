@@ -31,6 +31,12 @@ label = "Qwen3-Coder · 08 SFT (spectrum)"
 path = "../Jac_Model_Experiments/models/qwen-q4"
 adapter = "../Jac_Model_Experiments/experiments/08-nitin-new2-ds/adapter"
 
+[[models.registry]]
+id = "qwen-09-completion-pairs"
+label = "Qwen3-Coder · 09 SFT (08 + completion pairs)"
+path = "../Jac_Model_Experiments/models/qwen-q4"
+adapter = "../Jac_Model_Experiments/experiments/09-completion-pairs/adapter"
+
 # Archived best adapters (Jac_Model_Experiments/experiments/README.md)
 [[models.registry]]
 id = "qwen-04-spectrum-sft"
