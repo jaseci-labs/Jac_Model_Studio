@@ -12,12 +12,11 @@ jaclang streaming runtime does NOT bind the caller's root inside the generator
 body (`[root -->]` sees the system root, not the user's) — every other SSE
 endpoint here (chat_stream) only ever touches the GLOBAL model registry, never
 per-user graph, so this is the first to hit it. Instead we scan the workspace's
-<data_root>/projects/*/project.json for the pid (a 12-hex uuid — an effectively
-unguessable capability token) and read the run's own mlx_config.json (written by
-jms_train for local-mlx runs only) for the base-model path + adapter dir. The
-endpoint is still auth-gated (401 without a token); the pid is the object
-capability. On this single-user desktop box the workspace is shared local storage,
-so this matches how the rest of JMS treats it.
+<data_root>/projects/*/project.json for the pid and read the run's own
+mlx_config.json (written by jms_train for local-mlx runs only) for the base-model
+path + adapter dir. Ownership is still checked against the graph: the endpoint is a
+plain function that returns the generator, and its body (which runs inside the
+request context) refuses any pid not in the caller's own graph.
 
 Only local-mlx runs are chattable: a spheron run writes no mlx_config.json and its
 base weights aren't local, so it resolves to a clean SSE error frame — one that
@@ -37,6 +36,7 @@ import json;
 import from server.core { jobs }
 import from server.core { paths }
 import from server.models { inference }
+import from server.jms.jms_projects { _find_project }
 import from pathlib { Path }
 
 """True iff *adir* holds at least one *.safetensors adapter file (a real adapter
@@ -110,19 +110,17 @@ def _resolve_run(pid: str, rid: str) -> dict {
     return {"ok": False, "error": "unknown project"};
 }
 
-"""Stream a completion from a project run's base model + LoRA adapter. Same SSE
-frame protocol as chat.sv.jac. Guard failures surface as a single error frame;
-generation errors surface via inference.stream_chat's own error frame."""
-def jms_chat_stream(
+"""A one-frame stream, for guard refusals."""
+def _one_frame(frame: dict) -> any {
+    yield frame;
+}
+
+"""The streaming half of jms_chat_stream: resolve the run from disk, then relay
+inference.stream_chat's frames."""
+def _run_stream(
     pid: str, rid: str, messages: list[dict],
-    temperature: float = 0.2, top_p: float = 0.9, max_tokens: int = 1024
+    temperature: float, top_p: float, max_tokens: int
 ) -> any {
-    # Same heavy-slot check as chat.chat_stream (see jobs.heavy_busy).
-    busy = jobs.heavy_busy();
-    if busy {
-        yield {"kind": "error", "text": f"GPU busy: {busy} is running — chat is paused until it finishes"};
-        return;
-    }
     res = _resolve_run(pid, rid);
     if not bool(res["ok"]) {
         yield {"kind": "error", "text": str(res["error"])};
@@ -137,4 +135,28 @@ def jms_chat_stream(
     for frame in gen {
         yield frame;
     }
+}
+
+"""Stream a completion from a project run's base model + LoRA adapter. Same SSE
+frame protocol as chat.sv.jac. Guard failures surface as a single error frame;
+generation errors surface via inference.stream_chat's own error frame.
+
+A plain function that RETURNS a generator (jac-scale streams any returned
+generator): this body runs inside the request context, so `root` is the
+caller's and the ownership check can walk their graph. The generator body runs
+after the context is torn down, so it must not touch `root`."""
+def jms_chat_stream(
+    pid: str, rid: str, messages: list[dict],
+    temperature: float = 0.2, top_p: float = 0.9, max_tokens: int = 1024
+) -> any {
+    # Same heavy-slot check as chat.chat_stream (see jobs.heavy_busy).
+    busy = jobs.heavy_busy();
+    if busy {
+        return _one_frame({"kind": "error", "text": f"GPU busy: {busy} is running — chat is paused until it finishes"});
+    }
+    # The caller must own the project: knowing its pid is not enough.
+    if _find_project(pid) is None {
+        return _one_frame({"kind": "error", "text": "unknown project"});
+    }
+    return _run_stream(pid, rid, messages, temperature, top_p, max_tokens);
 }

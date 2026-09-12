@@ -38,7 +38,6 @@ import from server.core { jobs }
 import from server.core { metrics }
 import server.models.models as models;  # not `import from server.models { models }`: jac check resolves that to the package
 import from server.core { paths }
-import from server.models { inference }
 import from server.jms { jms_llm }
 import from server.jms { jms_plan }
 import from pathlib { Path }
@@ -299,8 +298,6 @@ def start_gen(
         if not grab["ok"] {
             return {"ok": False, "jid": "", "error": "GPU busy: " + str(grab["busy_with"]) + " is running"};
         }
-        # The worker loads its own copy; don't keep ours resident beside it.
-        inference.evict();
     }
     pr = jms_llm.price_for(model);
     env: dict = {

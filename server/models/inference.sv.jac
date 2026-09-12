@@ -32,6 +32,7 @@ glob _S: dict = {
     "tokenizer": None,
     "current_id": "",
     "load_seconds": 0.0,
+    "evict_pending": False,
     "lock": threading.Lock(),
 };
 
@@ -266,11 +267,35 @@ def _unload_locked() {
     _S["model"] = None;
     _S["tokenizer"] = None;
     _S["current_id"] = "";
+    _S["evict_pending"] = False;
     gc.collect();
     try {
         import from mlx.core { clear_cache }
         clear_cache();
     } except Exception {}
+}
+
+"""Free the resident model because a heavy GPU job just claimed the slot (called
+by jobs.heavy_acquire). Never waits long: if a chat stream holds the model lock,
+the eviction is marked pending instead; the stream stops at its next token and
+unloads before it releases the lock. Returns True when handled right away."""
+def evict(timeout: float = 2.0) -> bool {
+    if not _S["lock"].acquire(timeout=timeout) {
+        _S["evict_pending"] = True;
+        return False;
+    }
+    try {
+        if _S["current_id"] or _S["model"] is not None { _unload_locked(); }
+        _S["evict_pending"] = False;
+    } finally {
+        _S["lock"].release();
+    }
+    return True;
+}
+
+"""Carry out a deferred evict(). Call with the lock HELD, just before releasing."""
+def _evict_if_pending_locked() {
+    if _S["evict_pending"] { _unload_locked(); }
 }
 
 """Repair residency bookkeeping after a failed load. Call with the lock HELD.
@@ -319,32 +344,12 @@ def load_sync(model_id: str, path: str, adapter_path: str = "") -> float {
         _reconcile_locked();
         raise e;
     } finally {
+        _evict_if_pending_locked();
         _S["lock"].release();
     }
 }
 
 def current_id() -> str { return _S["current_id"] as str; }
-
-"""Drop the resident model, if any, so a detached MLX job (gen / train / eval
-worker) that loads its OWN copy doesn't sit next to this one — two 16GB copies
-plus training on a 48GB box is the swap wedge. Waits at most *timeout_s* for the
-model lock (an in-flight stream holds it) and then gives up rather than stalling
-the job start. Returns the evicted residency key, "" when nothing was resident or
-the lock was busy."""
-def evict(timeout_s: float = 5.0) -> str {
-    if not _S["current_id"] { return ""; }
-    if not _S["lock"].acquire(timeout=timeout_s) { return ""; }
-    try {
-        old = str(_S["current_id"]);
-        if old {
-            _unload_locked();
-            _S["load_seconds"] = 0.0;
-        }
-        return old;
-    } finally {
-        _S["lock"].release();
-    }
-}
 
 """Peak RSS → GB. ru_maxrss is bytes on macOS, kilobytes on Linux."""
 def _rss_to_gb(rss: float) -> float {
@@ -471,6 +476,9 @@ def stream_chat(
         ntok: any = 0;
         ntps: any = 0.0;
         for resp in gen {
+            if _S["evict_pending"] {
+                raise RuntimeError("chat stopped: a heavy GPU job claimed the GPU");
+            }
             # Extract native attrs into locals before yielding (checker crash).
             txt: str = str(resp.text);
             ntok = resp.generation_tokens;
@@ -491,6 +499,7 @@ def stream_chat(
         # would queue behind it. Releasing first makes the error path safe no
         # matter what the consumer does with the frame.
         _reconcile_locked();
+        _evict_if_pending_locked();
         _S["lock"].release();
         held = False;
         yield {"kind": "error", "text": str(e)};
@@ -498,6 +507,7 @@ def stream_chat(
         # GeneratorExit (client disconnect) is a BaseException, so it skips the
         # except block above and lands here with the lock still held — release it.
         if held {
+            _evict_if_pending_locked();
             _S["lock"].release();
         }
     }

@@ -29,14 +29,46 @@ class FakeTransport:
         return supervisor.subprocess.CompletedProcess([cmd], rc, "", "")
 
 
-def _sup(run_dir):
+def _sup(run_dir, **spec_extra):
     spec = {"run_id": "r1", "name": "t", "mode": "sft", "remote_dir": "studio-run-t-r1",
             "launch_cmd": "python train_sft.py", "policy": {}}
+    spec.update(spec_extra)
     with open(os.path.join(run_dir, "runspec.json"), "w") as f:
         json.dump(spec, f)
-    s = supervisor.Supervisor(run_dir, no_api=True)
+    s = supervisor.Supervisor(run_dir)
     s.transport = FakeTransport()
     return s
+
+
+class ByoClusterTests(unittest.TestCase):
+    """No vendor API: the box is reached only through runspec ssh_override, and
+    terminate just marks the run (the cluster is the user's own)."""
+
+    def test_wait_vm_requires_ssh_override(self):
+        with tempfile.TemporaryDirectory() as d:
+            s = _sup(d)
+            with self.assertRaises(supervisor.RunFailed):
+                s.phase_wait_vm()
+
+    def test_wait_vm_with_ssh_override_reaches_ssh_and_starts_billing(self):
+        with tempfile.TemporaryDirectory() as d:
+            s = _sup(d, ssh_override="ssh user@fake")
+            s.phase_wait_vm()
+            self.assertIn("true", s.transport.cmds)
+            self.assertTrue(s.st["cost"]["started_billing"])
+
+    def test_terminate_marks_vm_terminated(self):
+        with tempfile.TemporaryDirectory() as d:
+            s = _sup(d)
+            s.terminate_vm(reason="run succeeded")
+            self.assertTrue(s.st["vm_terminated"])
+            self.assertTrue(s.st["cost"]["terminated_at"])
+
+    def test_terminate_policy_never_keeps_the_box(self):
+        with tempfile.TemporaryDirectory() as d:
+            s = _sup(d, policy={"auto_terminate": "never"})
+            s.terminate_vm(reason="run succeeded")
+            self.assertFalse(s.st["vm_terminated"])
 
 
 class LaunchTests(unittest.TestCase):

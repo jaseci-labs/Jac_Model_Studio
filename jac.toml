@@ -23,8 +23,6 @@ tailwindcss = "4.3.3"
 "@tailwindcss/vite" = "4.3.3"
 tw-animate-css = "latest"
 recharts = "latest"
-clsx = "latest"
-tailwind-merge = "latest"
 # Self-hosted fonts for the JMS theme system (client/styles/jms.css) — offline webview, so no
 # Google Fonts URLs; Vite inlines these into @font-face rules at build time.
 "@fontsource-variable/space-grotesk" = "latest"

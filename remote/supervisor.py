@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Orchestration supervisor for one remote GPU training run (Spheron.ai VM).
+"""Orchestration supervisor for one remote GPU training run (BYO cluster, ssh).
 
 Spawned detached by the studio server:
     Popen(shell=True, start_new_session=True, stdout=<run-dir>/run-<mode>.log)
@@ -14,16 +14,16 @@ in its run dir:
   writes  train.log / metrics.jsonl mirrors (byte-offset incremental)
   appends "__EXIT__ <code>" to run-<mode>.log at finalize
 
-Spheron REST API is only used for: deployment status/sshCommand polling,
-can-terminate check, and DELETE. There is NO exec/log API -- SSH from this
-Mac is the only channel to the VM.
+The box is reached only through runspec ssh_override; there is no vendor API.
+SSH from this Mac is the only channel to the VM, and "terminate" just marks
+the run's vm_terminated (the cluster is the user's own).
 
 Transport seam: the binaries used for ssh/rsync/scp come from env
 JMS_SSH_BIN / JMS_RSYNC_BIN / JMS_SCP_BIN (default ssh/rsync/scp) so tests
 can substitute a local transport shim with the same argv surface.
 
 stdlib only. CLI:
-    supervisor.py --run-dir <dir> [--resume] [--pull-only] [--no-spheron-api]
+    supervisor.py --run-dir <dir> [--resume] [--pull-only]
 """
 
 import argparse
@@ -41,8 +41,6 @@ import time
 SSH_BIN = os.environ.get("JMS_SSH_BIN", "ssh")
 RSYNC_BIN = os.environ.get("JMS_RSYNC_BIN", "rsync")
 SCP_BIN = os.environ.get("JMS_SCP_BIN", "scp")
-
-DEFAULT_API_URL = "https://api.spheron.network"
 
 # ssh flags that consume a value argument
 _SSH_VAL_FLAGS = {"-p", "-i", "-o", "-l", "-F", "-J", "-E", "-L", "-R", "-W", "-b", "-c", "-D", "-e", "-m", "-Q", "-S"}
@@ -171,78 +169,13 @@ class Transport:
         return p
 
 
-class SpheronAPI:
-    """Minimal Bearer-auth client for the 4 endpoints the supervisor needs."""
-
-    def __init__(self):
-        self.url = os.environ.get("SPHERON_API_URL", DEFAULT_API_URL).rstrip("/")
-        self.key = os.environ.get("SPHERON_API_KEY", "")
-
-    def _request(self, method, path):
-        import urllib.request
-        import urllib.error
-        req = urllib.request.Request(
-            self.url + path, method=method,
-            headers={"Authorization": "Bearer %s" % self.key,
-                     "Content-Type": "application/json"})
-        try:
-            with urllib.request.urlopen(req, timeout=30) as r:
-                body = r.read().decode("utf-8", "replace")
-        except urllib.error.HTTPError as e:
-            body = e.read().decode("utf-8", "replace")
-            raise RuntimeError("HTTP %s %s %s: %s" % (e.code, method, path, body[:300]))
-        except Exception as e:
-            raise RuntimeError("%s %s: %s" % (method, path, e))
-        try:
-            return json.loads(body) if body.strip() else {}
-        except ValueError:
-            return {"raw": body}
-
-    def deployment(self, dep_id):
-        return self._request("GET", "/api/deployments/%s" % dep_id)
-
-    def can_terminate(self, dep_id):
-        return self._request("GET", "/api/deployments/%s/can-terminate" % dep_id)
-
-    def delete(self, dep_id):
-        return self._request("DELETE", "/api/deployments/%s" % dep_id)
-
-
-def _dep_status(dep):
-    for k in ("status", "state", "cur_state"):
-        v = dep.get(k)
-        if isinstance(v, str) and v:
-            return v.lower()
-    return ""
-
-
-def _dep_ssh(dep):
-    """Defensively extract an ssh command from a deployment dict."""
-    for k in ("sshCommand", "ssh_command", "ssh", "sshCmd"):
-        v = dep.get(k)
-        if isinstance(v, str) and v.strip():
-            return v.strip()
-    conn = dep.get("connection")
-    if isinstance(conn, dict):
-        for k in ("ssh", "sshCommand", "ssh_command"):
-            v = conn.get(k)
-            if isinstance(v, str) and v.strip():
-                return v.strip()
-    return ""
-
-
-RUNNING_STATES = ("running", "active", "ready", "deployed", "healthy")
-DEAD_STATES = ("terminated", "failed", "deleted", "destroyed", "error", "closed", "stopped")
-
-
 class Supervisor:
     PHASES = ["wait_vm", "provision", "launch", "monitor", "pull", "terminate", "finalize"]
 
-    def __init__(self, run_dir, resume=False, pull_only=False, no_api=False):
+    def __init__(self, run_dir, resume=False, pull_only=False):
         self.run_dir = os.path.abspath(run_dir)
         self.resume = resume
         self.pull_only = pull_only
-        self.no_api = no_api
         self.spec = read_json(os.path.join(self.run_dir, "runspec.json"))
         if not self.spec:
             print("fatal: cannot read runspec.json in %s" % self.run_dir, file=sys.stderr)
@@ -251,7 +184,6 @@ class Supervisor:
         self.mode = self.spec.get("mode", "sft")
         self.name = self.spec.get("name", self.spec.get("run_id", ""))
         self.remote_dir = self.spec.get("remote_dir", "studio-run")
-        self.api = None if no_api else SpheronAPI()
         self.transport = None
         self.exit_code = None          # remote train exit code, when known
         self._stop_reason = None
@@ -355,8 +287,7 @@ class Supervisor:
 
     # -- transport resolution -----------------------------------------------
     def resolve_transport(self, require=True):
-        """ssh_override always wins for transport (even in API mode -- the
-        API then only supplies deployment status). Else API sshCommand."""
+        """Transport from runspec ssh_override (else the ssh recorded in status)."""
         if self.transport:
             return self.transport
         ovr = self.spec.get("ssh_override", "")
@@ -368,18 +299,8 @@ class Supervisor:
         if ssh:
             self.transport = Transport(ssh, self.run_dir)
             return self.transport
-        if self.api and self.st["deployment_id"]:
-            try:
-                dep = self.api.deployment(self.st["deployment_id"])
-                ssh = _dep_ssh(dep)
-                if ssh:
-                    self.st["ssh"] = ssh
-                    self.transport = Transport(ssh, self.run_dir)
-                    return self.transport
-            except Exception as e:
-                _log("resolve_transport: api error: %s" % e)
         if require:
-            raise RunFailed("no ssh transport available (no ssh_override and no API sshCommand)")
+            raise RunFailed("no ssh transport available (runspec has no ssh_override)")
         return None
 
     # -- phase 1: wait_vm ----------------------------------------------------
@@ -387,36 +308,9 @@ class Supervisor:
         self.set_phase("wait_vm", "waiting for VM")
         timeout = float(self.policy.get("ssh_wait_timeout_s", 900))
         deadline = time.time() + timeout
-        if self.no_api:
-            if not self.spec.get("ssh_override"):
-                raise RunFailed("--no-spheron-api requires runspec ssh_override")
-            self.resolve_transport()
-        else:
-            dep_id = self.st["deployment_id"]
-            if not dep_id:
-                raise RunFailed("runspec has no deployment_id")
-            while True:
-                self.check_control()
-                try:
-                    dep = self.api.deployment(dep_id)
-                except Exception as e:
-                    _log("wait_vm: api poll error: %s" % e)
-                    dep = {}
-                stt = _dep_status(dep)
-                ssh = _dep_ssh(dep)
-                self.st["message"] = "vm status: %s" % (stt or "unknown")
-                self.write_status()
-                if stt in DEAD_STATES:
-                    raise RunFailed("deployment %s is %s before boot" % (dep_id, stt))
-                if stt in RUNNING_STATES and (ssh or self.spec.get("ssh_override")):
-                    if ssh and not self.spec.get("ssh_override"):
-                        self.st["ssh"] = ssh
-                    break
-                if time.time() > deadline:
-                    self.terminate_vm(reason="wait_vm timeout")
-                    raise RunFailed("timed out waiting for VM to run (%.0fs)" % timeout)
-                time.sleep(min(10, float(self.policy.get("poll_interval_s", 10))))
-            self.resolve_transport()
+        if not self.spec.get("ssh_override"):
+            raise RunFailed("runspec has no ssh_override")
+        self.resolve_transport()
         self.start_billing()
         # ssh reachability loop
         self.st["message"] = "waiting for ssh"
@@ -604,18 +498,7 @@ class Supervisor:
                 down = time.time() - ssh_fail_since
                 _log("monitor: ssh unreachable for %.0fs" % down)
                 if down > 300:
-                    dead = False
-                    if self.no_api:
-                        dead = True
-                    elif self.api and self.st["deployment_id"]:
-                        try:
-                            stt = _dep_status(self.api.deployment(self.st["deployment_id"]))
-                            dead = stt in DEAD_STATES
-                        except Exception as e:
-                            _log("monitor: api check failed: %s" % e)
-                    if dead:
-                        raise RunFailed("vm lost (ssh dead >5min%s)" % (
-                            "" if self.no_api else ", api says deployment dead"), pull_first=True)
+                    raise RunFailed("vm lost (ssh dead >5min)", pull_first=True)
                 # back off, don't fail
                 self.write_status()
                 time.sleep(min(60, poll * 2))
@@ -738,34 +621,9 @@ class Supervisor:
         if self.st.get("vm_terminated"):
             return
         self.set_phase("terminate", reason or "terminating VM")
-        if self.no_api or self.api is None:
-            _log("terminate: --no-spheron-api, marking vm_terminated")
-            self.st["vm_terminated"] = True
-            self.st["cost"]["terminated_at"] = _now_iso()
-            self.write_status()
-            return
-        dep_id = self.st["deployment_id"]
-        if not dep_id:
-            return
-        deadline = time.time() + 600  # bounded 10 min on can-terminate
-        while time.time() < deadline:
-            try:
-                chk = self.api.can_terminate(dep_id)
-                if bool(chk.get("canTerminate", chk.get("can_terminate", False))):
-                    break
-                _log("terminate: minimum runtime not met (remaining=%s), waiting"
-                     % chk.get("timeRemaining"))
-            except Exception as e:
-                _log("terminate: can-terminate error: %s" % e)
-            time.sleep(15)
-        try:
-            self.api.delete(dep_id)
-            self.st["vm_terminated"] = True
-            self.st["cost"]["terminated_at"] = _now_iso()
-            _log("terminate: deployment %s deleted" % dep_id)
-        except Exception as e:
-            self.st["error"] = self.st["error"] or ("terminate failed: %s" % e)
-            _log("terminate: DELETE failed: %s" % e)
+        _log("terminate: BYO cluster (no vendor API), marking vm_terminated")
+        self.st["vm_terminated"] = True
+        self.st["cost"]["terminated_at"] = _now_iso()
         self.write_status()
 
     # -- phase 7: finalize ---------------------------------------------------
@@ -845,21 +703,11 @@ class Supervisor:
 
     # -- resume probing ------------------------------------------------------
     def compute_resume_phase(self):
-        """Probe remote + API to decide where to jump. Returns phase name."""
+        """Probe the remote to decide where to jump. Returns phase name."""
         prev = read_json(self.status_path(), {}) or {}
         if prev.get("status") in ("done", "failed", "stopped"):
             _log("resume: previous run already terminal (%s); nothing to do" % prev["status"])
             return None
-        # is the deployment even alive?
-        if not self.no_api and self.api and self.st["deployment_id"]:
-            try:
-                stt = _dep_status(self.api.deployment(self.st["deployment_id"]))
-                if stt in DEAD_STATES:
-                    raise RunFailed("resume: deployment already %s; finalizing from local mirrors" % stt)
-            except RunFailed:
-                raise
-            except Exception as e:
-                _log("resume: api probe error (continuing): %s" % e)
         try:
             self.resolve_transport()
         except RunFailed:
@@ -935,10 +783,8 @@ def main():
     ap.add_argument("--run-dir", required=True)
     ap.add_argument("--resume", action="store_true")
     ap.add_argument("--pull-only", action="store_true")
-    ap.add_argument("--no-spheron-api", action="store_true")
     args = ap.parse_args()
-    sup = Supervisor(args.run_dir, resume=args.resume, pull_only=args.pull_only,
-                     no_api=args.no_spheron_api)
+    sup = Supervisor(args.run_dir, resume=args.resume, pull_only=args.pull_only)
     sys.exit(sup.run())
 
 

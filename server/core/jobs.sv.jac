@@ -21,6 +21,7 @@ import from server.core { audit }
 import from server.core { metrics }
 import from server.core { paths }
 import server.models.models as models;  # not `import from server.models { models }`: jac check resolves that to the package
+import server.models.inference as inference;
 import from pathlib { Path }
 import from signal { SIGTERM }
 import from subprocess { Popen, STDOUT, PIPE }
@@ -346,7 +347,7 @@ free and both claim it). Both are released on every path, and the guard self-hea
 # the spawned job's status reaching "running": during it a detached holder's
 # job_file does not yet say running, so _heavy_live reads it as stale. Narrowing
 # that needs a job-file state machine, not a lock change."""
-def heavy_acquire(holder: str, job_file: Path | None = None, runlog: Path | None = None) -> dict {
+def _heavy_claim(holder: str, job_file: Path | None = None, runlog: Path | None = None) -> dict {
     _heavy_mutex.acquire();
     try {
         lf = _heavy_lock_file();
@@ -375,6 +376,17 @@ def heavy_acquire(holder: str, job_file: Path | None = None, runlog: Path | None
     } finally {
         _heavy_mutex.release();
     }
+}
+
+"""Claim the heavy slot (_heavy_claim), then evict any chat model resident in THIS
+server (inference.evict) so the job never shares the GPU + 48 GB with it. Chat and
+warm refuse while heavy_busy(), so nothing reloads it until the slot is released.
+Runs after the claim's mutex + guard are dropped: evict may wait briefly on the
+model lock, and holding the 15s-stale guard meanwhile would invite a steal."""
+def heavy_acquire(holder: str, job_file: Path | None = None, runlog: Path | None = None) -> dict {
+    res = _heavy_claim(holder, job_file, runlog);
+    if bool(res["ok"]) { inference.evict(); }
+    return res;
 }
 
 """Label of the live heavy-slot holder, "" when the slot is free. Read-only (never
