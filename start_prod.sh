@@ -44,7 +44,8 @@ if ! ulimit -S -n 65536 2>/dev/null; then
 fi
 echo "[start_prod.sh] open-file limit: soft=$(ulimit -Sn) hard=$(ulimit -Hn)"
 
-# Bind API on loopback; put Caddy/nginx in front for TLS (see deploy/Caddyfile).
+# Put Caddy/nginx in front for TLS (see deploy/Caddyfile). jac start has no host
+# option and always listens on 0.0.0.0, so firewall these ports from outside.
 API_PORT="${JAC_API_PORT:-8001}"
 UI_PORT="${JAC_UI_PORT:-8000}"
 

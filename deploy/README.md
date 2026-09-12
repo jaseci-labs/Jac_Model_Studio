@@ -6,7 +6,7 @@ Single-VM, multi-tenant deploy behind Caddy. Files in this dir:
 |------|---------|
 | `env.example` | Environment/secrets template → `/etc/jac-studio/env` (mode 0600) |
 | `studio.service` | systemd unit running `start_prod.sh` |
-| `Caddyfile` | TLS reverse proxy, binds the app to loopback |
+| `Caddyfile` | TLS reverse proxy to 127.0.0.1:8000. The app itself listens on 0.0.0.0 (jac-scale has no host option), so firewall :8000 |
 | `studio-backup.service` / `studio-backup.timer` | daily graph backup |
 | `logrotate/jac-studio` | rotation for the audit trail + run logs |
 

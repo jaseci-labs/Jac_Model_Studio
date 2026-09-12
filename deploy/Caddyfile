@@ -10,8 +10,13 @@
 # Splitting paths onto :8001 sent every API call to a closed port (502), and the
 # bare `handle /` matched only "/" itself, so /assets/* and /cl/* got nothing.
 #
-# jac-scale binds 0.0.0.0 unless [plugins.scale.server] host is set, so also
-# firewall :8000 from the outside (only Caddy should reach it).
+# The app always listens on 0.0.0.0:8000. `jac start` (jaclang 0.16.1 /
+# jac-scale 0.2.23) has no host flag, env var or jac.toml key for the local
+# server: JacAPIServerCore.start calls run_server(port=...) with no host, so
+# uvicorn gets JFastApiServer.run_server's '0.0.0.0' default.
+# [plugins.scale.server] host is parsed but never reaches that call (the
+# CLI --host is jac-client's mobile live-reload option). So firewall :8000
+# from the outside (only Caddy should reach it), e.g. `ufw deny 8000`.
 
 studio.example.com {
 	reverse_proxy 127.0.0.1:8000
